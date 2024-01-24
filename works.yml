@@ -1,0 +1,140 @@
+#https://github.com/typst/hayagriva/blob/main/docs/file-format.md
+
+vscode-buffer:
+  type: web
+  title: Text Buffer Reimplementation
+  author: Peng Lyu
+  date: 2018-03-23
+  url: https://code.visualstudio.com/blogs/2018/03/23/text-buffer-reimplementation
+
+polog:
+  type: article
+  title: Pure Operation-Based Replicated Data Types
+  author: ["Baquero, Carlos", "Almeida, Paulo Sergio", "Shoker, Ali"]
+  date: 2017
+  arxiv: 1710.04469
+
+fugue:
+  type: article
+  title: "The Art of the Fugue: Minimizing Interleaving in Collaborative Text Editing"
+  author: ["Weidner, Matthew", "Kleppmann, Martin"]
+  date: 2023
+  arxiv: 2305.00583
+
+shapiro:
+  type: article
+  title: "Conflict-free Replicated Data Types"
+  author: ["Shapiro, Marc", "Preguiça, Nuno", "Baquero, Carlos", "Zawirski, Marek"]
+  date: 2011-08-25
+  issn: 0249-6399
+
+reference-reg:
+  type: repository
+  title: "Reference Eg-walker implementation in Typescript"
+  author: ["Gentle, Joseph"]
+  url: https://github.com/josephg/reference-reg
+
+editing-traces:
+  type: repository
+  title: "Editing Traces (github repository)"
+  author: ["Gentle, Joseph"]
+  url: https://github.com/josephg/editing-traces
+
+dt:
+  type: repository
+  title: "Diamond Types: A fully featured realtime editing library"
+  author: ["Gentle, Joseph"]
+  url: https://github.com/josephg/diamond-types
+
+dt-crdt:
+  type: repository
+  title: "Diamond Types sequence CRDT implementation"
+  author: ["Gentle, Joseph"]
+  url: https://github.com/josephg/diamond-types/tree/master/crates/diamond-types-crdt
+
+am-converter:
+  type: repository
+  title: "Automerge Converter: An event graph replay function for Automerge"
+  author: ["Gentle, Joseph"]
+  url: https://github.com/josephg/automerge-converter/
+
+cola:
+  type: repository
+  title: "cola CRDT library"
+  author: ["Mazzarini, Riccardo"]
+  url: https://github.com/nomad/cola
+
+yjs:
+  type: web
+  title: "Yjs Shared Editing"
+  author: ["Jahns, Kevin"]
+  url: https://yjs.dev/
+
+jsonjoy:
+  type: web
+  title: "json-joy: Real-time JSON apps"
+  author: ["Dalecky, Vadim"]
+  url: https://jsonjoy.com/
+
+automerge:
+  type: web
+  title: "Automerge CRDT"
+  author: ["Kleppmann, Martin", "et al"]
+  # author: ["Jahns, Kevin"]
+  url: https://automerge.org/
+
+automerge-storage:
+  type: web
+  title: "Automerge Binary Document Format"
+  author: ["Good, Alex", "Jeffery, Andrew"]
+  # author: ["Jahns, Kevin"]
+  url: https://automerge.org/automerge-binary-format-spec/
+
+cola-gtree:
+  type: blog
+  title: "cola: a text CRDT for real-time collaborative editing"
+  author: ["Mazzarini, Riccardo"]
+  url: https://nomad.foo/blog/cola#an-even-better-alternative-g-trees
+
+crdts-go-brrr:
+  type: blog
+  title: "5000x faster CRDTs: An Adventure in Optimization"
+  author: ["Gentle, Joseph"]
+  url: https://josephg.com/blog/crdts-go-brrr/
+
+crdts-hard-parts:
+  type: Misc
+  title: "CRDTs: The Hard Parts"
+  author: ["Kleppmann, Martin"]
+  date: 2020-07-06
+  url: https://martin.kleppmann.com/2020/07/06/crdt-hard-parts-hydra.html
+  parent:
+    - type: Conference
+      title: "Hydra distributed computing conference"
+
+# rga:
+#   type: article
+#   author: ["Roh, Hyun-Gul", "Jeon, Myeongjae", "Kim, Jin-Soo", "Lee, Joonwon"]
+#   title: "Replicated Abstract Data Types: Building Blocks for Collaborative Applications"
+#   serial-number:
+#     doi: "10.1016/j.jpdc.2010.12.006"
+#     issn: 0743-7315
+#   date: 2011
+
+# @article{Roh2011RGA,
+#   author = {Roh, Hyun-Gul and Jeon, Myeongjae and Kim, Jin-Soo and Lee, Joonwon},
+#   title = {Replicated Abstract Data Types: Building Blocks for Collaborative Applications},
+#   journal = {Journal of Parallel and Distributed Computing},
+#   volume = {71},
+#   number = {3},
+#   month = mar,
+#   year = {2011},
+#   issn = {0743-7315},
+#   pages = {354--368},
+#   publisher = {Elsevier},
+#   doi = {10.1016/j.jpdc.2010.12.006},
+#   pdf = {http://csl.snu.ac.kr/papers/jpdc11.pdf},
+#   keywords = {text-editing, RGA}
+# }
+
+
