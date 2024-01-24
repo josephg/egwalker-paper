@@ -1,0 +1,77 @@
+{
+  "dt_merge": {
+    "automerge-paper": 0.7918098438506807,
+    "seph-blog1": 1.2815987168820155,
+    "clownschool": 4.1308550938461535,
+    "friendsforever": 2.9577801672222215,
+    "git-makefile": 15.17514401,
+    "node_nodecc": 12.009441208000002
+  },
+  "dt_local": {
+    "automerge-paper": 3.8396173342857103,
+    "seph-blog1": 2.598144307999999,
+    "clownschool_flat": 0.45729516085386707,
+    "friendsforever_flat": 0.20792345129110198
+  },
+  "dt_local_rle": {
+    "automerge-paper": 0.6405764650810979,
+    "seph-blog1": 0.9776583675078792,
+    "clownschool_flat": 0.2258372762526183,
+    "friendsforever_flat": 0.16348489856064471
+  },
+  "dt-crdt_process_remote_edits": {
+    "automerge-paper": 7.16465268375,
+    "seph-blog1": 7.267163748571431,
+    "clownschool": 2.1904978660869565,
+    "friendsforever": 1.8471285005530371,
+    "git-makefile": 13.7349791425,
+    "node_nodecc": 45.531077465
+  },
+  "dt-crdt_local": {
+    "automerge-paper": 21.19139933333333,
+    "seph-blog1": 15.0929091975,
+    "clownschool_flat": 2.4683935376190473,
+    "friendsforever_flat": 0.9082007437575337
+  },
+  "dt_ff_on": {
+    "automerge-paper": 0.24319341821815765,
+    "seph-blog1": 0.435778973414777,
+    "clownschool": 4.131100194615387,
+    "friendsforever": 2.8185659877777773,
+    "git-makefile": 14.06220203,
+    "node_nodecc": 8.749748785000001
+  },
+  "dt_ff_off": {
+    "automerge-paper": 3.863642949999999,
+    "seph-blog1": 7.04797987125,
+    "clownschool": 4.900672292727271,
+    "friendsforever": 3.506519129999999,
+    "git-makefile": 14.099610945,
+    "node_nodecc": 30.012588405000002
+  },
+  "automerge_local": {
+    "automerge-paper": 128.45114919,
+    "seph-blog1": 178.40443912,
+    "clownschool_flat": 14.701853973333332,
+    "friendsforever_flat": 13.752826576666662
+  },
+  "automerge_remote": {
+    "automerge-paper": 164.26032016,
+    "seph-blog1": 200.91015786000003,
+    "clownschool": 676.61514948,
+    "friendsforever": 87.73340798000001,
+    "node_nodecc": 448.50248824
+  },
+  "cola_local": {
+    "automerge-paper": 6.1610234125,
+    "seph-blog1": 4.095725552727271,
+    "clownschool_flat": 0.9752274926570057,
+    "friendsforever_flat": 0.8568268368139288
+  },
+  "cola-nocursor_local": {
+    "automerge-paper": 18.258659700000003,
+    "seph-blog1": 12.244735005,
+    "clownschool_flat": 2.2488704266666657,
+    "friendsforever_flat": 2.21218457
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "op_stats": {
+    "entry_byte_size": 64,
+    "len": 3650,
+    "capacity": 4096
+  },
+  "graph_stats": {
+    "entry_byte_size": 72,
+    "len": 2405,
+    "capacity": 4096
+  },
+  "aa_stats": {
+    "entry_byte_size": 32,
+    "len": 1463,
+    "capacity": 2048
+  },
+  "num_insert_keystrokes": 23720,
+  "num_delete_keystrokes": 2358,
+  "total_keystrokes": 26078,
+  "concurrency_estimate": 0.44865403,
+  "graph_rle_size": 3685,
+  "num_agents": 2
+}
