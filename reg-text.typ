@@ -57,7 +57,7 @@ Existing collaboration algorithms are either slow to merge files that have diver
 We introduce Eg-walker, a collaboration algorithm for text that achieves the best of both the OT and the CRDT worlds: it avoids the overheads of CRDTs while simultaneously offering fast merges.
 Our implementation of Eg-walker outperforms existing CRDT and OT algorithms in most editing scenarios, while also using less memory, having smaller file sizes, and supporting peer-to-peer collaboration without a central server.
 *(TODO: quantify the performance improvement?)*
-Our result makes it feasible for collaborative text editors to retain keystroke-granularity editing history, and to reconstruct the document at arbitrary points in time by replaying that history.
+By offering performance that is competitive with centralised algorithms, our result paves the way towards the widespread adoption of peer-to-peer collaboration software.
 
 
 = Introduction
@@ -117,13 +117,31 @@ Instead of transforming one operation with respect to one other operation, as in
 In fact, we use a CRDT to implement this data structure.
 However, unlike existing algorithms, we only invoke the CRDT to perform merges, and we avoid the CRDT overhead whenever operations are not concurrent (which is the common case in most editing workflows).
 
+The fact that both sequential operations and large merges are fast makes Eg-walker suitable for both real-time collaboration and offline work.
+Moreover, since Eg-walker assumes no central server, it can be used over a peer-to-peer network.
+Although all existing CRDTs and a few OT algorithms can be used peer-to-peer, most of them have poor performance compared to the centralised OT used in production software such as Google Docs.
+In contrast, Eg-walker's performance matches or surpasses that of centralised algorithms.
+It therefore paves the way towards the widespread adoption of peer-to-peer collaboration software, and perhaps overcoming the dominance of centralised cloud software that exists in the market today.
+
+In this paper we focus on collaborative editing of plain text files, although we believe that our approach could be generalised to other file types such as rich text, spreadsheets, graphics, presentations, CAD drawings, etc.
 This paper makes the following contributions:
 
 - TODO
 - We unify the fields of OT and CRDT, which to date have been largely separate research areas, by demonstrating how to combine the strengths of both in a single algorithm.
 
+// Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
+
 /*
 = Related Work
+
+// Explain relationship to merging in version control systems such as Git, Darcs, etc.
+
+// https://neil.fraser.name/writing/sync/eng047-fraser.pdf
+// https://neil.fraser.name/writing/sync/
+// Some discussion of Differential Sync in http://archagon.net/blog/2018/03/24/data-laced-with-history/
+
+// Raph Levien's unified theory of CRDT and OT
+// https://medium.com/@raphlinus/towards-a-unified-theory-of-operational-transformation-and-crdt-70485876f72f
 
 Most practical implementations of OT require a central server to impose a total order on operations.
 Although it is possible to perform OT in a peer-to-peer context without a central server, such algorithms are challenging to reason about, as evidenced by the fact that many published peer-to-peer OT algorithms later turned out to be flawed @Imine2003 @Oster2006TTF.
