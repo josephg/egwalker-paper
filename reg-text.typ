@@ -9,8 +9,12 @@
 #import "charts.typ"
 #show: thmrules
 
-#set page(numbering: "1")
-
+#set page(
+paper: "a4",
+numbering: "1",
+margin: (x: 50pt),
+)
+#set text(9pt)
 #set heading(numbering: "1.a")
 
 #let definition = thmbox("definition", "Definition",
@@ -43,6 +47,8 @@
 #align(center, text(15pt)[
   *DRAFT DRAFT DO NOT PUBLISH*
 ])
+
+#columns(2)[
 
 #pad(left: 2em, right: 2em)[
   #align(center)[*Abstract*]
@@ -2016,5 +2022,6 @@ function integrate(ctx: EditContext, cg: causalGraph.CausalGraph, newItem: Item,
 
 #bibliography(("works.yml", "works.bib"),
   title: "References",
-  style: "ieee"
+  style: "association-for-computing-machinery"
 )
+]
