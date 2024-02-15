@@ -39,7 +39,7 @@ margin: (x: 50pt),
   ],
 
   align(center)[
-    ?Martin Kleppmann? \
+    Martin Kleppmann \
     #link("mailto:martin@kleppmann.com")
   ]
 )
@@ -50,20 +50,94 @@ margin: (x: 50pt),
 
 #columns(2)[
 
-#pad(left: 2em, right: 2em)[
-  #align(center)[*Abstract*]
+#align(center)[*Abstract*]
 
-  Conflict-Free Replicated Data Types (CRDTs) are useful for multi-master collaborative text editing, but they have several downsides: The entire CRDT's state must be loaded in memory during editing sessions, and the state grows without bounds as it is edited. Transmitted and stored data is CRDT type specific - so innovations in CRDT algorithms usually require entire collaborative editing systems to be rewritten from scratch to incorporate new innovations._Pure Operation-Based RDT_ solve these problems. However, to our knowledge, no pure operation based RDT has yet been proposed for text editing.
-
-  // In this paper we present a new formalism for pure operation logs
-
-  In this paper we introduce _Eg-walker_ (Event Graph Walker). Eg-walker is an efficient algorithm for collaboratively editing text using pure operations. Eg-walker performs extremely well: It outperforms existing text based CRDT implementations in most editing scenarios. And it inherits all of the benefits of pure operation based editing: The network format is generic. And the CRDT state doesn't need to be stored and loaded into RAM during editing sessions.
-
-  Eg-walker is built on top of a new formal model which we call _event graphs_. Using this formalism we show how any CRDT can be adapted to the "pure operation" model. Eg-walker is an optimized algorithm for sequence editing.
-]
+Collaborative text editing algorithms allow several users to concurrently modify a text file, and automatically merge concurrent edits into a consistent state.
+Existing collaboration algorithms are either slow to merge files that have diverged substantially due to offline editing (in the case of Operational Transformation/OT), or incur overheads due to giving a unique ID to every character (in the case of CRDTs).
+We introduce Eg-walker, a collaboration algorithm for text that achieves the best of both the OT and the CRDT worlds: it avoids the overheads of CRDTs while simultaneously offering fast merges.
+Our implementation of Eg-walker outperforms existing CRDT and OT algorithms in most editing scenarios, while also using less memory, having smaller file sizes, and supporting peer-to-peer collaboration without a central server.
+*(TODO: quantify the performance improvement?)*
+Our result makes it feasible for collaborative text editors to retain keystroke-granularity editing history, and to reconstruct the document at arbitrary points in time by replaying that history.
 
 
 = Introduction
+
+Real-time collaborative editing has become an essential feature for many types of software, including document editors such as Google Docs, Microsoft Word, or Overleaf, and graphics software such as Figma.
+In such software, each user's device locally maintains a copy of the shared file (e.g. in a tab of their web browser).
+A user's edits to the file are immediately applied to their own local copy, without waiting for a network round-trip, in order to ensure that the user interface is responsive regardless of network latency.
+Different users may therefore make edits concurrently, and the software must merge such concurrent edits in a way that preserves the users' intentions, and ensuring that all devices converge towards the same state.
+
+For example, in @two-inserts, two users initially have the same document "Helo".
+User 1 inserts a second letter "l" at index 3, while concurrently user 2 inserts an exclamation mark at index 4.
+When user 2 receives the operation $italic("Insert")(3, \"l\")$ it can apply it to obtain "Hello!", but when user 1 receives $italic("Insert")(4, \"!\")$ it cannot apply that operation directly, since doing so would result in the state "Hell!o", which would be inconsistent with the other user's state and the intended insertion position.
+Due to the concurrent insertion at an earlier index, user 1 must insert the exclamation mark at index 5.
+
+#figure(
+  fletcher.diagram({
+    let (left1, right1, left2, right2, left3, right3) = ((0,2), (2,2), (0,1), (2,1), (0,0), (2,0))
+    node((0,2.4), "User 1:")
+    node((2,2.4), "User 2:")
+    node(left1, `Helo`)
+    node(left2, `Hello`)
+    node(left3, `Hello!`)
+    node(right1, `Helo`)
+    node(right2, `Helo!`)
+    node(right3, `Hello!`)
+    edge(left1, left2, $italic("Insert")(3, \"l\")$, "->", label-side: right)
+    edge(right1, right2, $italic("Insert")(4, \"!\")$, "->", label-side: left)
+    edge(left2, left3, $italic("Insert")(5, \"!\")$, "->", label-side: right)
+    edge(right2, right3, $italic("Insert")(3, \"l\")$, "->", label-side: left)
+    edge((0.1,1.5), (1.9,0.5), "->", "dashed", bend: +20deg)
+    edge((1.9,1.5), (0.1,0.5), "->", "dashed", bend: -20deg)
+  }),
+  placement: top,
+  caption: [Two concurrent insertions into a text document.],
+) <two-inserts>
+
+One way of solving this problem is to use _Operational Transformation_ (OT): when user 1 receives $italic("Insert")(4, \"!\")$ that operation is transformed with regard to the concurrent insertion at index 3, which increments the index at which the exclamation mark is inserted.
+OT is an old and widely-used technique: it was introduced in 1989 @Ellis1989, and the OT algorithm Jupiter @Nichols1995 forms the basis of real-time collaboration in Google Docs @DayRichter2010.
+
+OT is simple and fast in the case of @two-inserts, where each user performed only one operation since the last version they had in common.
+In general, if user 1 performed $k$ operations and user 2 performed $m$ operations since their last common version, merging their states using OT has a cost of at least $O(k m)$, since each of the $k$ operations must be transformed with respect to each of the $m$ operations and vice versa.
+Some OT algorithms have a complexity that is quadratic or even cubic in the number of operations performed by each user @Li2006 @Roh2011RGA @Sun2020OT.
+This is acceptable for online collaboration where $k$ and $m$ are typically small, but if users may edit a document offline or if the software supports explicit branching and merging workflows @Upwelling, $O(k m)$ can become impracticably slow.
+
+_Conflict-free Replicated Data Types_ (CRDTs) have been proposed as an alternative to OT.
+The first CRDT for collaborative text editing appeared in 2006 @Oster2006WOOT, and over a dozen text CRDTs have been published since @crdt-papers.
+These algorithms work by giving each character a unique identifier, and using those IDs instead of integer indexes to identify the position of insertions and deletions in the document.
+This avoids having to transform operations (since IDs are not affected by concurrent operations), but storing and transmitting those IDs introduces overhead.
+Moreover, some CRDT algorithms need to retain IDs of deleted characters (_tombstones_), which introduces further overhead.
+
+In this paper we propose _Event Graph Walker_ (Eg-walker), an approach to collaborative editing that combines the strengths of OT and CRDT in a single algorithm.
+Like OT, Eg-walker uses integer indexes to identify insertion and deletion positions, and it avoids the overheads of CRDTs at times when there is no concurrency.
+On the other hand, when two users concurrently perform $k$ and $m$ operations respectively, Eg-walker can merge them at a cost of $O((k+m) log (k+m))$, which is much faster than the cost of $O(k m)$ or worse incurred by OT algorithms.
+
+To merge concurrent operations, Eg-walker must also transform the indexes of insertions and deletions like in @two-inserts.
+Instead of transforming one operation with respect to one other operation, as in OT, Eg-walker transforms sets of concurrent operations by first building a temporary data structure that reflects all of the operations that have occurred since the last version they had in common, and then using that structure to transform each operation.
+In fact, we use a CRDT to implement this data structure.
+However, unlike existing algorithms, we only invoke the CRDT to perform merges, and we avoid the CRDT overhead whenever operations are not concurrent (which is the common case in most editing workflows).
+
+This paper makes the following contributions:
+
+- TODO
+- We unify the fields of OT and CRDT, which to date have been largely separate research areas, by demonstrating how to combine the strengths of both in a single algorithm.
+
+/*
+= Related Work
+
+Most practical implementations of OT require a central server to impose a total order on operations.
+Although it is possible to perform OT in a peer-to-peer context without a central server, such algorithms are challenging to reason about, as evidenced by the fact that many published peer-to-peer OT algorithms later turned out to be flawed @Imine2003 @Oster2006TTF.
+
+Conflict-Free Replicated Data Types (CRDTs) are useful for multi-master collaborative text editing, but they have several downsides: The entire CRDT's state must be loaded in memory during editing sessions, and the state grows without bounds as it is edited. Transmitted and stored data is CRDT type specific - so innovations in CRDT algorithms usually require entire collaborative editing systems to be rewritten from scratch to incorporate new innovations._Pure Operation-Based RDT_ solve these problems. However, to our knowledge, no pure operation based RDT has yet been proposed for text editing.
+
+In this paper we introduce _Eg-walker_ (Event Graph Walker). Eg-walker is an efficient algorithm for collaboratively editing text using pure operations. Eg-walker performs extremely well: It outperforms existing text based CRDT implementations in most editing scenarios. And it inherits all of the benefits of pure operation based editing: The network format is generic. And the CRDT state doesn't need to be stored and loaded into RAM during editing sessions.
+
+Eg-walker is built on top of a new formal model which we call _event graphs_. Using this formalism we show how any CRDT can be adapted to the "pure operation" model. Eg-walker is an optimized algorithm for sequence editing.
+
+Gu et al.'s mark \& retrace method @Gu2005 is superficially similar to eg-walker, but it differs in several important details: it builds a CRDT-like structure containing the entire editing history, not only the parts being merged, and its ordering of concurrent insertions is prone to interleaving.
+*/
+
+= Previous Introduction
 
 In realtime collaborative editing systems build around CRDTs, data flows through the system in 3 clear stages:
 

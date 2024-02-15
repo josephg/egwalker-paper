@@ -90,6 +90,12 @@ automerge-storage:
   # author: ["Jahns, Kevin"]
   url: https://automerge.org/automerge-binary-format-spec/
 
+crdt-papers:
+  type: web
+  title: CRDT Papers
+  author: ["Kleppmann, Martin", "Bieniusa, Annette", "Shapiro, Marc"]
+  url: https://crdt.tech/papers.html
+
 cola-gtree:
   type: blog
   title: "cola: a text CRDT for real-time collaborative editing"
