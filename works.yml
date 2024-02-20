@@ -12,14 +12,14 @@ polog:
   title: Pure Operation-Based Replicated Data Types
   author: ["Baquero, Carlos", "Almeida, Paulo Sergio", "Shoker, Ali"]
   date: 2017
-  arxiv: 1710.04469
+  url: https://arxiv.org/abs/1710.04469
 
 fugue:
   type: article
   title: "The Art of the Fugue: Minimizing Interleaving in Collaborative Text Editing"
   author: ["Weidner, Matthew", "Kleppmann, Martin"]
   date: 2023
-  arxiv: 2305.00583
+  url: https://arxiv.org/abs/2305.00583
 
 shapiro:
   type: article

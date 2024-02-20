@@ -116,6 +116,7 @@ To merge concurrent operations, Eg-walker must also transform the indexes of ins
 Instead of transforming one operation with respect to one other operation, as in OT, Eg-walker transforms sets of concurrent operations by first building a temporary data structure that reflects all of the operations that have occurred since the last version they had in common, and then using that structure to transform each operation.
 In fact, we use a CRDT to implement this data structure.
 However, unlike existing algorithms, we only invoke the CRDT to perform merges, and we avoid the CRDT overhead whenever operations are not concurrent (which is the common case in most editing workflows).
+Moreover, we use the CRDT only temporarily for merges; we never write CRDT data to disk and never send it over the network.
 
 The fact that both sequential operations and large merges are fast makes Eg-walker suitable for both real-time collaboration and offline work.
 Moreover, since Eg-walker assumes no central server, it can be used over a peer-to-peer network.
@@ -129,10 +130,67 @@ This paper makes the following contributions:
 - TODO
 - We unify the fields of OT and CRDT, which to date have been largely separate research areas, by demonstrating how to combine the strengths of both in a single algorithm.
 
+= Background
+
+We consider a collaborative plain text editor whose state is a linear sequence of characters, which may be edited by inserting or deleting characters at any position.
+Such an edit is captured as an _operation_; we use the notation $italic("Insert")(i, c)$ to denote an operation that inserts character $c$ at index $i$, and $italic("Delete")(i)$ deletes the character at index $i$ (indexes are zero-based).
+Our implementation compresses runs of consecutive insertions or deletions, but for simplicity we describe the algorithm in terms of single-character operations.
+
+== System model
+
+Each device on which a user is editing a document is a _replica_, and each replica stores the full editing history of the document.
+When a user makes an insertion or deletion, that operation is immediately applied to the user's local replica, and then asynchronously sent over the network to any other replicas that have a copy of the same document.
+Users can also make edits while offline, which are then enqueued and sent when the device is next online.
+
+Our algorithm makes no assumptions about the underlying network via which operations are replicated: any reliable broadcast protocol (which detects and retransmits lost messages) is sufficient.
+For example, a relay server could store and forward messages from one replica to the others, or replicas could use a peer-to-peer gossip protocol.
+We make no timing assumptions and can tolerate arbitrary network delay, but we assume replicas are non-Byzantine.
+
+== Event graphs
+
+In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
+We therefore associate each operation with a _version_ of the document, and we store enough context to be able to reconstruct the exact state of the document as of any version.
+
+Specifically, we represent the editing history of a document as an _event graph_, which is a directed acyclic graph (DAG) in which every node is labelled with an operation and a unique ID.
+When the graph contains an edge from node $a$ to node $b$ we say that $a$ is a _parent_ of $b$, and $b$ is a _child_ of $a$.
+The graph is transitively reduced (i.e. it contains no redundant edges).
+When there is a directed path from $a$ to $b$ we say that $a$ _happened before_ $b$, and write $a -> b$.
+The $->$ relation is therefore a strict partial order.
+The _frontier_ is the set of nodes with no children.
+
+Whenever a user performs an operation, a new node labelled with that operation is added to the graph, and the previous frontier becomes the new node's parents.
+The new node and its incoming edges are then replicated over the network.
+Two replicas can merge their event graphs by simply taking the union of the sets of nodes and edges.
+An operation is immutable once it has been added to the graph (we discuss later how old parts of the graph can be pruned when they are no longer needed).
+
+#figure(
+  fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
+    let (char1, char2, char3, char4, char5, char6) = ((0,2), (0,1.5), (0,1), (0,0.5), (-0.5,0), (0.5,0))
+    node(char1, $id_1: italic("Insert")(0, \"H\")$)
+    node(char2, $id_2: italic("Insert")(1, \"e\")$)
+    node(char3, $id_3: italic("Insert")(2, \"l\")$)
+    node(char4, $id_4: italic("Insert")(3, \"o\")$)
+    node(char5, $id_5: italic("Insert")(3, \"l\")$)
+    node(char6, $id_6: italic("Insert")(4, \"!\")$)
+    edge(char1, char2, "->")
+    edge(char2, char3, "->")
+    edge(char3, char4, "->")
+    edge(char4, char5, "->")
+    edge(char4, char6, "->")
+  }),
+  placement: top,
+  caption: [The event graph corresponding to @two-inserts.],
+) <graph-example>
+
+For example, @graph-example shows the event graph resulting from the operations in @two-inserts.
+Operations that happened one after another are related by $->$, while concurrent operations appear in different branches.
+
+A collaborative text editing algorithm can then be viewed as a deterministic function that takes an event graph as input, and returns the document state resulting from applying all operations in the graph.
+(In fact, this is how pure operation-based CRDTs @polog are formulated, as discussed in @related-work).
+
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
-/*
-= Related Work
+= Related Work <related-work>
 
 // Explain relationship to merging in version control systems such as Git, Darcs, etc.
 
@@ -143,6 +201,7 @@ This paper makes the following contributions:
 // Raph Levien's unified theory of CRDT and OT
 // https://medium.com/@raphlinus/towards-a-unified-theory-of-operational-transformation-and-crdt-70485876f72f
 
+/*
 Most practical implementations of OT require a central server to impose a total order on operations.
 Although it is possible to perform OT in a peer-to-peer context without a central server, such algorithms are challenging to reason about, as evidenced by the fact that many published peer-to-peer OT algorithms later turned out to be flawed @Imine2003 @Oster2006TTF.
 
