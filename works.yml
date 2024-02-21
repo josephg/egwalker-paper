@@ -21,13 +21,6 @@ fugue:
   date: 2023
   url: https://arxiv.org/abs/2305.00583
 
-shapiro:
-  type: article
-  title: "Conflict-free Replicated Data Types"
-  author: ["Shapiro, Marc", "Preguiça, Nuno", "Baquero, Carlos", "Zawirski, Marek"]
-  date: 2011-08-25
-  issn: 0249-6399
-
 reference-reg:
   type: repository
   title: "Reference Eg-walker implementation in Typescript"

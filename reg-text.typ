@@ -134,44 +134,47 @@ This paper makes the following contributions:
 
 We consider a collaborative plain text editor whose state is a linear sequence of characters, which may be edited by inserting or deleting characters at any position.
 Such an edit is captured as an _operation_; we use the notation $italic("Insert")(i, c)$ to denote an operation that inserts character $c$ at index $i$, and $italic("Delete")(i)$ deletes the character at index $i$ (indexes are zero-based).
-Our implementation compresses runs of consecutive insertions or deletions, but for simplicity we describe the algorithm in terms of single-character operations.
+//Our implementation compresses runs of consecutive insertions or deletions, but for simplicity we describe the algorithm in terms of single-character operations.
 
 == System model
 
-Each device on which a user is editing a document is a _replica_, and each replica stores the full editing history of the document.
+Each device on which a user edits a document is a _replica_, and each replica stores the full editing history of the document.
 When a user makes an insertion or deletion, that operation is immediately applied to the user's local replica, and then asynchronously sent over the network to any other replicas that have a copy of the same document.
-Users can also make edits while offline, which are then enqueued and sent when the device is next online.
+Users can also edit their local copy while offline; the corresponding operations are then enqueued and sent when the device is next online.
 
 Our algorithm makes no assumptions about the underlying network via which operations are replicated: any reliable broadcast protocol (which detects and retransmits lost messages) is sufficient.
 For example, a relay server could store and forward messages from one replica to the others, or replicas could use a peer-to-peer gossip protocol.
 We make no timing assumptions and can tolerate arbitrary network delay, but we assume replicas are non-Byzantine.
 
+One of the properties that the collaboration algorithm must satisfy is _convergence_: any two replicas that have seen the same set of operations must be in the same state, even if the operations arrived in a different order.
+If we assume that every non-crashed replica eventually receives every operation, the algorithm achieves _strong eventual consistency_ @Shapiro2011.
+Our algorithm also satisfies the _strong list specification_, a formal specification of collaborative text editing @Attiya2016.
+
 == Event graphs
 
-In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
-We therefore associate each operation with a _version_ of the document, and we store enough context to be able to reconstruct the exact state of the document as of any version.
+We represent the editing history of a document as an _event graph_, which is a directed acyclic graph (DAG) in which every node is an _event_ consisting of an operation and a unique ID.
+When the graph contains an edge from event $a$ to event $b$ we say that $a$ is a _parent_ of $b$, and $b$ is a _child_ of $a$.
+The graph is transitively reduced (i.e., it contains no redundant edges).
+When there is a directed path from $a$ to $b$ we say that $a$ _happened before_ $b$, and write $a -> b$ as per Lamport @Lamport1978.
+The $->$ relation is a strict partial order.
+We say that events $a$ and $b$ are _concurrent_, written $a parallel b$, if both events are in the graph, but neither happened before the other: $a arrow.r.not b and b arrow.r.not a$.
 
-Specifically, we represent the editing history of a document as an _event graph_, which is a directed acyclic graph (DAG) in which every node is labelled with an operation and a unique ID.
-When the graph contains an edge from node $a$ to node $b$ we say that $a$ is a _parent_ of $b$, and $b$ is a _child_ of $a$.
-The graph is transitively reduced (i.e. it contains no redundant edges).
-When there is a directed path from $a$ to $b$ we say that $a$ _happened before_ $b$, and write $a -> b$.
-The $->$ relation is therefore a strict partial order.
-The _frontier_ is the set of nodes with no children.
-
-Whenever a user performs an operation, a new node labelled with that operation is added to the graph, and the previous frontier becomes the new node's parents.
-The new node and its incoming edges are then replicated over the network.
+The _frontier_ is the set of events with no children.
+Whenever a user performs an operation, a new event containing that operation is added to the graph, and the previous frontier in the replica's local copy of the graph becomes the new event's parents.
+The new event and its parent edges are then replicated over the network, and each replica adds them to its copy of the graph.
+If any parent events are missing, the replica waits for them to arrive before adding them to the graph; the result is a simple causal broadcast protocol @Birman1991 @Cachin2011.
 Two replicas can merge their event graphs by simply taking the union of the sets of nodes and edges.
-An operation is immutable once it has been added to the graph (we discuss later how old parts of the graph can be pruned when they are no longer needed).
+An event in the graph is immutable; it always represents the operation as it was originally generated, not some transformed operation.
 
 #figure(
   fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
     let (char1, char2, char3, char4, char5, char6) = ((0,2), (0,1.5), (0,1), (0,0.5), (-0.5,0), (0.5,0))
-    node(char1, $id_1: italic("Insert")(0, \"H\")$)
-    node(char2, $id_2: italic("Insert")(1, \"e\")$)
-    node(char3, $id_3: italic("Insert")(2, \"l\")$)
-    node(char4, $id_4: italic("Insert")(3, \"o\")$)
-    node(char5, $id_5: italic("Insert")(3, \"l\")$)
-    node(char6, $id_6: italic("Insert")(4, \"!\")$)
+    node(char1, $italic(id)_1: italic("Insert")(0, \"H\")$)
+    node(char2, $italic(id)_2: italic("Insert")(1, \"e\")$)
+    node(char3, $italic(id)_3: italic("Insert")(2, \"l\")$)
+    node(char4, $italic(id)_4: italic("Insert")(3, \"o\")$)
+    node(char5, $italic(id)_5: italic("Insert")(3, \"l\")$)
+    node(char6, $italic(id)_6: italic("Insert")(4, \"!\")$)
     edge(char1, char2, "->")
     edge(char2, char3, "->")
     edge(char3, char4, "->")
@@ -183,10 +186,42 @@ An operation is immutable once it has been added to the graph (we discuss later 
 ) <graph-example>
 
 For example, @graph-example shows the event graph resulting from the operations in @two-inserts.
-Operations that happened one after another are related by $->$, while concurrent operations appear in different branches.
+The events with IDs $italic(id)_5$ and $italic(id)_6$ are concurrent, and the frontier of this graph is the set of events with IDs ${italic(id)_5, italic(id)_6}$.
 
-A collaborative text editing algorithm can then be viewed as a deterministic function that takes an event graph as input, and returns the document state resulting from applying all operations in the graph.
-(In fact, this is how pure operation-based CRDTs @polog are formulated, as discussed in @related-work).
+The event graph for a substantial document, such as a research paper, may contain hundreds of thousands of events.
+It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs, and many portions of a typical event graph are linear.
+As event IDs we can use pairs of a replica ID and a per-replica sequence number, which also compress very well.
+We describe the storage format in more detail in Section TODO.
+
+== Document versions
+
+In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
+Due to convergence, any two replicas that have the same set of events must be in the same state.
+The set of events that happened before a given event $e$ is exactly the set of events that were known to the replica at the time when $e$ was generated.
+Since the state of the document must be a deterministic function of the set of events, the parents of $e$ unambiguously define the document state in which $e$ must be interpreted.
+//Moreover, the set of events that happened before some event $e$ does not change, because an event is only added to the graph once all of its parents are present, and an event's set of parents is immutable.
+
+We define the _version_ of an event graph to be its frontier set:
+
+$ sans("Version")(G) = {e_1 in G | exists.not e_2 in G: e_1 -> e_2} $
+
+Given some version $V$, the corresponding set of events can be reconstructed as follows:
+
+$ sans("Events")(V) = V union {e_1 | exists e_2 in V : e_1 -> e_2} $
+
+Since an event graph grows only by adding events that are concurrent to or children of existing events (we never add a parent of an existing event), there is a one-to-one correspondence between an event graph and its version.
+Hence, for all valid event graphs $G$, we have $sans("Events")(sans("Version")(G)) = G$.
+
+The set of parents of an event in the graph is the version of the document in which that operation must be interpreted.
+The version can hence also be seen as a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
+Even if the event graph and the number of replicas are large, a version rarely consists of more than two events.
+The _root version_ $emptyset$ is the version of the empty event graph.
+
+/*
+A collaborative text editing algorithm can be viewed as a deterministic function that takes an event graph as input, and returns the document state resulting from applying all operations in the graph.
+This function can use the parent-child relationships between events, but for concurrent events there is no order.
+(In fact, this is how pure operation-based CRDTs @polog are formulated, as discussed in @related-work.)
+*/
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
@@ -345,11 +380,7 @@ In @eg-partial we show how the algorithm can be optimised to visit only a small 
 
 = Event Graphs
 
-Rather than replicating a CRDT's internal state between peers, our system instead replicates the _Event Graph_ - which is the set of all editing events created on every collaborating peer while editing our document $d in DD$. Each event has an ID, associated event data and a _parent version_ describing when the event happened relative to other events in the graph.
-
-This construction is similar to _Partially Ordered Logs_ in @polog. However, in this formalism we define event graphs and versions (logical clocks) in terms of set and graph theory. This theory is used in the construction of our eg-walker algorithm in @eg-walker.
-
-// The event graph is a set of all of the original editing events produced by users while editing a document. Each event has an ID, associated event data and a _parent version_ describing when the event happened relative to other events in the graph.
+TODO: old material in this section, to be edited
 
 Formally, the event graph $G$ is a set of globally unique event IDs ${i_1, i_2, i_3, ..}$ as well as associated event data $e_i$ and parent version $P_i$ for each event in the graph, where:
 
@@ -359,72 +390,11 @@ Formally, the event graph $G$ is a set of globally unique event IDs ${i_1, i_2, 
 / $e_i$: is the original editing event that occurred. For text editing, this is either *Insert(pos, content)* or *Delete(pos)*. Events have an associated _apply function_ $plus.circle$ which applies the event to a document. For example, $\""AB"\" plus.circle italic("Insert")(1, \"C\") = \""ACB"\"$
 / $P_i$: is a set of ids ($P_i subset G$) of other events which _happened-before_ $e_i$. The parents set is stored in a transitively reduced form. // $forall a in P_b: e_a -> e_b$
 
-The events form a Directed Acyclic Graph (DAG). The _happened-before_ relationship (via the parents field of each event) defines the edges in the graph. The graph is also a _join semi-lattice_ - and referred to as such in many papers (@shapiro, etc).
-
-// The _happened-before_ relationship defines a partial order on events in the graph. In this paper we use the notation $a < b$ to denote _a happened-before b_. Events $a$ and $b$ are _concurrent_ if neither event happened-before the other: $a parallel b := (a != b) and (a lt.not b) and (a gt.not b)$. The parents field stores this relationship: $a in P_b "iff" a < b$. // where $P_b$ is the set of all parents of $b$.
-
-The _happened-before_ relationship is denoted as $a -> b$, meaning _a happened-before b_. This relationship is transitive and anti-reflexive. Events $a$ and $b$ are _concurrent_ if neither event happened-before the other: $a parallel b := (a != b) and (a arrow.r.not b) and (b arrow.r.not a)$. The parents field stores this relationship: $a in P_b$ iff $a -> b$. // where $P_b$ is the set of all parents of $b$.
-
-// The _happened-before_ relationship can also be defined between event graphs. Consider event graphs $G_a$ and $G_b$. Graph $G_a < G_b$ iff $G_b$ is a strict superset of $G_a$. Ie, $G_a < G_b := G_a supset G_b$. Likewise, $G_a$ and $G_b$ are concurrent iff $G_a supset.not G_b and G_b supset.not G_a$.
-
-> *DIAGRAMS OF EXAMPLE GRAPHS*
-
-An event graph _must_ contain the transitive parents of all of its items. If event $i$ is in $G$, then all of the parents of $i$ must also be in $G$. Ie, $i in G => P_i subset.eq G$.
-
-Replicas will typically each store a local copy of the event graph, with associated parents and events. The set of events known to each replica grows over time. Once added, events are never modified or removed.
-
-
-//references a parent event $p in P_i | i in G$, that parent event must also be in $G$. Ie, $i in G => P_i subset.eq G$ // $forall (i, e_i, P_i) in G: P_i subset.eq G$.
-
-
-== Versions
-
-> TODO: Introduce this section somehow.
-
-// The [po-log] paper and associated work ([..]) use a logical timestamp (typically a vector clock) to express the causal relationship between changes. In our definition of replayable event graphs, we depart from this approach and simply stick to graph theory for versioning changes.
-
-// In this work we simply  graph theory to define
-
-// Rather than using vector clocks [REF], in this work we define versions based on the graph itself.
-
-#definition("Versions")[
-  The _version_ of a graph $G$, denoted as $V = floor(G)$, is the graph's _frontier set_. That is, $V$ is the set of events in $G$ that do not have any descendants within $G$.
-]
-
-The version is a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
-
-// We depart from existing literature (eg po-log) by using the frontier set to denote the graph's _version_.
-
-// We can uniquely name an event graph (or a subset of an event graph) by its _version_, denoted as $floor(G)$. We define versions in a slightly different way that other approaches (eg [po-log]):
-
-// The version of graph $G$ is the set of events in $G$ that do not have a child in the same graph.
-
-Formally:
-
-$ floor(G) = {forall i in G | exists.not j in G: i -> j } $
-// $ floor(G) = {forall i_1 in G | exists.not i_2 in G: i_1 < i_2 } $
-
-There is a one-to-one correspondence between versions and the corresponding expanded event graph. Given some version $V$, the corresponding graph $G$ can be reconstructed as $G = ceil(V)$ where:
-
-$ ceil(V) = V union {i | exists v in V : i -> v} $
-
-// $ forall G: G = ceil(floor(G)) $
-
-The empty version $emptyset$ is the version of the empty event graph. The empty version is sometimes called the _root version_.
-
-// The version of the empty graph $emptyset$ is sometimes called the _root version_, also denoted as $emptyset$.
-
-Using this definition of versions, we can now redefine the parents field $P_i$ of an event $i$ as the version of the document immediately before event $i$ happened on the editing replica.
-
 The _happened-before_ relationship $->$ can be extended to versions and events:
 
 - Event $i$ _happened-before_ version $V$ if $i$ is within the event graph described by $V$. Ie, $i -> V$ iff $i in ceil(V)$.
 - Given two versions $V_1$ and $V_2$, $V_1 -> V_2$ iff $ceil(V_1) subset ceil(V_2)$.// (Or, equivalently, $V_1 != V_2 and forall i_1 in ceil(V_1): i_1 -> V_2$).
 // - Versions $V_1$ and $V_2$ are concurrent (written $V_1 || V_2$) iff $V_1 arrow.r.not V_2 and V_2 arrow.r.not V_1$.
-
-// The event graph may become very large, but the version is almost always quite small - usually 2 items or less.
-
-// (Claim: The version is never larger than the equivalent vector clock)
 
 
 == Critical Versions <critical-version>
@@ -522,7 +492,7 @@ Some observations about critical versions:
 
 > TODO: Consider removing this section
 
-The network needs to eventually deliver all events to all replicas in the set of peers. We can do that by treating the event graph in turn as a Grow-Only Set CRDT of event triples $(i, e_i, P_i)$. Using the notation from @shapiro:
+The network needs to eventually deliver all events to all replicas in the set of peers. We can do that by treating the event graph in turn as a Grow-Only Set CRDT of event triples $(i, e_i, P_i)$. Using the notation from @Shapiro2011:
 
 - The state $s$ is the event graph $G$, defined above.
 - $s^0$ is the empty set $emptyset$
@@ -569,7 +539,7 @@ We can define a replay function's behaviour by constructing it from the definiti
 #definition("CRDT based replay function")[
   We can define a replay function from a CRDT definition. Consider a network of collaborating replicas which are using a CRDT to create and replicate the events described by the event graph $G$. Once this network of peers has reaches quiescence, all peers will have converged on some document state. $r(G)$ must emit this document state.
 
-  More formally, assume we have some CRDT defined as $(S, s^0, q, t, u, P)$ via @shapiro. $S$ and $s^0$ are the state domain and initial state, respectively. $q$ is the _query_ function, $t$ is the _prepare_ function and $u$ is the _effect_ function.
+  More formally, assume we have some CRDT defined as $(S, s^0, q, t, u, P)$ via @Shapiro2011. $S$ and $s^0$ are the state domain and initial state, respectively. $q$ is the _query_ function, $t$ is the _prepare_ function and $u$ is the _effect_ function.
 
   Let $c: G => S$ be a function which generates the corresponding CRDT state for any event graph. $c$ is defined such that:
 
@@ -602,7 +572,7 @@ Worse, it must generate the CRDT state on every peer (instead of once, across th
 
 // However, because the corresponding CRDT state is not actually visible outside the replay function, it does not actually need to be generated.
 
-// In CRDT literature (eg @shapiro), the replay function's output corresponds to the output of the CRDT's _query function_ ($q$) when run on the CRDT state implied by the event graph. However, $r$ accepts as input the set of all original events, not the corresponding CRDT state. Thus, our replay function must also effectively perform all the work of the equivalent CRDT's _prepare_ and _effect_ functions on the entire event graph.
+// In CRDT literature (eg @Shapiro2011), the replay function's output corresponds to the output of the CRDT's _query function_ ($q$) when run on the CRDT state implied by the event graph. However, $r$ accepts as input the set of all original events, not the corresponding CRDT state. Thus, our replay function must also effectively perform all the work of the equivalent CRDT's _prepare_ and _effect_ functions on the entire event graph.
 
 // We can implement this function in a variety of different ways. But the most obvious approach is to construct $r$ from an existing CRDT, and have it simulate the corresponding network of collaborating peers making changes to the document. This approach was described in [time machines], and simple algorithm to do so is provided in [appendix X]. However, implemented this way, this process replicate the computation of the entire collaborating network on every peer on that network. Naively implemented, it multiplies CPU and memory requirements for every peer by the number of peers on the network.
 
@@ -615,7 +585,7 @@ The performance - and by extension practical viability - of this approach to bui
 
 > TODO: Consider moving this inside the eg-walker section.
 
-Discussion of operation transformation is curiously absent from most of the CRDT literature, given how useful it is when building practical systems. Most text editing CRDT algorithm papers (@fugue, [RGA], etc) describe user content embedded directly inside the CRDT's data structure. CRDTs are defined in @shapiro with a simple query function $q: S => DD$ which emits a bulk copy of the new document state.
+Discussion of operation transformation is curiously absent from most of the CRDT literature, given how useful it is when building practical systems. Most text editing CRDT algorithm papers (@fugue, [RGA], etc) describe user content embedded directly inside the CRDT's data structure. CRDTs are defined in @Shapiro2011 with a simple query function $q: S => DD$ which emits a bulk copy of the new document state.
 
 
 
