@@ -225,15 +225,61 @@ The _root version_ $emptyset$ is the version of the empty event graph.
 
 == Replaying editing history
 
-Collaborative editing algorithms are usually defined in terms of sending and receiving messages.
+Collaborative editing algorithms are usually defined in terms of sending and receiving messages over a network.
 The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a deterministic function that takes an event graph as input, and returns the document state resulting from applying all operations in the graph.
-This function can use the parent-child relationships between events, but for concurrent events there is no order.
-(In fact, this is how pure operation-based CRDTs @polog are formulated, as discussed in @related-work.)
+This function can use the parent-child relationships between events, but concurrent events could be processed in any order.
+This allows us to separate the process of replicating the event graph from the algorithm that ensures convergence.
+(In fact, this is how _pure operation-based CRDTs_ @polog are formulated, as discussed in @related-work.)
 
+In addition to determining the document state from an entire event graph, we need an _incremental update_ function: when we have an existing event graph and document state, and a small number of events from a remote replica are added to the graph, we need to efficiently determine the corresponding update to the document state so that it reflects the new events, without re-processing the entire graph.
+For text documents, the incremental update is also described as insertions and deletions at particular indexes; however, the indexes may differ from those in the original events due to the effects of concurrent operations.
+
+This incremental update is what both OT and CRDT algorithms focus on.
+If there are no concurrent events, OT is straightforward: the incremental update is identical to the operation in the original event, as no transformation takes place.
+If there is concurrency, OT must transform each new event with regard to each existing, concurrent event.
+
+In CRDTs, each event is first translated into operations that use unique IDs instead of indexes, based on the document state in which the event was generated, and then these operations are applied to a data structure that reflects all of the operations seen so far (both concurrent operations and those that happened before).
+In order to update the text editor, these updates to the CRDT's internal structure need to be translated back into index-based insertions and deletions.
+Many CRDT papers elide this translation from unique IDs back to indexes, but it is important for practical applications (for example, to ensure that the local user's cursor position remains in the correct place when another user changes text earlier in the document).
+
+Thus, regardless of whether the OT or the CRDT approach is used, a collaborative editing algorithm can be boiled down to an incremental update to an event graph: given an event to be added to an existing event graph, return the operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event.
+
+= The Event Graph Walker algorithm
+
+Eg-walker is a collaborative text editing algorithm based on the idea of replaying an event graph.
+The algorithm builds on a replication layer that ensures that all non-crashed replicas eventually receive every event that any replica adds to the graph.
+Each replica stores the event graph on disk alongside the current state of the document.
+
+To reconstruct the state of the document at any point in time, eg-walker replays the subset of events corresponding to that document version.
+It does this by performing a topological sort of the event DAG, and then transforming each event so that if the transformed insertions and deletions are applied in topologically sorted order, starting with an empty document, the final document correctly represents the set of events processed.
+Our correctness criterion is that the resulting document is consistent with the strong list specification @Attiya2016 (i.e., it converges and it applies operations in the right place), and it is maximally non-interleaving @fugue (i.e., concurrent insertions at the same position are placed one after another, and not interleaved).
+
+In graphs with concurrent operations there are multiple possible topological sort orders, and eg-walker guarantees that the final document is the same, regardless which of these orders is chosen.
+For example, the graph in @graph-example has two possible sort orders; eg-walker will either first insert the second "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first insert "!" at index 4 followed by the second "l" at index 3 (like User 2 in @two-inserts).
+The final document is the same either way, but the choice of sort order affects the performance of the algorithm, as discussed in Section TODO.
+
+Event graph replay extends directly to incremental updates: when a new event is added to the graph, since all of its parents must already be in the graph, each added event becomes the next element of the topologically sorted sequence.
+We can transform each new event in the same way as during replay, and apply the transformed operation to the current document state.
+
+== Making replay fast
+
+In general, replaying an event graph using a CRDT algorithm is not difficult; it works essentially by simulating a network of communicating peers and their states.
+The core insight of eg-walker are a number of algorithmic optimisations that make this process efficient.
+
+/*
+The persistent state of eg-walker consists only of the event graph (no CRDT state is written to disk)
+
+- The CRDT's state grows without bounds.
+- The CRDT's state needs to be available both when emitting new, local events, and when merging remote events. Generally, this data structure in its entirety needs to be loaded entirely into RAM on each peer before any editing can happen.
+- The storage format and network protocols are tied to a particular CRDT algorithm. This makes protocol standardization and code reuse very difficult when new CRDTs are invented.
+*/
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
 = Related Work <related-work>
+
+The idea of capturing a DAG of operations in the form they were generated appears in several algorithms, including pure operation-based CRDTs @polog and time machines (TODO: citation).
+However, existing publications on pure operation-based CRDTs consider only datatypes such as sets and registers, but not text or lists.
 
 // Explain relationship to merging in version control systems such as Git, Darcs, etc.
 
@@ -256,130 +302,6 @@ Eg-walker is built on top of a new formal model which we call _event graphs_. Us
 
 Gu et al.'s mark \& retrace method @Gu2005 is superficially similar to eg-walker, but it differs in several important details: it builds a CRDT-like structure containing the entire editing history, not only the parts being merged, and its ordering of concurrent insertions is prone to interleaving.
 */
-
-= Previous Introduction
-
-In realtime collaborative editing systems build around CRDTs, data flows through the system in 3 clear stages:
-
-/ 1. Original Events: Every edit a user makes to a document is captured as an _event_ (or _pure operation_). This event is expressed relative to the document being edited. /*, both in space (_where_ the event happened in the document) and in time (_when_ the event happened relative to other events)*/ For example, an insert event might insert "x" at position 4. Each event happened to a document at some _version_, (or _logical timestamp_).
-/ 2. CRDT Messages: CRDTs use a _prepare_ (aka _generate_) method to convert this change into some internal, CRDT-specific format. For example, Fugue (@fugue) may re-express this change as _(id: UUID, "x", tree_parent: UUID(y), Left)_. Different sequence based CRDTs (eg [RGA, YATA]) use different message formats.
-/ 3. Transformed Operations: When a CRDT message is received from a remote peer, it is used to modify the local CRDT state via an _effect-update_ (aka _effector_) function. When the CRDT state is modified, the system emits corresponding modifications to a projected, user visible document. These modifications correspond to a "transformed" version of the event, as in Operational Transformation literature. [REFERENCE ME]
-
-
-// The version of the document at which an event was generated does not need to match the version of the document into which the event was applied.
-
-// The advantage of this approach is that the version of the target CRDT does not need to match the version of
-
-In a CRDT based system, the CRDT events (*2*) are persisted to disk and replicated between peers.
-
-
-// #figure(
-//   fletcher.diagram(
-//     // cell-size: 1mm,
-//     spacing: (8mm, 8mm),
-//     // node-stroke: black + 0.5pt,
-//     node-stroke: 0.5pt,
-//     // node-shape: rectangular,
-//     // debug: 1,
-//     // node-fill: blue.lighten(90%),
-//     render: (grid, nodes, edges, options) => {
-//       cetz.canvas({
-//         fletcher.draw-diagram(grid, nodes, edges, options)
-
-//         let rect(topleft, botright) = {
-//           let a = fletcher.to-physical-coords(grid, topleft)
-//           let b = fletcher.to-physical-coords(grid, botright)
-//           fletcher.draw.rect(a, b)
-//         }
-
-//         // rect((-1,0), (1,1))
-
-//         // fletcher.draw.rect(
-//         //   (
-//         //     grid.centers.at(0).at(0) - grid.sizes.at(0).at(0) / 2,
-//         //     grid.centers.at(1).at(2) - grid.sizes.at(1).at(2) / 2,
-//         //   ),
-//         //   (
-//         //     grid.centers.at(0).at(0) + grid.sizes.at(0).at(0) / 2,
-//         //     grid.centers.at(1).at(2) + grid.sizes.at(1).at(2) / 2
-//         //   )
-//         // )
-//         // fletcher.draw.line((grid.centers.at(0).at(0), grid.centers.at(1).at(0)),
-//         //   (grid.centers.at(0).at(0) + grid.sizes.at(0).at(0) / 2, grid.centers.at(1).at(0))
-//         // )
-//         // fletcher.draw.line((grid.sizes.at(0).at(0), 0), (grid.sizes.at(0).at(1), 0))
-//         // fletcher.draw.line((grid.sizes.at(0).at(1), 0), (grid.sizes.at(0).at(1), 0))
-//         // fletcher.draw.line((0, grid.sizes.at(0).at(0)), (0, grid.sizes.at(0).at(3)))
-//         // fletcher.draw.line((10, 10), (0,0))
-//         // cetz.draw.content((0, 0), "asdf")
-//         // fletcher.compute-grid(nodes, options).bounding-size
-
-// // fletcher.compute-node-positions()
-//         // let n1 = fletcher.find-node-at(nodes, (0, 0))
-//         // let p1 = fletcher.get-node-anchor(n1, 90deg)
-//         // let n2 = fletcher.find-node-at(nodes, (2, 0))
-//         // let p2 = fletcher.get-node-anchor(n2, -90deg)
-//         // cetz.draw.rect(p1, p2)
-//       })
-//     },
-//   {
-//     let (ed, evts, crdt, xf) = ((-1, 0.5), (0,0), (1, 0), (2, 0))
-//     node(ed, text(10pt, [(Editor)]), stroke: none)
-//     node(evts, [Orig Events])
-//     node(crdt, [CRDT Messages], stroke: 1.1pt)
-//     node(xf, [XF Operations])
-//     edge(ed, evts, bend: 20deg, "-->")
-//     edge(evts, crdt, "->")
-//     edge(crdt, xf, "->")
-
-//     let (evts2, crdt2, xf2) = ((0,-1), (1, -1), (2, -1))
-//     // node(evts2, [Orig Events])
-//     node(crdt2, [CRDT Messages], stroke: 1.1pt)
-//     node(xf2, [XF Operations])
-//     // edge(evts2, crdt2, "->")
-//     edge(crdt2, xf2, "->")
-
-//     // let (a, b, c, d) = ((0, 0), (-1, -1), (1, -1), (0, -2))
-//     // node(a, $A$)
-//     // node(b, $B$)
-//     // node(c, $C$)
-//     // node(d, $D$)
-//     // edge(a, b, bend: -10deg, "->")
-//     // edge(a, c, bend: 10deg, "->")
-//     // edge(b, d, bend: -10deg, "->")
-//     // edge(c, d, bend: 10deg, "->")
-//   }),
-//   caption: [Data flow in a CRDT based collaborative editing system]
-// )
-
-> Diagram
-
-#figure(
-  image("diagrams/dataflow.svg", width: 65%),
-  caption: [Data flow in a CRDT based collaborative editing system]
-)
-
-This approach has a few significant downsides for collaborative text editing:
-
-- The CRDT's state grows without bounds.
-- The CRDT's state needs to be available both when emitting new, local events, and when merging remote events. Generally, this data structure in its entirety needs to be loaded entirely into RAM on each peer before any editing can happen.
-- The storage format and network protocols are tied to a particular CRDT algorithm. This makes protocol standardization and code reuse very difficult when new CRDTs are invented.
-
-Another approach, proposed in @polog, [time machines], ?? is to instead store and replicate (*1*): the set of original events, along with the document version at which each of these events happened. We call this the _Event Graph_.
-
-
-#figure(
-  image("diagrams/dataflow-eg.svg", width: 65%),
-  caption: [Data flow in a CRDT based collaborative editing system]
-)
-
-// Sequence editing events (inserts and deletes) are not commutative. As a result (as noted by @polog), events must be stored alongside a logical timestamp describing _when_ each event happened relative to other events stored in the system. // More specifically, the system stores the _version_ of the document state immediately prior to the event's
-
-The event graph contains all the information needed to simulate a network of collaborating peers and deterministically generate the resulting document state (as shown in @generic-crdt-replay). However, naively simulating the entire network on each peer is computationally expensive. The generic algorithmic approach also does not allow the system to prune any events from the event graph.
-
-Some effort has been made to adapt existing CRDTs to work simply using the "pure operation log" [po-log followup]. However, as far as we know this is the first work to directly address the problem of collaborative text editing (or, more generally, sequence editing) on top of an event graph.
-
-
 
 = Event Graphs
 
