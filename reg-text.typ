@@ -128,7 +128,14 @@ In this paper we focus on collaborative editing of plain text files, although we
 This paper makes the following contributions:
 
 - TODO
+- In @benchmarking we evaluate the performance of eg-walker, comparing it to equivalent CRDT based approaches on file size, CPU time and memory usage in real world editing environments. Eg-walker is faster and smaller than equivalent CRDT based approaches in our real world data sets. However, it scales worse than CRDTs in extremely concurrent environments (eg very complex git editing histories).
 - We unify the fields of OT and CRDT, which to date have been largely separate research areas, by demonstrating how to combine the strengths of both in a single algorithm.
+
+/*
+In @eg-walker, we introduce _eg-walker_ (_Event Graph Walker_). Eg-walker can efficiently replay any event graph of sequence edits and generate the corresponding document state. Natively, eg-walker traverses the entire event graph to generate the corresponding CRDT state (using FugueMax @fugue). During this traversal, events are transformed and applied. However, traversing the entire event graph to regenerate the CRDT state on every peer is inefficient and slow. And it precludes replicas from pruning any events in the event graph.
+
+In @eg-partial we show how the algorithm can be optimised to visit only a small subset of events in the graph when merging changes from remote peers. This optimisation also dramatically improves performance for linear editing traces - by about 15x in our testing.
+*/
 
 = Background
 
@@ -157,7 +164,7 @@ When the graph contains an edge from event $a$ to event $b$ we say that $a$ is a
 The graph is transitively reduced (i.e., it contains no redundant edges).
 When there is a directed path from $a$ to $b$ we say that $a$ _happened before_ $b$, and write $a -> b$ as per Lamport @Lamport1978.
 The $->$ relation is a strict partial order.
-We say that events $a$ and $b$ are _concurrent_, written $a parallel b$, if both events are in the graph, but neither happened before the other: $a arrow.r.not b and b arrow.r.not a$.
+We say that events $a$ and $b$ are _concurrent_, written $a parallel b$, if both events are in the graph, $a eq.not b$, but neither happened before the other: $a arrow.r.not b and b arrow.r.not a$.
 
 The _frontier_ is the set of events with no children.
 Whenever a user performs an operation, a new event containing that operation is added to the graph, and the previous frontier in the replica's local copy of the graph becomes the new event's parents.
@@ -196,12 +203,11 @@ We describe the storage format in more detail in Section TODO.
 == Document versions
 
 In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
-Due to convergence, any two replicas that have the same set of events must be in the same state.
-The set of events that happened before a given event $e$ is exactly the set of events that were known to the replica at the time when $e$ was generated.
-Since the state of the document must be a deterministic function of the set of events, the parents of $e$ unambiguously define the document state in which $e$ must be interpreted.
-//Moreover, the set of events that happened before some event $e$ does not change, because an event is only added to the graph once all of its parents are present, and an event's set of parents is immutable.
+Due to convergence, any two replicas that have the same set of events must be in the same state; hence, the state of the document must be a deterministic function of the set of events that have occurred.
+The set of events that were known to the generating replica at the time when a given event $e$ was generated is exactly the subset of events that happened before $e$, i.e., $e$'s parents and all of their ancestors.
+Therefore, the parents of $e$ unambiguously define the document state in which $e$ must be interpreted.
 
-We define the _version_ of an event graph to be its frontier set:
+Given an event graph $G$ (represented as a set of events), we define the _version_ of $G$ to be its frontier set:
 
 $ sans("Version")(G) = {e_1 in G | exists.not e_2 in G: e_1 -> e_2} $
 
@@ -209,19 +215,21 @@ Given some version $V$, the corresponding set of events can be reconstructed as 
 
 $ sans("Events")(V) = V union {e_1 | exists e_2 in V : e_1 -> e_2} $
 
-Since an event graph grows only by adding events that are concurrent to or children of existing events (we never add a parent of an existing event), there is a one-to-one correspondence between an event graph and its version.
+Since an event graph grows only by adding events that are concurrent to or children of existing events (we never change the parents of an existing event), there is a one-to-one correspondence between an event graph and its version.
 Hence, for all valid event graphs $G$, we have $sans("Events")(sans("Version")(G)) = G$.
 
 The set of parents of an event in the graph is the version of the document in which that operation must be interpreted.
 The version can hence also be seen as a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
-Even if the event graph and the number of replicas are large, a version rarely consists of more than two events.
+Even if the event graph is large, a version rarely consists of more than two events in practice.
 The _root version_ $emptyset$ is the version of the empty event graph.
 
-/*
-A collaborative text editing algorithm can be viewed as a deterministic function that takes an event graph as input, and returns the document state resulting from applying all operations in the graph.
+== Replaying editing history
+
+Collaborative editing algorithms are usually defined in terms of sending and receiving messages.
+The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a deterministic function that takes an event graph as input, and returns the document state resulting from applying all operations in the graph.
 This function can use the parent-child relationships between events, but for concurrent events there is no order.
 (In fact, this is how pure operation-based CRDTs @polog are formulated, as discussed in @related-work.)
-*/
+
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
@@ -371,11 +379,6 @@ The event graph contains all the information needed to simulate a network of col
 
 Some effort has been made to adapt existing CRDTs to work simply using the "pure operation log" [po-log followup]. However, as far as we know this is the first work to directly address the problem of collaborative text editing (or, more generally, sequence editing) on top of an event graph.
 
-In @eg-walker, we introduce _eg-walker_ (_Event Graph Walker_). Eg-walker can efficiently replay any event graph of sequence edits and generate the corresponding document state. Natively, eg-walker traverses the entire event graph to generate the corresponding CRDT state (using FugueMax @fugue). During this traversal, events are transformed and applied. However, traversing the entire event graph to regenerate the CRDT state on every peer is inefficient and slow. And it precludes replicas from pruning any events in the event graph.
-
-In @eg-partial we show how the algorithm can be optimised to visit only a small subset of events in the graph when merging changes from remote peers. This optimisation also dramatically improves performance for linear editing traces - by about 15x in our testing.
-
-@benchmarking evaluates the performance of eg-walker, comparing it to equivalent CRDT based approaches on file size, CPU time and memory usage in real world editing environments. Eg-walker is faster and smaller than equivalent CRDT based approaches in our real world data sets. However, it scales worse than CRDTs in extremely concurrent environments (eg very complex git editing histories).
 
 
 = Event Graphs
