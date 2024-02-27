@@ -182,11 +182,11 @@ An event in the graph is immutable; it always represents the operation as it was
     node(char4, $italic(id)_4: italic("Insert")(3, \"o\")$)
     node(char5, $italic(id)_5: italic("Insert")(3, \"l\")$)
     node(char6, $italic(id)_6: italic("Insert")(4, \"!\")$)
-    edge(char1, char2, "->")
-    edge(char2, char3, "->")
-    edge(char3, char4, "->")
-    edge(char4, char5, "->")
-    edge(char4, char6, "->")
+    edge(char1, char2, "-|>")
+    edge(char2, char3, "-|>")
+    edge(char3, char4, "-|>")
+    edge(char4, char5, "-|>")
+    edge(char4, char6, "-|>")
   }),
   placement: top,
   caption: [The event graph corresponding to @two-inserts.],
@@ -244,6 +244,76 @@ Many CRDT papers elide this translation from unique IDs back to indexes, but it 
 
 Thus, regardless of whether the OT or the CRDT approach is used, a collaborative editing algorithm can be boiled down to an incremental update to an event graph: given an event to be added to an existing event graph, return the operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event.
 
+#figure(
+  fletcher.diagram(node-inset: 2pt, node-stroke: black, node-fill: black, {
+    let (a1, a2, a3, a4, a5, a6) = ((0,2), (0,1.5), (0,1), (0,0.5), (0,0), (0,-0.5))
+    let (b1, b2, b3, b4) = ((1,1.5), (1,1), (1,0.5), (1,0))
+    let (c1, c2, c3) = ((-1,1), (-1,0.5), (-1,0))
+    let (x1, x2, x3, x4, x5, x6, x7) = ((4,2), (4,1.5), (4,1), (4,0.5), (4,0), (4,-0.5), (4,-1))
+    let (x8, x9, x10, x11, x12, x13) = ((5,2), (5,1.5), (5,1), (5,0.5), (5,0), (5,-0.5))
+    node(a1, text(0.1em, $a$))
+    node(a2, text(0.1em, $a$))
+    node(a3, text(0.1em, $a$))
+    node(a4, text(0.1em, $a$))
+    node(a5, text(0.1em, $a$))
+    node(a6, text(0.1em, $a$))
+    node(b1, text(0.1em, $a$))
+    node(b2, text(0.1em, $a$))
+    node(b3, text(0.1em, $a$))
+    node(b4, text(0.1em, $a$))
+    node(c1, text(0.1em, $a$))
+    node(c2, text(0.1em, $a$))
+    node(c3, text(0.1em, $a$))
+    node(x1, text(0.1em, $a$))
+    node(x2, text(0.1em, $a$))
+    node(x3, text(0.1em, $a$))
+    node(x4, text(0.1em, $a$))
+    node(x5, text(0.1em, $a$))
+    node(x6, text(0.1em, $a$))
+    node(x7, text(0.1em, $a$))
+    node(x8, text(0.1em, $a$))
+    node(x9, text(0.1em, $a$))
+    node(x10, text(0.1em, $a$))
+    node(x11, text(0.1em, $a$))
+    node(x12, text(0.1em, $a$))
+    node(x13, text(0.1em, $a$))
+    edge(a1, a2, $e_"A1"$, "-|>", label-pos: 0)
+    edge(a2, a3, $e_"A2"$, "-|>", label-pos: 0, label-side: left)
+    edge(a3, a4, $e_"A3"$, "-|>", label-pos: 0)
+    edge(a4, a5, $e_"A4"$, "-|>", label-pos: 0)
+    edge(a5, a6, $e_"A5"$, "-|>", label-pos: 0)
+    edge(a5, (0,-0.55), $e_"A6"$, label-pos: 1, label-side: left)
+    edge(b1, b2, $e_"B1"$, "-|>", label-pos: 0, label-side: left)
+    edge(b2, b3, $e_"B2"$, "-|>", label-pos: 0, label-side: left)
+    edge(b3, b4, $e_"B3"$, "-|>", label-pos: 0, label-side: left)
+    edge(b3, (1,-0.05), $e_"B4"$, label-pos: 1, label-side: left)
+    edge(c1, c2, $e_"C1"$, "-|>", label-pos: 0)
+    edge(c2, c3, $e_"C2"$, "-|>", label-pos: 0)
+    edge(c2, (-1,-0.05), $e_"C3"$, label-pos: 1)
+    edge(a1, b1, "-|>", bend: +20deg)
+    edge(a3, b3, "-|>")
+    edge(b2, a5, "-|>")
+    edge(a2, c1, "-|>", bend: -20deg)
+    edge(c3, a6, "-|>")
+    edge(x1, x2, $e_"A1"$, "-|>", label-pos: 0)
+    edge(x2, x3, $e_"A2"$, "-|>", label-pos: 0)
+    edge(x3, x4, $e_"A3"$, "-|>", label-pos: 0)
+    edge(x4, x5, $e_"A4"$, "-|>", label-pos: 0)
+    edge(x5, x6, $e_"B1"$, "-|>", label-pos: 0)
+    edge(x6, x7, $e_"B2"$, "-|>", label-pos: 0)
+    edge(x6, (4,-1.05), $e_"B3"$, label-pos: 1)
+    edge(x7, x8, "-|>")
+    edge(x8, x9, $e_"B4"$, "-|>", label-pos: 0, label-side: left)
+    edge(x9, x10, $e_"C1"$, "-|>", label-pos: 0, label-side: left)
+    edge(x10, x11, $e_"C2"$, "-|>", label-pos: 0, label-side: left)
+    edge(x11, x12, $e_"C3"$, "-|>", label-pos: 0, label-side: left)
+    edge(x12, x13, $e_"A5"$, "-|>", label-pos: 0, label-side: left)
+    edge(x12, (5,-0.55), $e_"A6"$, label-pos: 1, label-side: left)
+  }),
+  placement: top,
+  caption: [Left: example of an event graph with a complex branching and merging structure. Right: one possible topologically sorted order of this graph.],
+) <topological-sort>
+
 = The Event Graph Walker algorithm
 
 Eg-walker is a collaborative text editing algorithm based on the idea of replaying an event graph.
@@ -251,7 +321,7 @@ The algorithm builds on a replication layer that ensures that all non-crashed re
 Each replica stores the event graph on disk alongside the current state of the document.
 
 To reconstruct the state of the document at any point in time, eg-walker replays the subset of events corresponding to that document version.
-It does this by performing a topological sort of the event DAG, and then transforming each event so that if the transformed insertions and deletions are applied in topologically sorted order, starting with an empty document, the final document correctly represents the set of events processed.
+It does this by performing a topological sort of the event DAG, as illustrated in @topological-sort, and then transforming each event so that if the transformed insertions and deletions are applied in topologically sorted order, starting with an empty document, the final document correctly represents the set of events processed.
 Our correctness criterion is that the resulting document is consistent with the strong list specification @Attiya2016 (i.e., it converges and it applies operations in the right place), and it is maximally non-interleaving @fugue (i.e., concurrent insertions at the same position are placed one after another, and not interleaved).
 
 In graphs with concurrent operations there are multiple possible topological sort orders, and eg-walker guarantees that the final document is the same, regardless which of these orders is chosen.
