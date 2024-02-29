@@ -236,13 +236,26 @@ For text documents, the incremental update is also described as insertions and d
 
 This incremental update is what both OT and CRDT algorithms focus on.
 If there are no concurrent events, OT is straightforward: the incremental update is identical to the operation in the original event, as no transformation takes place.
-If there is concurrency, OT must transform each new event with regard to each existing, concurrent event.
+If there is concurrency, OT must transform each new event with regard to each existing event that is concurrent to it.
 
 In CRDTs, each event is first translated into operations that use unique IDs instead of indexes, based on the document state in which the event was generated, and then these operations are applied to a data structure that reflects all of the operations seen so far (both concurrent operations and those that happened before).
 In order to update the text editor, these updates to the CRDT's internal structure need to be translated back into index-based insertions and deletions.
-Many CRDT papers elide this translation from unique IDs back to indexes, but it is important for practical applications (for example, to ensure that the local user's cursor position remains in the correct place when another user changes text earlier in the document).
+Many CRDT papers elide this translation from unique IDs back to indexes, but it is important for practical applications:
 
-Thus, regardless of whether the OT or the CRDT approach is used, a collaborative editing algorithm can be boiled down to an incremental update to an event graph: given an event to be added to an existing event graph, return the operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event.
+- Text editors use specialised data structures such as piece tables @vscode-buffer to support fast edits on large documents, and integrating with these structures requires index-based operations. Incrementally updating these structures also enables syntax highlighting without having to repeatedly parse the whole file on every keystroke.
+- The user's cursor position in a document can be represented as an index; if another user changes text earlier in the document, index-based operations make it easy to update the cursor so that it remains in the correct position relative to the surrounding text.
+
+Thus, regardless of whether the OT or the CRDT approach is used, a collaborative editing algorithm can be boiled down to an incremental update to an event graph: given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event.
+
+= The Event Graph Walker algorithm
+
+Eg-walker is a collaborative text editing algorithm based on the idea of replaying an event graph.
+The algorithm builds on a replication layer that ensures that all non-crashed replicas eventually receive every event that any replica adds to the graph.
+Each replica stores the event graph on disk alongside the current state of the document.
+
+Eg-walker performs a topological sort of the event DAG, as illustrated in @topological-sort, and then transforms each event so that if the transformed insertions and deletions are applied in topologically sorted order, starting with an empty document, the final document correctly represents the set of events processed.
+The input of the algorithm is the event graph, and the output is this topologically sorted sequence of transformed operations.
+In graphs with concurrent operations there are multiple possible sort orders, and eg-walker guarantees that the final document is the same, regardless which of these orders is chosen.
 
 #figure(
   fletcher.diagram(node-inset: 2pt, node-stroke: black, node-fill: black, {
@@ -311,37 +324,47 @@ Thus, regardless of whether the OT or the CRDT approach is used, a collaborative
     edge(x12, (5,-0.55), $e_"A6"$, label-pos: 1, label-side: left)
   }),
   placement: top,
-  caption: [Left: example of an event graph with a complex branching and merging structure. Right: one possible topologically sorted order of this graph.],
+  caption: [An event graph (left) and one possible topologically sorted order of that graph (right).],
 ) <topological-sort>
 
-= The Event Graph Walker algorithm
-
-Eg-walker is a collaborative text editing algorithm based on the idea of replaying an event graph.
-The algorithm builds on a replication layer that ensures that all non-crashed replicas eventually receive every event that any replica adds to the graph.
-Each replica stores the event graph on disk alongside the current state of the document.
-
-To reconstruct the state of the document at any point in time, eg-walker replays the subset of events corresponding to that document version.
-It does this by performing a topological sort of the event DAG, as illustrated in @topological-sort, and then transforming each event so that if the transformed insertions and deletions are applied in topologically sorted order, starting with an empty document, the final document correctly represents the set of events processed.
-Our correctness criterion is that the resulting document is consistent with the strong list specification @Attiya2016 (i.e., it converges and it applies operations in the right place), and it is maximally non-interleaving @fugue (i.e., concurrent insertions at the same position are placed one after another, and not interleaved).
-
-In graphs with concurrent operations there are multiple possible topological sort orders, and eg-walker guarantees that the final document is the same, regardless which of these orders is chosen.
-For example, the graph in @graph-example has two possible sort orders; eg-walker will either first insert the second "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first insert "!" at index 4 followed by the second "l" at index 3 (like User 2 in @two-inserts).
-The final document is the same either way, but the choice of sort order affects the performance of the algorithm, as discussed in Section TODO.
+For example, the graph in @graph-example has two possible sort orders; eg-walker will either first insert the second "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first insert "!" at index 4 followed by the second "l" at index 3 (like User 2 in @two-inserts); the final document is the same either way.
+However, the choice of sort order affects the performance of the algorithm, as discussed in Section TODO.
 
 Event graph replay extends directly to incremental updates: when a new event is added to the graph, since all of its parents must already be in the graph, each added event becomes the next element of the topologically sorted sequence.
 We can transform each new event in the same way as during replay, and apply the transformed operation to the current document state.
+This way, the algorithm supports real-time collaboration.
 
-== Making replay fast
+== Characteristics of Eg-walker
 
-In general, replaying an event graph using a CRDT algorithm is not difficult; it works essentially by simulating a network of communicating peers and their states.
-The core insight of eg-walker are a number of algorithmic optimisations that make this process efficient.
+Eg-walker ensures that the resulting document is consistent with Attiya et al.'s _strong list specification_ @Attiya2016 (in essence, it converges and it applies operations in the right place), and it is _maximally non-interleaving_ @fugue (i.e., concurrent sequences of insertions at the same position are placed one after another, and not interleaved).
+
+One way of achieving this goal would be to track the state of the document on each branch of the event graph, to translate each event into a corresponding CRDT operation (based on the document state in which that event was generated), and when branches in the event graph merge, to apply the CRDT operations from one branch to the other branch's state.
+Essentially, this approach simulates a network of communicating CRDT replicas and their states.
+However, doing this naively leads to poor performance, because the CRDT overhead is incurred on every operation.
+
+Eg-walker is able to achieve much better performance by skipping the CRDT entirely in portions of the event graph that have no concurrency (which, in many editing histories, is the vast majority of the graph), and invoking the CRDT only during those portions with concurrency.
+When processing an event that has no concurrent events, eg-walker is able to discard all of the CRDT state accumulated so far, keeping the data structure small.
+A key insight of eg-walker is how to compute the correct transformed operations even though the CRDT state may reflect only a small part of the editing history.
+
+Moreover, eg-walker requires the event graph and CRDT state only in order to transform an operation to account for concurrent events.
+The algorithm does not inspect them when generating new events, or when adding an event to the graph that happened after all existing events.
+This means that most of the time, the event graph can remain on disk without using any space in memory or any CPU time to load; it is sufficient to load only the latest document state, which can be stored in a separate file from the event graph.
+We only have to load the event graph into memory when handling concurrency, and even then we only have to replay the portion of the graph since the last point where the CRDT state was discarded.
+
+Eg-walker's approach contrasts with the usual CRDT approach, which requires every replica to persist the CRDT state (including the unique ID for each character) to disk and send it over the network, and which requires that state to be loaded into memory in order to both generate and receive operations, even when there is no concurrency.
+This can use significant amounts of memory and can make documents slow to load.
+
+OT algorithms avoid the metadata overhead of CRDTs; similarly to eg-walker, they only need to persist the latest document state and the history of operations that may be concurrent to operations that might arrive in the future.
+In both eg-walker and OT, the editing history/event graph can be discarded if we know that no event we may receive in the future will be concurrent with any existing event.
+However, OT algorithms have asymptotically worse performance than eg-walker in transforming concurrent operations.
 
 /*
-The persistent state of eg-walker consists only of the event graph (no CRDT state is written to disk)
+To update the state to a different version, retreat on ops that are not included in the new state,
+and advance on ops that are included in the new state but weren't in the old one.
 
-- The CRDT's state grows without bounds.
-- The CRDT's state needs to be available both when emitting new, local events, and when merging remote events. Generally, this data structure in its entirety needs to be loaded entirely into RAM on each peer before any editing can happen.
-- The storage format and network protocols are tied to a particular CRDT algorithm. This makes protocol standardization and code reuse very difficult when new CRDTs are invented.
+Apply emits transformed op; revert/replay do not, but only update the prepare state. Revert/replay
+uses ID-based ops, not indexes. Transformed ops are not used internally by the algorithm, only
+emitted to the text editor.
 */
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
