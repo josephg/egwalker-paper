@@ -176,12 +176,12 @@ An event in the graph is immutable; it always represents the operation as it was
 #figure(
   fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
     let (char1, char2, char3, char4, char5, char6) = ((0,2), (0,1.5), (0,1), (0,0.5), (-0.5,0), (0.5,0))
-    node(char1, $italic(id)_1: italic("Insert")(0, \"H\")$)
-    node(char2, $italic(id)_2: italic("Insert")(1, \"e\")$)
-    node(char3, $italic(id)_3: italic("Insert")(2, \"l\")$)
-    node(char4, $italic(id)_4: italic("Insert")(3, \"o\")$)
-    node(char5, $italic(id)_5: italic("Insert")(3, \"l\")$)
-    node(char6, $italic(id)_6: italic("Insert")(4, \"!\")$)
+    node(char1, $e_1: italic("Insert")(0, \"H\")$)
+    node(char2, $e_2: italic("Insert")(1, \"e\")$)
+    node(char3, $e_3: italic("Insert")(2, \"l\")$)
+    node(char4, $e_4: italic("Insert")(3, \"o\")$)
+    node(char5, $e_5: italic("Insert")(3, \"l\")$)
+    node(char6, $e_6: italic("Insert")(4, \"!\")$)
     edge(char1, char2, "-|>")
     edge(char2, char3, "-|>")
     edge(char3, char4, "-|>")
@@ -193,7 +193,7 @@ An event in the graph is immutable; it always represents the operation as it was
 ) <graph-example>
 
 For example, @graph-example shows the event graph resulting from the operations in @two-inserts.
-The events with IDs $italic(id)_5$ and $italic(id)_6$ are concurrent, and the frontier of this graph is the set of events with IDs ${italic(id)_5, italic(id)_6}$.
+The events $e_5$ and $e_6$ are concurrent, and the frontier of this graph is the set of events ${e_5, e_6}$.
 
 The event graph for a substantial document, such as a research paper, may contain hundreds of thousands of events.
 It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs, and many portions of a typical event graph are linear.
@@ -358,14 +358,94 @@ OT algorithms avoid the metadata overhead of CRDTs; similarly to eg-walker, they
 In both eg-walker and OT, the editing history/event graph can be discarded if we know that no event we may receive in the future will be concurrent with any existing event.
 However, OT algorithms have asymptotically worse performance than eg-walker in transforming concurrent operations.
 
-/*
-To update the state to a different version, retreat on ops that are not included in the new state,
-and advance on ops that are included in the new state but weren't in the old one.
+== Walking the event graph
 
-Apply emits transformed op; revert/replay do not, but only update the prepare state. Revert/replay
-uses ID-based ops, not indexes. Transformed ops are not used internally by the algorithm, only
-emitted to the text editor.
-*/
+For the sake of clarity we first explain a simplified version of eg-walker that replays the entire event graph, does not discard its CRDT state along the way, and incurs CRDT overhead even for non-concurrent operations.
+In Section TODO we show how to add the optimisation that allows us to replay only parts of the event graph.
+
+First, we topologically sort the event graph in a way that keeps events on the same branch consecutive as much as possible: for example, in @topological-sort we first visit $e_"A1" ... e_"A4"$, then $e_"B1" ... e_"B4"$; we avoid alternating between branches, such as $e_"A1", e_"B1", e_"A2", e_"B2" ...$, even though that would also be a valid topological sort.
+For this we use a standard textbook algorithm @CLRS2009: do a depth-first traversal, and build up the topologically sorted list in reverse order while returning from the traversal (i.e. after visiting events that happened later).
+When choosing which branch to traverse, we use a greedy heuristic so that branches with fewer events tend to appear before branches with more events in the sorted order; this can improve performance but is not essential.
+
+The algorithm then processes the events one at a time in topologically sorted order, updating a state object and outputting a transformed operation for each event.
+The state object simultaneously captures the document at two versions: the version in which an event was generated (which we call the _prepare_ version), and the version in which all events seen so far have been applied (which we call the _effect_ version).
+If the prepare and effect versions are the same, the transformed operation is identical to the original one.
+In general, the prepare version is the document resulting from a subset of the set of events in the effect version.
+// Due to the topological sorting it is not possible for the prepare version to be later than the effect version.
+
+The state object can be updated with three methods, each of which takes an event as argument:
+
+/ Apply: Updates the prepare version and the effect version to both include the given event, assuming that the current prepare state equals the parents of that event, and that the event has not previously been applied. This method interprets the event in the context of the prepare version, and outputs the operation representing how the effect version has been updated.
+/ Retreat: Updates the prepare version to remove the given event, assuming that the prepare version previously included that event.
+/ Advance: Updates the prepare version to add the given event, assuming that the prepare version previously did not include that event, but the effect version did.
+
+#figure(
+  fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
+    let (e1, e2, e3, e4, e5, e6, e7, e8) = ((0.5,2.5), (0.5,2), (0,1.5), (0,1), (1,1.5), (1,1), (1,0.5), (0.5,0))
+    node(e1, $e_1: italic("Insert")(0, \"h\")$)
+    node(e2, $e_2: italic("Insert")(1, \"i\")$)
+    node(e3, $e_3: italic("Insert")(0, \"H\")$)
+    node(e4, $e_4: italic("Delete")(1)$)
+    node(e5, $e_5: italic("Delete")(1)$)
+    node(e6, $e_6: italic("Insert")(1, \"e\")$)
+    node(e7, $e_7: italic("Insert")(2, \"y\")$)
+    node(e8, $e_8: italic("Insert")(3, \"!\")$)
+    edge(e1, e2, "-|>")
+    edge(e2, e3, "-|>")
+    edge(e3, e4, "-|>")
+    edge(e2, e5, "-|>")
+    edge(e5, e6, "-|>")
+    edge(e6, e7, "-|>")
+    edge(e7, e8, "-|>")
+    edge(e4, e8, "-|>")
+  }),
+  placement: top,
+  caption: [An event graph. Starting with document "hi", one user changes "hi" to "hey", while concurrently another user capitalises the "H". After the users merge to the state "Hey", one of the users appends an exclamation mark to produce "Hey!".],
+) <graph-hi-hey>
+
+The effect version only moves forwards in time (through $italic("apply")$), whereas the prepare version can move both forwards and backwards.
+Consider the example event graph in @graph-hi-hey, and assume that the events $e_1 ... e_8$ are traversed in order of their subscript.
+These events can be processed as follows:
+
+1. Start in the empty state, and then call $italic("apply")(e_1)$, $italic("apply")(e_2)$, $italic("apply")(e_3)$, and $italic("apply")(e_4)$. This is valid because each event's parent version is the set of all events processed so far.
+2. Before we can apply $e_5$ we must rewind the prepare version to be $e_2$, which is the parent of $e_5$. We can do this by calling $italic("retreat")(e_4)$ and $italic("retreat")(e_3)$.
+3. Now we can call $italic("apply")(e_5)$, $italic("apply")(e_6)$, and $italic("apply")(e_7)$.
+4. The parents of $e_8$ are ${e_4, e_7}$; before we can apply $e_8$ we must therefore add $e_3$ and $e_4$ back into the prepare state again. We do this by calling $italic("advance")(e_3)$ and $italic("advance")(e_4)$.
+5. Finally, we can call $italic("apply")(e_8)$.
+
+In complex event graphs such as the one in @topological-sort it can be necessary to retreat and advance on the same event multiple times, but it is possible to process arbitrary DAGs this way.
+The general rule is: apply the events in topologically sorted order, but before applying each event, compute $G_"old" = sans("Events")(V_p)$ where $V_p$ is the current prepare version, and $G_"new" = sans("Events")(e.italic("parents"))$ where $e$ is the next event to be applied.
+We then call $italic("retreat")$ on each event in $G_"old" - G_"new"$ (in reverse order of their appearance in the topological sort), and call $italic("advance")$ on each event in $G_"new" - G_"old"$ (in topological sort order) before calling $italic("apply")(e)$.
+
+== Representing prepare and effect versions
+
+#figure(
+  fletcher.diagram(node-stroke: 0.5pt,
+    node((0.0,0), [_id_: 3\ _ch_: H\ $s_p$: 0\ $s_e$: 0]),
+    node((0.7,0), [_id_: 1\ _ch_: h\ $s_p$: 1\ $s_e$: 1]),
+    node((1.4,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
+    node((2.8,0), [_id_: 3\ _ch_: H\ $s_p$: -1\ $s_e$: 0]),
+    node((3.5,0), [_id_: 1\ _ch_: h\ $s_p$: 0\ $s_e$: 1]),
+    node((4.2,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
+    edge((1.9,0), (2.3,0), marks: "=>", thickness: 0.8pt)
+  ),
+  placement: top,
+  caption: [TODO]
+) <crdt-state-1>
+
+#figure(
+  fletcher.diagram(node-stroke: 0.5pt,
+    node((0.0,0), [_id_: 3\ _ch_: H\ $s_p$: 0\ $s_e$: 0]),
+    node((0.7,0), [_id_: 1\ _ch_: h\ $s_p$: 1\ $s_e$: 1]),
+    node((1.4,0), [_id_: 6\ _ch_: e\ $s_p$: 0\ $s_e$: 0]),
+    node((2.1,0), [_id_: 7\ _ch_: y\ $s_p$: 0\ $s_e$: 0]),
+    node((2.8,0), [_id_: 8\ _ch_: !\ $s_p$: 0\ $s_e$: 0]),
+    node((3.5,0), [_id_: 2\ _ch_: i\ $s_p$: 1\ $s_e$: 1])
+  ),
+  placement: top,
+  caption: [TODO]
+) <crdt-state-2>
+
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
