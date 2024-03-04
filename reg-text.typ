@@ -200,7 +200,7 @@ It can nevertheless be stored in a very compact form by exploiting the typical e
 As event IDs we can use pairs of a replica ID and a per-replica sequence number, which also compress very well.
 We describe the storage format in more detail in Section TODO.
 
-== Document versions
+== Document versions <versions>
 
 In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
 Due to convergence, any two replicas that have the same set of events must be in the same state; hence, the state of the document must be a deterministic function of the set of events that have occurred.
@@ -361,7 +361,7 @@ However, OT algorithms have asymptotically worse performance than eg-walker in t
 == Walking the event graph
 
 For the sake of clarity we first explain a simplified version of eg-walker that replays the entire event graph, does not discard its CRDT state along the way, and incurs CRDT overhead even for non-concurrent operations.
-In Section TODO we show how to add the optimisation that allows us to replay only parts of the event graph.
+In @clearing we show how to add the optimisation that allows us to replay only parts of the event graph.
 
 First, we topologically sort the event graph in a way that keeps events on the same branch consecutive as much as possible: for example, in @topological-sort we first visit $e_"A1" ... e_"A4"$, then $e_"B1" ... e_"B4"$; we avoid alternating between branches, such as $e_"A1", e_"B1", e_"A2", e_"B2" ...$, even though that would also be a valid topological sort.
 For this we use a standard textbook algorithm @CLRS2009: do a depth-first traversal, and build up the topologically sorted list in reverse order while returning from the traversal (i.e. after visiting events that happened later).
@@ -488,6 +488,7 @@ As the tree is balanced, this can be done in $O(log n)$ time.
 Now it is easy to find the $i$th record with $s_p = 0$ in logarithmic time by starting at the root of the tree, and adding up the values in the subtrees that have been skipped.
 Moreover, once we have a record in the sequence we can efficiently determine its index in the effect state by going in the opposite direction: working upwards in the tree towards the root, and summing the numbers of records with $s_e = 0$ that lie in subtrees to the left of the starting record.
 This allows us to efficiently transform an operation from the prepare version into the effect version.
+If the character was already deleted in the effect version ($s_e > 0$), the transformed operation is a no-op.
 
 We use this process on every $italic("apply")(e)$, and then store the ID of the target record on the event $e$ in the event graph.
 For insertions, this is simply the ID of the event itself; for deletion events, it is the ID of the event that originally inserted the character being deleted.
@@ -495,6 +496,33 @@ When we subsequently perform a $italic("retreat")(e)$ or $italic("advance")(e)$,
 We can therefore ignore the operation index when retreating and advancing, and instead use the ID to look up the record to be updated.
 To this end we maintain a second B-tree that is keyed by event ID, and which points at the leaf nodes of the first B-tree.
 This tree allows us to advance or retreat in logarithmic time.
+
+== Clearing CRDT state <clearing>
+
+As described so far, the algorithm retains every insertion since document creation forever in its internal state, causing the state to become big, and requiring the entire event graph to be replayed in order to restore the state.
+We now introduce a further optimisation that allows eg-walker to completely discard its internal state from time to time, and replay only a subset of the event graph.
+
+We define a version $V subset.eq G$ to be a _critical version_ in an event graph $G$ iff it partitions the graph into two subsets of events $G_1 = sans("Events")(V)$ and $G_2 = G - G_1$ such that all events in $G_1$ happened before all events in $G_2$:
+$ forall e_1 in G_1: forall e_2 in G_2: e_1 -> e_2. $
+
+Equivalently, $V$ is a critical version iff every event in the graph is either included in $V$ or happened after _all_ of the events in $V$:
+$ forall e_1 in G: e_1 in sans("Events")(V) or (forall e_2 in V: e_2 -> e_1). $
+If a version is critical, that does not guarantee that it will remain critical forever; it is possible for a critical version to become non-critical because a concurrent event is added to the graph.
+
+This concept enables several key optimisations:
+
+- If the version of the event graph processed so far is critical, we can discard all of the internal state (including both B-trees and all $s_p$ and $s_e$ values), and replace it with a placeholder as explained in @placeholders.
+- If the parents of the next event are equal to the version of the event graph processed so far, we just output the unmodified operation from the event as the transformed operation.
+- If both an event's version and its parent version are critical versions, there is no need to traverse the B-trees and update the CRDT state, since we would immediately discard that state anyway; we can just skip this work.
+
+These optimisations make it very fast to process documents that are mostly edited sequentially (e.g., because the authors took turns and did not write concurrently), since most of the event graph of such a document is a linear chain of critical versions.
+
+If a replica receives events that are concurrent with existing events in its graph, but the replica has already discarded its internal state resulting from those events, it needs to rebuild some of that state.
+It can do this by identifying the most recent critical version that happened before the new event, replaying the existing events that happened after that critical version (in topologically sorted order), and finally applying the new events.
+Events from before that critical version do not need to be replayed.
+Since most editing histories have critical versions from time to time, this means that usually only a small subset of the event graph needs to be replayed.
+
+== Placeholders for partial event graph replay <placeholders>
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
