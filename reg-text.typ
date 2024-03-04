@@ -470,6 +470,31 @@ In the prepare state, by retreating $e_4$ and $e_3$ the "H" is marked as not yet
 ) <crdt-state-2>
 
 @crdt-state-2 shows the state after replaying all of the events in @graph-hi-hey: "i" is also deleted, the characters "e" and "y" are inserted immediately after the "h", $e_3$ and $e_4$ are advanced again, and finally the exclamation mark is inserted after the "y".
+The figures include the character for the sake of readability, but the algorithm actually does not need to store characters in its internal state.
+
+== Mapping indexes to character IDs
+
+In the event graph, insertion and deletion operations specify the index at which they apply; in order to update eg-walker's internal state, we need to map these to the correct record in the sequence.
+Moreover, to produce the transformed operations, we need to map these internal IDs back to indexes again.
+
+A simple but inefficient algorithm would be: to apply a $italic("Delete")(i)$ operation we iterate over the sequence of records and pick the $i$th record with a prepare state of $s_p = 0$ (i.e., the $i$th among the characters that are visible in the prepare state, which is the document state in which the operation should be interpreted).
+Similarly, to apply $italic("Insert")(i, c)$ we skip over $i - 1$ records with $s_p = 0$ and insert the new record after the last skipped record (if there have been concurrent insertions at the same position, we may also need to skip over some records with $s_p = -1$, as determined by the list CRDT's insertion ordering).
+
+To reduce the cost of this algorithm from $O(n)$ to $O(log n)$, where $n$ is the number of characters in the document, we construct a B-tree whose leaves, from left to right, contain the sequence of records representing character states.
+We extend the tree into an _order statistic tree_ @CLRS2009 (also known as _ranked B-tree_) by adding two integers to each node: the number of records with $s_p = 0$ contained within that subtree, and the number of records with $s_e = 0$ in that subtree.
+Every time the state variables are updated, we also update those numbers on the path from the updated record to the root.
+As the tree is balanced, this can be done in $O(log n)$ time.
+
+Now it is easy to find the $i$th record with $s_p = 0$ in logarithmic time by starting at the root of the tree, and adding up the values in the subtrees that have been skipped.
+Moreover, once we have a record in the sequence we can efficiently determine its index in the effect state by going in the opposite direction: working upwards in the tree towards the root, and summing the numbers of records with $s_e = 0$ that lie in subtrees to the left of the starting record.
+This allows us to efficiently transform an operation from the prepare version into the effect version.
+
+We use this process on every $italic("apply")(e)$, and then store the ID of the target record on the event $e$ in the event graph.
+For insertions, this is simply the ID of the event itself; for deletion events, it is the ID of the event that originally inserted the character being deleted.
+When we subsequently perform a $italic("retreat")(e)$ or $italic("advance")(e)$, that event $e$ must have already been applied, and therefore we must have previously stored the ID of the record it refers to.
+We can therefore ignore the operation index when retreating and advancing, and instead use the ID to look up the record to be updated.
+To this end we maintain a second B-tree that is keyed by event ID, and which points at the leaf nodes of the first B-tree.
+This tree allows us to advance or retreat in logarithmic time.
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
