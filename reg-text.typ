@@ -242,7 +242,7 @@ In CRDTs, each event is first translated into operations that use unique IDs ins
 In order to update the text editor, these updates to the CRDT's internal structure need to be translated back into index-based insertions and deletions.
 Many CRDT papers elide this translation from unique IDs back to indexes, but it is important for practical applications:
 
-- Text editors use specialised data structures such as piece tables @vscode-buffer to support fast edits on large documents, and integrating with these structures requires index-based operations. Incrementally updating these structures also enables syntax highlighting without having to repeatedly parse the whole file on every keystroke.
+- Text editors use specialised data structures such as piece trees @vscode-buffer to support fast edits on large documents, and integrating with these structures requires index-based operations. Incrementally updating these structures also enables syntax highlighting without having to repeatedly parse the whole file on every keystroke.
 - The user's cursor position in a document can be represented as an index; if another user changes text earlier in the document, index-based operations make it easy to update the cursor so that it remains in the correct position relative to the surrounding text.
 
 Thus, regardless of whether the OT or the CRDT approach is used, a collaborative editing algorithm can be boiled down to an incremental update to an event graph: given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event.
@@ -370,12 +370,12 @@ When choosing which branch to traverse, we use a greedy heuristic so that branch
 The algorithm then processes the events one at a time in topologically sorted order, updating a state object and outputting a transformed operation for each event.
 The state object simultaneously captures the document at two versions: the version in which an event was generated (which we call the _prepare_ version), and the version in which all events seen so far have been applied (which we call the _effect_ version).
 If the prepare and effect versions are the same, the transformed operation is identical to the original one.
-In general, the prepare version is the document resulting from a subset of the set of events in the effect version.
+In general, the prepare version represents a subset of the events of the effect version.
 // Due to the topological sorting it is not possible for the prepare version to be later than the effect version.
 
 The state object can be updated with three methods, each of which takes an event as argument:
 
-/ Apply: Updates the prepare version and the effect version to both include the given event, assuming that the current prepare state equals the parents of that event, and that the event has not previously been applied. This method interprets the event in the context of the prepare version, and outputs the operation representing how the effect version has been updated.
+/ Apply: Updates both the prepare version and the effect version to include the given event, assuming that the current prepare version equals the parents of that event, and that the event has not previously been applied. This method interprets the event in the context of the prepare version, and outputs the operation representing how the effect version has been updated.
 / Retreat: Updates the prepare version to remove the given event, assuming that the prepare version previously included that event.
 / Advance: Updates the prepare version to add the given event, assuming that the prepare version previously did not include that event, but the effect version did.
 
@@ -419,19 +419,42 @@ We then call $italic("retreat")$ on each event in $G_"old" - G_"new"$ (in revers
 
 == Representing prepare and effect versions
 
+The state object implements the $italic("apply")$, $italic("retreat")$, and $italic("advance")$ methods by maintaining a CRDT data structure.
+This structure consists of a linear sequence of records, one per character in the document (runs of characters with consecutive IDs and the same properties can be run-length encoded to save memory).
+A record is inserted into this sequence by $italic("apply")(e_i)$ for an insertion event $e_i$; subsequent deletion events and $italic("retreat")$/$italic("advance")$ calls may modify properties of the record, but records in the sequence are not removed or reordered once they have been inserted.
+
+When the event graph contains concurrent insertion operations, we use an existing CRDT algorithm to ensure that all replicas place the records in this sequence in the same order, regardless of the order in which they traverse the event graph.
+Any list CRDT could be used for this purpose; the main differences between algorithms are their performance and their interleaving characteristics @fugue.
+Our implementation of eg-walker uses a variant of the Yjs algorithm @yjs @Nicolaescu2016YATA that we conjecture to be maximally non-interleaving; we leave a detailed analysis of this algorithm to future work, since it is not core to this paper.
+
+Each record in this sequence contains the ID of the event that inserted the character, two integer state variables $s_p$ (the character's state in the prepare version) and $s_e$ (its state in the effect version), and any other fields required by the CRDT to determine the order of concurrent insertions.
+$s_p$ and $s_e$ are zero if the character is visible (inserted but not deleted) in the prepare and effect version respectively; a positive integer indicates how many times that character has been deleted by concurrent delete events.
+$s_p$ can also be -1 if the character has not yet been inserted in the prepare version, but $s_p$ cannot be less than -1 and $s_e$ cannot be negative.
+
+The rules for updating $s_p$ and $s_e$ are:
+
+- When a record is first inserted by $italic("apply")(e_i)$ with an insertion event $e_i$, it is initialised with $s_p = s_e = 0$.
+- Calling $italic("apply")(e_d)$ with a deletion event $e_d$ increments both $s_p$ and $s_e$ in the record representing the deleted character.
+- If $italic("retreat")(e_i)$ is called with an insertion event $e_i$, $s_p$ must be zero in the record affected by the event, and we move the affected character from $s_p = 0$ to $s_p = -1$. Conversely, $italic("advance")(e_i)$ moves from $s_p = -1$ to $s_p = 0$.
+- If $italic("retreat")(e_d)$ is called with a deletion event $e_d$, $s_p$ must be positive in the record affected by the event, and $s_p$ is decremented. Conversely, $italic("advance")(e_d)$ increments $s_p$.
+
 #figure(
   fletcher.diagram(node-stroke: 0.5pt,
     node((0.0,0), [_id_: 3\ _ch_: H\ $s_p$: 0\ $s_e$: 0]),
-    node((0.7,0), [_id_: 1\ _ch_: h\ $s_p$: 1\ $s_e$: 1]),
-    node((1.4,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
-    node((2.8,0), [_id_: 3\ _ch_: H\ $s_p$: -1\ $s_e$: 0]),
-    node((3.5,0), [_id_: 1\ _ch_: h\ $s_p$: 0\ $s_e$: 1]),
-    node((4.2,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
-    edge((1.9,0), (2.3,0), marks: "=>", thickness: 0.8pt)
+    node((0.6,0), [_id_: 1\ _ch_: h\ $s_p$: 1\ $s_e$: 1]),
+    node((1.25,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
+    node((2.9,0), [_id_: 3\ _ch_: H\ $s_p$: -1\ $s_e$: 0]),
+    node((3.6,0), [_id_: 1\ _ch_: h\ $s_p$: 0\ $s_e$: 1]),
+    node((4.25,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
+    edge((1.8,0), (2.4,0), text(0.7em, $italic("retreat")(e_4)\ italic("retreat")(e_3)$), marks: "=>", thickness: 0.8pt, label-sep: 0.5em)
   ),
   placement: top,
-  caption: [TODO]
+  caption: [Left: the internal state after applying $e_1 ... e_4$ from @graph-hi-hey. Right: after $italic("retreat")(e_4)$ and $italic("retreat")(e_3)$, the prepare state is updated to mark "H" as "not yet inserted" (–1), and the deletion of "h" is undone. The effect state is unchanged.]
 ) <crdt-state-1>
+
+For example, @crdt-state-1 shows the state after applying $e_1 ... e_4$ from @graph-hi-hey, and how that state is updated by retreating $e_4$ and $e_3$ before $e_5$ is applied.
+In the effect state, the lowercase "h" is marked as deleted, while the uppercase "H" and the "i" are visible.
+In the prepare state, by retreating $e_4$ and $e_3$ the "H" is marked as not yet inserted ($s_p = -1$), and the deletion of "h" is undone ($s_p = 0$).
 
 #figure(
   fletcher.diagram(node-stroke: 0.5pt,
@@ -443,9 +466,10 @@ We then call $italic("retreat")$ on each event in $G_"old" - G_"new"$ (in revers
     node((3.5,0), [_id_: 2\ _ch_: i\ $s_p$: 1\ $s_e$: 1])
   ),
   placement: top,
-  caption: [TODO]
+  caption: [The internal eg-walker state after replaying all of the events in @graph-hi-hey.]
 ) <crdt-state-2>
 
+@crdt-state-2 shows the state after replaying all of the events in @graph-hi-hey: "i" is also deleted, the characters "e" and "y" are inserted immediately after the "h", $e_3$ and $e_4$ are advanced again, and finally the exclamation mark is inserted after the "y".
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
