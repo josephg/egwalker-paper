@@ -336,7 +336,7 @@ This way, the algorithm supports real-time collaboration.
 
 == Characteristics of Eg-walker
 
-Eg-walker ensures that the resulting document is consistent with Attiya et al.'s _strong list specification_ @Attiya2016 (in essence, it converges and it applies operations in the right place), and it is _maximally non-interleaving_ @fugue (i.e., concurrent sequences of insertions at the same position are placed one after another, and not interleaved).
+Eg-walker ensures that the resulting document is consistent with Attiya et al.'s _strong list specification_ @Attiya2016 (in essence, replicas converge to the same state and apply operations in the right place), and it is _maximally non-interleaving_ @fugue (i.e., concurrent sequences of insertions at the same position are placed one after another, and not interleaved).
 
 One way of achieving this goal would be to track the state of the document on each branch of the event graph, to translate each event into a corresponding CRDT operation (based on the document state in which that event was generated), and when branches in the event graph merge, to apply the CRDT operations from one branch to the other branch's state.
 Essentially, this approach simulates a network of communicating CRDT replicas and their states.
@@ -349,7 +349,7 @@ A key insight of eg-walker is how to compute the correct transformed operations 
 Moreover, eg-walker requires the event graph and CRDT state only in order to transform an operation to account for concurrent events.
 The algorithm does not inspect them when generating new events, or when adding an event to the graph that happened after all existing events.
 This means that most of the time, the event graph can remain on disk without using any space in memory or any CPU time to load; it is sufficient to load only the latest document state, which can be stored in a separate file from the event graph.
-We only have to load the event graph into memory when handling concurrency, and even then we only have to replay the portion of the graph since the last point where the CRDT state was discarded.
+We only have to load the event graph into memory when handling concurrency, and even then we only have to replay the portion of the graph since the last ancestor that the concurrent operations had in common.
 
 Eg-walker's approach contrasts with the usual CRDT approach, which requires every replica to persist the CRDT state (including the unique ID for each character) to disk and send it over the network, and which requires that state to be loaded into memory in order to both generate and receive operations, even when there is no concurrency.
 This can use significant amounts of memory and can make documents slow to load.
