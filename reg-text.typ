@@ -328,7 +328,7 @@ In graphs with concurrent operations there are multiple possible sort orders, an
 ) <topological-sort>
 
 For example, the graph in @graph-example has two possible sort orders; eg-walker will either first insert the second "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first insert "!" at index 4 followed by the second "l" at index 3 (like User 2 in @two-inserts); the final document is the same either way.
-However, the choice of sort order affects the performance of the algorithm, as discussed in Section TODO.
+However, the choice of sort order affects the performance of the algorithm, as discussed in @complexity.
 
 Event graph replay extends directly to incremental updates: when a new event is added to the graph, since all of its parents must already be in the graph, each added event becomes the next element of the topologically sorted sequence.
 We can transform each new event in the same way as during replay, and apply the transformed operation to the current document state.
@@ -417,7 +417,7 @@ In complex event graphs such as the one in @topological-sort it can be necessary
 The general rule is: apply the events in topologically sorted order, but before applying each event, compute $G_"old" = sans("Events")(V_p)$ where $V_p$ is the current prepare version, and $G_"new" = sans("Events")(e.italic("parents"))$ where $e$ is the next event to be applied.
 We then call $italic("retreat")$ on each event in $G_"old" - G_"new"$ (in reverse order of their appearance in the topological sort), and call $italic("advance")$ on each event in $G_"new" - G_"old"$ (in topological sort order) before calling $italic("apply")(e)$.
 
-== Representing prepare and effect versions
+== Representing prepare and effect versions <prepare-effect-versions>
 
 The state object implements the $italic("apply")$, $italic("retreat")$, and $italic("advance")$ methods by maintaining a CRDT data structure.
 This structure consists of a linear sequence of records, one per character in the document (runs of characters with consecutive IDs and the same properties can be run-length encoded to save memory).
@@ -511,7 +511,7 @@ If a version is critical, that does not guarantee that it will remain critical f
 
 This concept enables several key optimisations:
 
-- If the version of the event graph processed so far is critical, we can discard all of the internal state (including both B-trees and all $s_p$ and $s_e$ values), and replace it with a placeholder as explained in @placeholders.
+- If the version of the event graph processed so far is critical, we can discard all of the internal state (including both B-trees and all $s_p$ and $s_e$ values), and replace it with a placeholder as explained in @partial-replay.
 - If the parents of the next event are equal to the version of the event graph processed so far, we just output the unmodified operation from the event as the transformed operation.
 - If both an event's version and its parent version are critical versions, there is no need to traverse the B-trees and update the CRDT state, since we would immediately discard that state anyway; we can just skip this work.
 
@@ -521,8 +521,51 @@ If a replica receives events that are concurrent with existing events in its gra
 It can do this by identifying the most recent critical version that happened before the new event, replaying the existing events that happened after that critical version (in topologically sorted order), and finally applying the new events.
 Events from before that critical version do not need to be replayed.
 Since most editing histories have critical versions from time to time, this means that usually only a small subset of the event graph needs to be replayed.
+The root version $emptyset$ is always a critical version, so in the worst case this algorithm replays the entire event graph.
 
-== Placeholders for partial event graph replay <placeholders>
+== Partial event graph replay <partial-replay>
+
+Assume that we want to add event $e_"new"$ to the event graph $G$, that $V_"curr" = sans("Version")(G)$ is the current document reflecting all events except $e_"new"$, and that $V_"crit" eq.not V_"curr"$ is the latest critical version in $G union {e_"new"}$ that happened before both $e_"new"$ and $V_"curr"$.
+Further assume that we have discarded the internal state, so the only information we have is the latest document state at $V_"curr"$ and the event graph; in particular, without replaying the entire event graph we do not know the document state at $V_"crit"$.
+
+However, a key insight of eg-walker is that the full document state at $V_"crit"$ is not needed; all we need is enough state to transform $e_"new"$ to apply to the document at $V_"curr"$, and this state can be obtained by replaying only the events since $V_"crit"$, that is, $G - sans("Events")(V_"crit")$, in topologically sorted order.
+For example, using the graph in @topological-sort, say the current state is $G = {e_"A1" ... e_"A5", e_"B1" ... e_"B4"}$, so $V_"curr" = {e_"A5", e_"B4"}$, and the new event $e_"new" = e_"C1"$.
+Then ${e_"A1"}$ is the most recent critical version.
+
+Before replaying the events, we initialise the internal state with a single placeholder record that represents the range of indexes $[0, infinity]$ of the document state at $V_"crit"$ (we do not know the exact length of the document at that version, but we can still have a placeholder for arbitrarily many indexes).
+Placeholders are counted as the number of characters they represent in the order statistic tree construction, and they have the same length in both the prepare and the effect versions.
+We then apply events as follows:
+
+- Applying an insertion at index $i$ creates a record with $s_p = s_e = 0$ and the ID of the insertion event. We map the index to a record in the sequence using the prepare state as usual; if $i$ falls within a placeholder for range $[j, k]$, we split it into a placeholder for $[j, i-1]$, followed by the new record, followed by a placeholder for $[i, k]$. Placeholders for empty ranges are omitted.
+- Applying a deletion at index $i$: if the deleted character was inserted prior to $V_"crit"$, the index must fall within a placeholder with some range $[j, k]$. We split it into a placeholder for $[j, i-1]$, followed by a new record with $s_p = s_e = 1$, followed by a placeholder for $[i+1, k]$. The new record has a placeholder ID that only needs to be unique within the local replica, and need not be consistent across replicas.
+- Applying a deletion of a character inserted since $V_"crit"$ updates the record created by the insertion.
+
+Before applying an event we retreat and advance as before.
+The algorithm never needs to retreat or advance an event that happened before $V_"crit"$, therefore we can rely on every retreated or advanced event to have a record ID that was assigned when we applied the event.
+
+While replaying events in $G$ we do not output transformed operations.
+When we have completed replaying up to $V_"curr"$, we next retreat/advance to the parent version of $e_"new"$, apply $e_"new"$, and output a transformed version of that event.
+We do this in the same way as before, by starting at the updated record and then moving upwards in the B-tree, adding up the preceding number of characters in the effect version (including placeholders).
+Events subsequent to $e_"new"$ can now be processed using the state we constructed, without having to repeat the replay.
+
+If there are concurrent insertions at the same position, we invoke the CRDT algorithm to place them in a consistent order as discussed in @prepare-effect-versions.
+Since all concurrent events must be after $V_"crit"$, they are included in the replay.
+When we are seeking for the insertion position, we never need to seek past a placeholder, since the placeholder represents characters that were inserted before $V_"crit"$.
+
+== Algorithm complexity <complexity>
+
+Say we have two users who have been working offline, generating $k$ and $m$ events respectively.
+When they come online and merge their event graphs, the latest critical version is immediately prior to the branching point.
+If the branch of $k$ events comes first in the topological sort, the replay algorithm first applies $k$ events, then retreats $k$ events, applies $m$ events, and finally advances $k$ events again.
+Asymptotically, $O(k+m)$ calls to apply/retreat/advance are required regardless of the order in which the branches are traversed, although in practice the algorithm is faster if $k<m$ since we don't need to retreat/advance on the branch that is visited last.
+
+Each apply/retreat/advance requires one or two traversals of the order statistic tree, and at most one traversal of the ID-keyed B-tree.
+The upper bound on the number of entries in each tree (including placeholders) is $2(k+m)+1$, since each event generates at most one new record and one placeholder split.
+Since the trees are balanced, the cost of each traversal is $O(log(k+m))$.
+Overall, the cost of merging branches with $k$ and $m$ events is therefore $O((k+m) log(k+m))$.
+
+To determine the worst-case complexity of replaying an event graph with $n$ events, note that each event is applied exactly once, and before each event we can at most retreat or advance each prior event once.
+The overall worst-case complexity of the algorithm is therefore $O(n^2 log n)$; however, this case is unlikely to occur in realistic collaborative text editing scenarios.
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
@@ -530,6 +573,8 @@ Since most editing histories have critical versions from time to time, this mean
 
 The idea of capturing a DAG of operations in the form they were generated appears in several algorithms, including pure operation-based CRDTs @polog and time machines (TODO: citation).
 However, existing publications on pure operation-based CRDTs consider only datatypes such as sets and registers, but not text or lists.
+
+TODO: more related work
 
 // Explain relationship to merging in version control systems such as Git, Darcs, etc.
 
