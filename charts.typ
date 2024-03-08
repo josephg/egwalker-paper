@@ -1,7 +1,8 @@
 // This file contains charts for reg-text.typ. Its awkward including them inline, so I've moved
 // them here.
 
-#import "@local/cetz:0.2.0": canvas, plot, draw, chart, palette, styles
+// #import "@local/cetz:0.2.0": canvas, plot, draw, chart, palette, styles
+#import "@preview/cetz:0.2.0": canvas, plot, draw, chart, palette, styles
 
 
 #let alg-colors = (
