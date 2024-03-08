@@ -1,4 +1,20 @@
 {
+  "egwalker": {
+    "size": 355551,
+    "smolSize": 184685,
+    "uncompressedSize": 632602,
+    "uncompressedSmolSize": 268178,
+    "amSize": 470852,
+    "amSizeUncompressed": 987713,
+    "yjsSize": 347740,
+    "insLen": 529552,
+    "endContentLen": 165128,
+    "patchesLen": 103017,
+    "smolPatchesLen": 103003,
+    "normalTextCompressed": 252498,
+    "smolTextCompressed": 81632,
+    "docLen": 165126
+  },
   "automerge-paper": {
     "size": 106247,
     "smolSize": 65654,
