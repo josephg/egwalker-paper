@@ -9,13 +9,61 @@
 #import "charts.typ"
 #show: thmrules
 
+#let anonymous = false
+
 #set page(
-paper: "a4",
-numbering: "1",
-margin: (x: 50pt),
+  paper: "a4",
+  numbering: "1",
+  // 178 × 229 mm text block on an A4 page (210 × 297 mm)
+  margin: (x: (210 - 178) / 2 * 1mm, y: (297 - 229) / 2 * 1mm),
 )
-#set text(9pt)
-#set heading(numbering: "1.a")
+
+// 10pt text with 12pt leading
+#set text(font: "Linux Libertine", size: 10pt)
+#let spacing = 0.55em
+#set par(justify: true, first-line-indent: 1em, leading: spacing)
+#show par: set block(spacing: spacing)
+//#show math.equation: set text(font: "Libertinus Math")
+
+#set heading(numbering: "1.1.1")
+
+// Heading formatting from https://gist.github.com/vtta/d6268ba81ebfdd1dc573db4b72df8436
+#show heading: it => locate(loc => {
+  // Find out the final number of the heading counter.
+  let levels = counter(heading).at(loc)
+  let deepest = if levels != () { levels.last() } else { 1 }
+  v(2 * spacing, weak: true)
+  if it.level == 1 {
+    let no-numbering = it.body in ([Abstract], [Acknowledgments], [Acknowledgment])
+    block(text(size: 12pt, {
+      if it.numbering != none and not no-numbering{ 
+        numbering(it.numbering, ..levels)
+        h(spacing, weak: true)
+      }
+      it.body
+      v(1.5 * spacing, weak: true)
+    }))
+  } else if it.level == 2 {
+    block(text(size: 10pt,{
+      if it.numbering != none { 
+        numbering(it.numbering, ..levels)
+        h(spacing, weak: true)
+      }
+      it.body
+      v(1.5 * spacing, weak: true)
+    }))
+  } else {
+    if it.numbering != none { 
+      h(-1em)
+      numbering(it.numbering, ..levels)
+      h(spacing, weak: true)
+    }
+    it.body + [.]
+  }
+})
+
+#set enum(indent: 10pt, body-indent: 9pt)
+#set list(indent: 10pt, body-indent: 9pt)
 
 #let definition = thmbox("definition", "Definition",
   base_level: 0,
@@ -27,30 +75,34 @@ margin: (x: 50pt),
   fill: rgb("#e8e8f8")
 )
 
-#align(center, text(17pt)[
+#align(center, text(20pt)[
   *Eg-walker: Text editing on the Event Graph*
 ])
 
-#grid(
-  columns: (1fr, 1fr),
-  align(center)[
-    Joseph Gentle \
-    #link("mailto:me@josephg.com")
-  ],
+#if anonymous {
+  align(center, text(12pt)[
+    Anonymous Author(s) \
+    Submission ID: TODO
+  ])
+} else {
+  grid(
+    columns: (1fr, 1fr),
+    align(center, text(12pt)[
+      Joseph Gentle \
+      #link("mailto:me@josephg.com")
+    ]),
 
-  align(center)[
-    Martin Kleppmann \
-    #link("mailto:martin@kleppmann.com")
-  ]
-)
+    align(center, text(12pt)[
+      Martin Kleppmann \
+      University of Cambridge, UK \
+      #link("mailto:martin@kleppmann.com")
+    ])
+  )
+}
 
-#align(center, text(15pt)[
-  *DRAFT DRAFT DO NOT PUBLISH*
-])
+#show: columns.with(2, gutter: 8mm)
 
-#columns(2)[
-
-#align(center)[*Abstract*]
+#heading(numbering: none, [Abstract])
 
 Collaborative text editing algorithms allow several users to concurrently modify a text file, and automatically merge concurrent edits into a consistent state.
 Existing collaboration algorithms are either slow to merge files that have diverged substantially due to offline editing (in the case of Operational Transformation/OT), or incur overheads due to giving a unique ID to every character (in the case of CRDTs).
@@ -1974,10 +2026,11 @@ Remarkably, eg-walker achieves this despite having excellent real-world performa
 
 We think this approach is a fascinating direction for future research in the field of realtime collaborative editing. We sincerely hope others build on this work, and find it as interesting and useful as we have.
 
+#if not anonymous [
+  #heading(numbering: none, [Acknowledgements])
 
-= Acknowledgements
-
-This work was made possible by the generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have been possible without financial support and the endless conversations we have shared about collaborative editing.
+  This work was made possible by the generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have been possible without financial support and the endless conversations we have shared about collaborative editing.
+]
 
 // We can define the length of each event at both #vp and #ve:
 
@@ -2114,18 +2167,16 @@ fn setPrepareVersion(oldInputVersion, newInputVersion) {
 
 */
 
+#show bibliography: set text(8pt)
+#bibliography(("works.yml", "works.bib"),
+  title: "References",
+  style: "association-for-computing-machinery"
+)
 
-// TODO: Use a different font for this!
-#align(left, text(17pt)[
-  *Appendix*
-])
-
-// #heading(level: 1, "Appendix")
-// =
 #counter(heading).update(0)
-#set heading(numbering: "A.", supplement: "Appendix")
+#set heading(numbering: "A", supplement: "Appendix")
 
-= Generic CRDT to replay algorithm: <generic-crdt-replay>
+= Generic CRDT to replay algorithm <generic-crdt-replay>
 
 In this section, we present a generic replay function which matches the behaviour of any CRDT. See @crdt-equivalence for details.
 
@@ -2363,9 +2414,3 @@ function integrate(ctx: EditContext, cg: causalGraph.CausalGraph, newItem: Item,
 }
 ```
 */
-
-#bibliography(("works.yml", "works.bib"),
-  title: "References",
-  style: "association-for-computing-machinery"
-)
-]
