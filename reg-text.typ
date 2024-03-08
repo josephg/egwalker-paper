@@ -1839,6 +1839,8 @@ We use 2 editing traces from each of the following 3 categories, representing di
   )
 }
 
+// TODO: This is a bit ugly in column format.
+#text(6pt, [
 #figure(
   table(
     columns: (auto, auto, auto, auto, auto, auto),
@@ -1852,6 +1854,7 @@ We use 2 editing traces from each of the following 3 categories, representing di
     // [git-Makefile], [async], [348 819], [*6.11*], [1215], [299],
     ..stats_for("automerge-paper", "sequential"),
     ..stats_for("seph-blog1", "sequential"),
+    ..stats_for("egwalker", "sequential"),
     ..stats_for("friendsforever", "concurrent"),
     ..stats_for("clownschool", "concurrent"),
     ..stats_for("node_nodecc", "async"),
@@ -1860,7 +1863,7 @@ We use 2 editing traces from each of the following 3 categories, representing di
   caption: [
     Various size measurements for the evaluation datasets. \# Events is the total number of inserted + deleted characters in the trace. Concurrency is an estimate of concurrency - during a BFS traversal of the graph, this shows the mean number of edits concurrent with each inserted or deleted character in the trace. EG RLE count is the number of nodes in the event graph when "runs" of trivial nodes (with 1 parent and 1 child) are joined together. \# Agents is the number of "user agents" which contributed to a trace. For traces from git, this is the number of unique authors which have touched the file.
   ]
-)
+)])
 
 
 == Speed

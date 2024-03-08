@@ -105,41 +105,42 @@
 }
 
 
-#let speed_local = canvas(length: 1cm, {
-  draw.set-style(barchart: barchart_style)
-  chart.barchart(
-    mode: "clustered",
-    // mode: "basic",
-    size: (7, 4),
-    value-key: (..range(1, 3)),
-    labels: (
-      // [dt-crdt], [dt]
-      [crdt (dt-crdt)], [eg-walker (dt)]
-    ),
-    axis-style: "scientific",
-    bar-style: idx => (
-      stroke: 0.1pt + black,
-      fill: (alg-colors.dtcrdt, alg-colors.dt).at(idx),
-    ),
-    // bar-style: palette.tango,
-    // x-unit: [x],
-    x-label: text(10pt)[Local speed in Mevents / sec processed. More is better],
-    x-max: 75,
-    x-min: -0.08,
-    x-tick-step: 10,
-    plot-args: (
-      // x-ticks: (10, 20),
-    ),
-    (
-      bar_for_local("automerge-paper", "automerge-paper"),
-      bar_for_local("seph-blog1", "seph-blog1"),
-      bar_for_local("clownschool", "clownschool_flat"),
-      bar_for_local("friendsforever", "friendsforever_flat"),
-      // bar_for_local("node_nodecc"),
-      // bar_for_local("git-makefile"),
-    ),
-  )
-})
+// #let speed_local = canvas(length: 1cm, {
+//   draw.set-style(barchart: barchart_style)
+//   chart.barchart(
+//     mode: "clustered",
+//     // mode: "basic",
+//     size: (7, 4),
+//     value-key: (..range(1, 3)),
+//     labels: (
+//       // [dt-crdt], [dt]
+//       [crdt (dt-crdt)], [eg-walker (dt)]
+//     ),
+//     axis-style: "scientific",
+//     bar-style: idx => (
+//       stroke: 0.1pt + black,
+//       fill: (alg-colors.dtcrdt, alg-colors.dt).at(idx),
+//     ),
+//     // bar-style: palette.tango,
+//     // x-unit: [x],
+//     x-label: text(10pt)[Local speed in Mevents / sec processed. More is better],
+//     x-max: 75,
+//     x-min: -0.08,
+//     x-tick-step: 10,
+//     plot-args: (
+//       // x-ticks: (10, 20),
+//     ),
+//     (
+//       bar_for_local("automerge-paper", "automerge-paper"),
+//       bar_for_local("seph-blog1", "seph-blog1"),
+//       bar_for_local("egwalker", "egwalker"),
+//       bar_for_local("clownschool", "clownschool_flat"),
+//       bar_for_local("friendsforever", "friendsforever_flat"),
+//       // bar_for_local("node_nodecc"),
+//       // bar_for_local("git-makefile"),
+//     ),
+//   )
+// })
 
 
 
@@ -162,7 +163,7 @@
     size: (7, 4),
     x-tick-step: 2,
     x-min: -0.02,
-    x-max: 16,
+    x-max: 18,
     label-key: 0,
     value-key: (..range(1, 3)),
     // value-key: (..range(1, 4)),
@@ -189,6 +190,7 @@
     (
       bar_for_remote("automerge-paper"),
       bar_for_remote("seph-blog1"),
+      bar_for_remote("egwalker"),
       bar_for_remote("friendsforever"),
       bar_for_remote("clownschool"),
       bar_for_remote("node_nodecc"),
@@ -241,6 +243,7 @@
     (
       bar_for_ff("automerge-paper"),
       bar_for_ff("seph-blog1"),
+      bar_for_ff("egwalker"),
       bar_for_ff("friendsforever"),
       bar_for_ff("clownschool"),
       bar_for_ff("node_nodecc"),
@@ -316,6 +319,7 @@
     (
       ("automerge-paper", "automerge-paper"),
       ("seph-blog1", "seph-blog1"),
+      ("egwalker", "egwalker"),
       ("clownschool", "clownschool_flat"),
       ("friendsforever", "friendsforever_flat"),
       // bar_for_all_local("node_nodecc"),
@@ -446,6 +450,7 @@
     (
       "automerge-paper",
       "seph-blog1",
+      "egwalker",
       "friendsforever",
       "clownschool",
       "node_nodecc",
@@ -498,11 +503,12 @@
       [DT (full)], [Automerge]
     ),
     // x-unit: [x],
-    x-label: text(10pt, [Ratio of resulting file size to inserted content length. (Smaller is better)]),
+    x-label: text(8pt, [Ratio of resulting file size to inserted content length. (Smaller is better)]),
     // x-label: text(10pt, [% file size overhead compared to total inserted content length. (Smaller is better)]),
     (
       "automerge-paper",
       "seph-blog1",
+      "egwalker",
       "friendsforever",
       "clownschool",
       "node_nodecc",
@@ -609,11 +615,12 @@
       // [crdt (dt-crdt)], [eg-walker (dt)], [automerge], [yjs]
     ),
     // x-unit: [x],
-    x-label: text(10pt, [Ratio of file size to stored document length. (Smaller is better)]),
+    x-label: text(8pt, [Ratio of file size to stored document length. (Smaller is better)]),
     // x-label: text(10pt, [% file size overhead compared to final document length. (Smaller is better)]),
     (
       "automerge-paper",
       "seph-blog1",
+      "egwalker",
       "friendsforever",
       "clownschool",
       "node_nodecc",
