@@ -65,6 +65,13 @@
 #set enum(indent: 10pt, body-indent: 9pt)
 #set list(indent: 10pt, body-indent: 9pt)
 
+#show figure.where(kind: table): set figure.caption(position: top)
+
+#show figure.caption: it => align(left, par(first-line-indent: 0pt, [
+  #text(weight: "bold", [#it.supplement #it.counter.display(it.numbering).])
+  #it.body
+]))
+
 #let definition = thmbox("definition", "Definition",
   base_level: 0,
   fill: rgb("#f8e8e8")
