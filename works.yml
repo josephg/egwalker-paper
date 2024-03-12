@@ -14,6 +14,13 @@ polog:
   date: 2017
   url: https://arxiv.org/abs/1710.04469
 
+time-machines:
+  type: article
+  title: CRDT and OT generalize as Time Machines
+  author: ["Toomim, Michael"]
+  date: 2024
+  url: https://braid.org/time-machines
+
 fugue:
   type: article
   title: "The Art of the Fugue: Minimizing Interleaving in Collaborative Text Editing"
