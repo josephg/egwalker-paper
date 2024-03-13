@@ -128,7 +128,7 @@ Different users may therefore make edits concurrently, and the software must mer
 
 For example, in @two-inserts, two users initially have the same document "Helo".
 User 1 inserts a second letter "l" at index 3, while concurrently user 2 inserts an exclamation mark at index 4.
-When user 2 receives the operation $italic("Insert")(3, \"l\")$ it can apply it to obtain "Hello!", but when user 1 receives $italic("Insert")(4, \"!\")$ it cannot apply that operation directly, since doing so would result in the state "Hell!o", which would be inconsistent with the other user's state and the intended insertion position.
+When user 2 receives the operation $italic("Insert")(3, \"l\")$ it can apply it to obtain "Hello!", but when user 1 receives $italic("Insert")(4, \"!\")$ it cannot apply that operation as-is, since that would result in the state "Hell!o", which would be inconsistent with the other user's state and the intended insertion position.
 Due to the concurrent insertion at an earlier index, user 1 must insert the exclamation mark at index 5.
 
 #figure(
@@ -146,8 +146,8 @@ Due to the concurrent insertion at an earlier index, user 1 must insert the excl
     edge(right1, right2, $italic("Insert")(4, \"!\")$, "->", label-side: left)
     edge(left2, left3, $italic("Insert")(5, \"!\")$, "->", label-side: right)
     edge(right2, right3, $italic("Insert")(3, \"l\")$, "->", label-side: left)
-    edge((0.1,1.5), (1.9,0.5), "->", "dashed", bend: +20deg)
-    edge((1.9,1.5), (0.1,0.5), "->", "dashed", bend: -20deg)
+    edge((0.1,1.5), (1.9,0.5), "->", "dashed")
+    edge((1.9,1.5), (0.1,0.5), "->", "dashed")
   }),
   placement: top,
   caption: [Two concurrent insertions into a text document.],
@@ -159,7 +159,7 @@ OT is an old and widely-used technique: it was introduced in 1989 @Ellis1989, an
 OT is simple and fast in the case of @two-inserts, where each user performed only one operation since the last version they had in common.
 In general, if user 1 performed $k$ operations and user 2 performed $m$ operations since their last common version, merging their states using OT has a cost of at least $O(k m)$, since each of the $k$ operations must be transformed with respect to each of the $m$ operations and vice versa.
 Some OT algorithms have a complexity that is quadratic or even cubic in the number of operations performed by each user @Li2006 @Roh2011RGA @Sun2020OT.
-This is acceptable for online collaboration where $k$ and $m$ are typically small, but if users may edit a document offline or if the software supports explicit branching and merging workflows @Upwelling, $O(k m)$ can become impracticably slow.
+This is acceptable for online collaboration where $k$ and $m$ are typically small, but if users may edit a document offline or if the software supports explicit branching and merging workflows @Upwelling, an algorithm with complexity $O(k m)$ can become impracticably slow.
 
 _Conflict-free Replicated Data Types_ (CRDTs) have been proposed as an alternative to OT.
 The first CRDT for collaborative text editing appeared in 2006 @Oster2006WOOT, and over a dozen text CRDTs have been published since @crdt-papers.
@@ -189,17 +189,11 @@ This paper makes the following contributions:
 - TODO
 - In @benchmarking we evaluate the performance of eg-walker, comparing it to equivalent CRDT based approaches on file size, CPU time and memory usage in real world editing environments. Eg-walker is faster and smaller than equivalent CRDT based approaches in our real world data sets. However, it scales worse than CRDTs in extremely concurrent environments (eg very complex git editing histories).
 
-/*
-In @eg-walker, we introduce _eg-walker_ (_Event Graph Walker_). Eg-walker can efficiently replay any event graph of sequence edits and generate the corresponding document state. Natively, eg-walker traverses the entire event graph to generate the corresponding CRDT state (using FugueMax @fugue). During this traversal, events are transformed and applied. However, traversing the entire event graph to regenerate the CRDT state on every peer is inefficient and slow. And it precludes replicas from pruning any events in the event graph.
-
-In @eg-partial we show how the algorithm can be optimised to visit only a small subset of events in the graph when merging changes from remote peers. This optimisation also dramatically improves performance for linear editing traces - by about 15x in our testing.
-*/
-
 = Background
 
 We consider a collaborative plain text editor whose state is a linear sequence of characters, which may be edited by inserting or deleting characters at any position.
 Such an edit is captured as an _operation_; we use the notation $italic("Insert")(i, c)$ to denote an operation that inserts character $c$ at index $i$, and $italic("Delete")(i)$ deletes the character at index $i$ (indexes are zero-based).
-//Our implementation compresses runs of consecutive insertions or deletions, but for simplicity we describe the algorithm in terms of single-character operations.
+Our implementation compresses runs of consecutive insertions or deletions, but for simplicity we describe the algorithm in terms of single-character operations.
 
 == System model
 
@@ -211,15 +205,14 @@ Our algorithm makes no assumptions about the underlying network via which operat
 For example, a relay server could store and forward messages from one replica to the others, or replicas could use a peer-to-peer gossip protocol.
 We make no timing assumptions and can tolerate arbitrary network delay, but we assume replicas are non-Byzantine.
 
-One of the properties that the collaboration algorithm must satisfy is _convergence_: any two replicas that have seen the same set of operations must be in the same state, even if the operations arrived in a different order.
-If we assume that every non-crashed replica eventually receives every operation, the algorithm achieves _strong eventual consistency_ @Shapiro2011.
-Our algorithm also satisfies the _strong list specification_, a formal specification of collaborative text editing @Attiya2016.
+A key property that the collaboration algorithm must satisfy is _convergence_: any two replicas that have seen the same set of operations must be in the same state (i.e., a text consisting of the same sequence of characters), even if the operations arrived in a different order at each replica.
+If the underlying broadcast protocol ensures that every non-crashed replica eventually receives every operation, the algorithm achieves _strong eventual consistency_ @Shapiro2011.
 
 == Event graphs
 
-We represent the editing history of a document as an _event graph_, which is a directed acyclic graph (DAG) in which every node is an _event_ consisting of an operation and a unique ID.
-When the graph contains an edge from event $a$ to event $b$ we say that $a$ is a _parent_ of $b$, and $b$ is a _child_ of $a$.
-The graph is transitively reduced (i.e., it contains no redundant edges).
+We represent the editing history of a document as an _event graph_, which is a directed acyclic graph (DAG) in which every node is an _event_ consisting of an operation (insert or delete a character), a unique ID, and a set of IDs of its _parent nodes_.
+When the parents of event $b$ contain the ID of event $a$, we say $a$ is a _parent_ of $b$, $b$ is a _child_ of $a$, and the graph contains an edge from $a$ to $b$.
+We construct events such that the graph is transitively reduced (i.e., it contains no redundant edges).
 When there is a directed path from $a$ to $b$ we say that $a$ _happened before_ $b$, and write $a -> b$ as per Lamport @Lamport1978.
 The $->$ relation is a strict partial order.
 We say that events $a$ and $b$ are _concurrent_, written $a parallel b$, if both events are in the graph, $a eq.not b$, but neither happened before the other: $a arrow.r.not b and b arrow.r.not a$.
@@ -228,7 +221,7 @@ The _frontier_ is the set of events with no children.
 Whenever a user performs an operation, a new event containing that operation is added to the graph, and the previous frontier in the replica's local copy of the graph becomes the new event's parents.
 The new event and its parent edges are then replicated over the network, and each replica adds them to its copy of the graph.
 If any parent events are missing, the replica waits for them to arrive before adding them to the graph; the result is a simple causal broadcast protocol @Birman1991 @Cachin2011.
-Two replicas can merge their event graphs by simply taking the union of the sets of nodes and edges.
+Two replicas can merge their event graphs by simply taking the union of their sets of events.
 An event in the graph is immutable; it always represents the operation as it was originally generated, not some transformed operation.
 
 #figure(
@@ -250,22 +243,26 @@ An event in the graph is immutable; it always represents the operation as it was
   caption: [The event graph corresponding to @two-inserts.],
 ) <graph-example>
 
-For example, @graph-example shows the event graph resulting from the operations in @two-inserts.
+For example, @graph-example shows the event graph corresponding to @two-inserts.
 The events $e_5$ and $e_6$ are concurrent, and the frontier of this graph is the set of events ${e_5, e_6}$.
 
 The event graph for a substantial document, such as a research paper, may contain hundreds of thousands of events.
-It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs, and many portions of a typical event graph are linear.
-As event IDs we can use pairs of a replica ID and a per-replica sequence number, which also compress very well.
+It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs, and many portions of a typical event graph are linear, with each event having one parent and one child.
 We describe the storage format in more detail in Section TODO.
 
 == Document versions <versions>
 
-In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
-Due to convergence, any two replicas that have the same set of events must be in the same state; hence, the state of the document must be a deterministic function of the set of events that have occurred.
-The set of events that were known to the generating replica at the time when a given event $e$ was generated is exactly the subset of events that happened before $e$, i.e., $e$'s parents and all of their ancestors.
-Therefore, the parents of $e$ unambiguously define the document state in which $e$ must be interpreted.
+Let $G$ be an event graph, represented as a set of events.
+Due to convergence, any two replicas that have the same set of events must be in the same state.
+Therefore, the document state (sequence of characters) resulting from $G$ must be $italic("replay")(G)$, where $italic("replay")$ is some pure (deterministic and non-mutating) function.
+In principle, any pure function of the set of events results in convergence, although a $italic("replay")$ function that is useful for text editing must satisfy additional criteria (see @characteristics).
 
-Given an event graph $G$ (represented as a set of events), we define the _version_ of $G$ to be its frontier set:
+In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
+Let $e_i$ be an event; the document state when $e_i$ was generated must be $italic("replay")(G_i)$, where $G_i$ is the set of events that were known to the generating replica at the time when $e_i$ was generated (not including $e_i$ itself).
+By definition, the parents of $e_i$ are the frontier of $G_i$, and thus $G_i$ is the set of all events that happened before $e_i$, i.e., $e_i$'s parents and all of their ancestors.
+Therefore, the parents of $e_i$ unambiguously define the document state in which $e_i$ must be interpreted.
+
+To formalise this, given an event graph (set of events) $G$, we define the _version_ of $G$ to be its frontier set:
 
 $ sans("Version")(G) = {e_1 in G | exists.not e_2 in G: e_1 -> e_2} $
 
@@ -279,28 +276,30 @@ Hence, for all valid event graphs $G$, we have $sans("Events")(sans("Version")(G
 The set of parents of an event in the graph is the version of the document in which that operation must be interpreted.
 The version can hence also be seen as a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
 Even if the event graph is large, a version rarely consists of more than two events in practice.
-The _root version_ $emptyset$ is the version of the empty event graph.
 
 == Replaying editing history
 
 Collaborative editing algorithms are usually defined in terms of sending and receiving messages over a network.
-The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a deterministic function that takes an event graph as input, and returns the document state resulting from applying all operations in the graph.
+The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a pure function $italic("replay")(G)$ of an event graph $G$.
 This function can use the parent-child relationships between events, but concurrent events could be processed in any order.
 This allows us to separate the process of replicating the event graph from the algorithm that ensures convergence.
-(In fact, this is how _pure operation-based CRDTs_ @polog are formulated, as discussed in @related-work.)
+In fact, this is how _pure operation-based CRDTs_ @polog are formulated, as discussed in @related-work.
 
-In addition to determining the document state from an entire event graph, we need an _incremental update_ function: when we have an existing event graph and document state, and a small number of events from a remote replica are added to the graph, we need to efficiently determine the corresponding update to the document state so that it reflects the new events, without re-processing the entire graph.
-For text documents, the incremental update is also described as insertions and deletions at particular indexes; however, the indexes may differ from those in the original events due to the effects of concurrent operations.
+In addition to determining the document state from an entire event graph, we need an _incremental update_ function.
+Say we have an existing event graph $G$ and document state $italic("doc") = italic("replay")(G)$, and an event $e$ from a remote replica is added to the graph.
+We could rerun the function to obtain $italic("doc")' = italic("replay")(G union {e})$, but it would be inefficient to re-process the entire graph.
+Instead, we need to efficiently compute the operation that we need to apply to $italic("doc")$ in order to obtain $italic("doc")'$.
+For text documents, this incremental update is also described as an insertion or deletion at a particular index; however, the index may differ from that in the original event due to the effects of concurrent operations, and a deletion may turn into a no-op if the same character has also been deleted by a concurrent operation.
 
-This incremental update is what both OT and CRDT algorithms focus on.
+Both OT and CRDT algorithms focus on this incremental update.
 If there are no concurrent events, OT is straightforward: the incremental update is identical to the operation in the original event, as no transformation takes place.
 If there is concurrency, OT must transform each new event with regard to each existing event that is concurrent to it.
 
-In CRDTs, each event is first translated into operations that use unique IDs instead of indexes, based on the document state in which the event was generated, and then these operations are applied to a data structure that reflects all of the operations seen so far (both concurrent operations and those that happened before).
+In CRDTs, each event is first translated into operations that use unique IDs instead of indexes, and then these operations are applied to a data structure that reflects all of the operations seen so far (both concurrent operations and those that happened before).
 In order to update the text editor, these updates to the CRDT's internal structure need to be translated back into index-based insertions and deletions.
 Many CRDT papers elide this translation from unique IDs back to indexes, but it is important for practical applications:
 
-- Text editors use specialised data structures such as piece trees @vscode-buffer to support fast edits on large documents, and integrating with these structures requires index-based operations. Incrementally updating these structures also enables syntax highlighting without having to repeatedly parse the whole file on every keystroke.
+- Text editors use specialised data structures such as piece trees @vscode-buffer to efficiently edit large documents, and integrating with these structures requires index-based operations. Incrementally updating these structures also enables syntax highlighting without having to repeatedly parse the whole file on every keystroke.
 - The user's cursor position in a document can be represented as an index; if another user changes text earlier in the document, index-based operations make it easy to update the cursor so that it remains in the correct position relative to the surrounding text.
 
 Thus, regardless of whether the OT or the CRDT approach is used, a collaborative editing algorithm can be boiled down to an incremental update to an event graph: given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event.
@@ -392,7 +391,7 @@ Event graph replay extends directly to incremental updates: when a new event is 
 We can transform each new event in the same way as during replay, and apply the transformed operation to the current document state.
 This way, the algorithm supports real-time collaboration.
 
-== Characteristics of Eg-walker
+== Characteristics of Eg-walker <characteristics>
 
 Eg-walker ensures that the resulting document is consistent with Attiya et al.'s _strong list specification_ @Attiya2016 (in essence, replicas converge to the same state and apply operations in the right place), and it is _maximally non-interleaving_ @fugue (i.e., concurrent sequences of insertions at the same position are placed one after another, and not interleaved).
 
