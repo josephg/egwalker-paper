@@ -197,7 +197,7 @@ Our implementation compresses runs of consecutive insertions or deletions, but f
 
 == System model
 
-Each device on which a user edits a document is a _replica_, and each replica stores the full editing history of the document.
+Each device on which a user edits a document is a _replica_, and each replica stores its full editing history.
 When a user makes an insertion or deletion, that operation is immediately applied to the user's local replica, and then asynchronously sent over the network to any other replicas that have a copy of the same document.
 Users can also edit their local copy while offline; the corresponding operations are then enqueued and sent when the device is next online.
 
@@ -205,7 +205,7 @@ Our algorithm makes no assumptions about the underlying network via which operat
 For example, a relay server could store and forward messages from one replica to the others, or replicas could use a peer-to-peer gossip protocol.
 We make no timing assumptions and can tolerate arbitrary network delay, but we assume replicas are non-Byzantine.
 
-A key property that the collaboration algorithm must satisfy is _convergence_: any two replicas that have seen the same set of operations must be in the same state (i.e., a text consisting of the same sequence of characters), even if the operations arrived in a different order at each replica.
+A key property that the collaboration algorithm must satisfy is _convergence_: any two replicas that have seen the same set of operations must be in the same document state (i.e., a text consisting of the same sequence of characters), even if the operations arrived in a different order at each replica.
 If the underlying broadcast protocol ensures that every non-crashed replica eventually receives every operation, the algorithm achieves _strong eventual consistency_ @Shapiro2011.
 
 == Event graphs
@@ -254,11 +254,11 @@ We describe the storage format in more detail in Section TODO.
 
 Let $G$ be an event graph, represented as a set of events.
 Due to convergence, any two replicas that have the same set of events must be in the same state.
-Therefore, the document state (sequence of characters) resulting from $G$ must be $italic("replay")(G)$, where $italic("replay")$ is some pure (deterministic and non-mutating) function.
-In principle, any pure function of the set of events results in convergence, although a $italic("replay")$ function that is useful for text editing must satisfy additional criteria (see @characteristics).
+Therefore, the document state (sequence of characters) resulting from $G$ must be $sans("replay")(G)$, where $sans("replay")$ is some pure (deterministic and non-mutating) function.
+In principle, any pure function of the set of events results in convergence, although a $sans("replay")$ function that is useful for text editing must satisfy additional criteria (see @characteristics).
 
 In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
-Let $e_i$ be an event; the document state when $e_i$ was generated must be $italic("replay")(G_i)$, where $G_i$ is the set of events that were known to the generating replica at the time when $e_i$ was generated (not including $e_i$ itself).
+Let $e_i$ be an event; the document state when $e_i$ was generated must be $sans("replay")(G_i)$, where $G_i$ is the set of events that were known to the generating replica at the time when $e_i$ was generated (not including $e_i$ itself).
 By definition, the parents of $e_i$ are the frontier of $G_i$, and thus $G_i$ is the set of all events that happened before $e_i$, i.e., $e_i$'s parents and all of their ancestors.
 Therefore, the parents of $e_i$ unambiguously define the document state in which $e_i$ must be interpreted.
 
@@ -280,19 +280,19 @@ Even if the event graph is large, a version rarely consists of more than two eve
 == Replaying editing history
 
 Collaborative editing algorithms are usually defined in terms of sending and receiving messages over a network.
-The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a pure function $italic("replay")(G)$ of an event graph $G$.
-This function can use the parent-child relationships between events, but concurrent events could be processed in any order.
+The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a pure function $sans("replay")(G)$ of an event graph $G$.
+This function can use the parent-child relationships to partially order events, but concurrent events could be processed in any order.
 This allows us to separate the process of replicating the event graph from the algorithm that ensures convergence.
 In fact, this is how _pure operation-based CRDTs_ @polog are formulated, as discussed in @related-work.
 
 In addition to determining the document state from an entire event graph, we need an _incremental update_ function.
-Say we have an existing event graph $G$ and document state $italic("doc") = italic("replay")(G)$, and an event $e$ from a remote replica is added to the graph.
-We could rerun the function to obtain $italic("doc")' = italic("replay")(G union {e})$, but it would be inefficient to re-process the entire graph.
-Instead, we need to efficiently compute the operation that we need to apply to $italic("doc")$ in order to obtain $italic("doc")'$.
+Say we have an existing event graph $G$ and document state $italic("doc") = sans("replay")(G)$, and an event $e$ from a remote replica is added to the graph.
+We could rerun the function to obtain $italic("doc")' = sans("replay")(G union {e})$, but it would be inefficient to process the entire graph again.
+Instead, we need to efficiently compute the operation to apply to $italic("doc")$ in order to obtain $italic("doc")'$.
 For text documents, this incremental update is also described as an insertion or deletion at a particular index; however, the index may differ from that in the original event due to the effects of concurrent operations, and a deletion may turn into a no-op if the same character has also been deleted by a concurrent operation.
 
 Both OT and CRDT algorithms focus on this incremental update.
-If there are no concurrent events, OT is straightforward: the incremental update is identical to the operation in the original event, as no transformation takes place.
+If none of the events in $G$ are concurrent with $e$, OT is straightforward: the incremental update is identical to the operation in $e$, as no transformation takes place.
 If there is concurrency, OT must transform each new event with regard to each existing event that is concurrent to it.
 
 In CRDTs, each event is first translated into operations that use unique IDs instead of indexes, and then these operations are applied to a data structure that reflects all of the operations seen so far (both concurrent operations and those that happened before).
@@ -308,11 +308,17 @@ Thus, regardless of whether the OT or the CRDT approach is used, a collaborative
 
 Eg-walker is a collaborative text editing algorithm based on the idea of replaying an event graph.
 The algorithm builds on a replication layer that ensures that all non-crashed replicas eventually receive every event that any replica adds to the graph.
-Each replica stores the event graph on disk alongside the current state of the document.
+The state of each replica consists of three parts:
 
-Eg-walker performs a topological sort of the event DAG, as illustrated in @topological-sort, and then transforms each event so that if the transformed insertions and deletions are applied in topologically sorted order, starting with an empty document, the final document correctly represents the set of events processed.
+1. *Event graph:* Each replica stores a copy of the event graph on disk, in a format described in Section TODO.
+2. *Document state:* The current sequence of characters in the document with no further metadata. On disk this is simply a plain text file; in memory it may be represented as a rope @Boehm1995, piece table @vscode-buffer, or similar structure to support efficient insertions and deletions.
+3. *Internal state:* A temporary CRDT structure that eg-walker uses to merge concurrent edits. It is not persisted or replicated, and it is discarded when the algorithm finishes running.
+
+Eg-walker can reconstruct the document state by replaying the entire event graph.
+It first performs a topological sort, as illustrated in @topological-sort, and then transforms each event so that the transformed insertions and deletions can be applied in topologically sorted order, starting with an empty document, to obtain the document state.
+In Git parlance, this process "rebases" a DAG of operations into a linear operation history with the same effect.
 The input of the algorithm is the event graph, and the output is this topologically sorted sequence of transformed operations.
-In graphs with concurrent operations there are multiple possible sort orders, and eg-walker guarantees that the final document is the same, regardless which of these orders is chosen.
+In graphs with concurrent operations there are multiple possible sort orders, and eg-walker guarantees that the final document state is the same, regardless which of these orders is chosen.
 
 #figure(
   fletcher.diagram(node-inset: 2pt, node-stroke: black, node-fill: black, {
@@ -384,57 +390,57 @@ In graphs with concurrent operations there are multiple possible sort orders, an
   caption: [An event graph (left) and one possible topologically sorted order of that graph (right).],
 ) <topological-sort>
 
-For example, the graph in @graph-example has two possible sort orders; eg-walker will either first insert the second "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first insert "!" at index 4 followed by the second "l" at index 3 (like User 2 in @two-inserts); the final document is the same either way.
+For example, the graph in @graph-example has two possible sort orders; eg-walker either first inserts "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first inserts "!" at index 4 followed by "l" at index 3 (like User 2 in @two-inserts); the final document state is "Hello!" either way.
 However, the choice of sort order affects the performance of the algorithm, as discussed in @complexity.
 
-Event graph replay extends directly to incremental updates: when a new event is added to the graph, since all of its parents must already be in the graph, each added event becomes the next element of the topologically sorted sequence.
+Event graph replay easily extends to incremental updates for real-time collaboration: when a new event is added to the graph, it becomes the next element of the topologically sorted sequence.
 We can transform each new event in the same way as during replay, and apply the transformed operation to the current document state.
-This way, the algorithm supports real-time collaboration.
 
 == Characteristics of Eg-walker <characteristics>
 
-Eg-walker ensures that the resulting document is consistent with Attiya et al.'s _strong list specification_ @Attiya2016 (in essence, replicas converge to the same state and apply operations in the right place), and it is _maximally non-interleaving_ @fugue (i.e., concurrent sequences of insertions at the same position are placed one after another, and not interleaved).
+Eg-walker ensures that the resulting document state is consistent with Attiya et al.'s _strong list specification_ @Attiya2016 (in essence, replicas converge to the same state and apply operations in the right place), and it is _maximally non-interleaving_ @fugue (i.e., concurrent sequences of insertions at the same position are placed one after another, and not interleaved).
 
 One way of achieving this goal would be to track the state of the document on each branch of the event graph, to translate each event into a corresponding CRDT operation (based on the document state in which that event was generated), and when branches in the event graph merge, to apply the CRDT operations from one branch to the other branch's state.
 Essentially, this approach simulates a network of communicating CRDT replicas and their states.
 However, doing this naively leads to poor performance, because the CRDT overhead is incurred on every operation.
 
-Eg-walker is able to achieve much better performance by skipping the CRDT entirely in portions of the event graph that have no concurrency (which, in many editing histories, is the vast majority of the graph), and invoking the CRDT only during those portions with concurrency.
-When processing an event that has no concurrent events, eg-walker is able to discard all of the CRDT state accumulated so far, keeping the data structure small.
-A key insight of eg-walker is how to compute the correct transformed operations even though the CRDT state may reflect only a small part of the editing history.
+Eg-walker is able to achieve much better performance by skipping the CRDT entirely in portions of the event graph that have no concurrency (which, in many editing histories, is the vast majority of the graph), and using the CRDT only for concurrent events.
+When processing an event that has no concurrent events, eg-walker is able to discard all of the internal state accumulated so far, keeping the data structure small.
+A key contribution of eg-walker is that it can compute the correct transformed operations even though the internal state may reflect only a small part of the event graph.
 
-Moreover, eg-walker requires the event graph and CRDT state only in order to transform an operation to account for concurrent events.
-The algorithm does not inspect them when generating new events, or when adding an event to the graph that happened after all existing events.
-This means that most of the time, the event graph can remain on disk without using any space in memory or any CPU time to load; it is sufficient to load only the latest document state, which can be stored in a separate file from the event graph.
-We only have to load the event graph into memory when handling concurrency, and even then we only have to replay the portion of the graph since the last ancestor that the concurrent operations had in common.
+Moreover, eg-walker does not need the event graph and the internal state when generating new events, or when adding an event to the graph that happened after all existing events.
+Most of the time, we only need the current document state; the event graph can remain on disk without using any space in memory or any CPU time.
+The event graph is only required when handling concurrency, and even then we only have to replay the portion of the graph since the last ancestor that the concurrent operations had in common.
 
-Eg-walker's approach contrasts with the usual CRDT approach, which requires every replica to persist the CRDT state (including the unique ID for each character) to disk and send it over the network, and which requires that state to be loaded into memory in order to both generate and receive operations, even when there is no concurrency.
+Eg-walker's approach contrasts with existing CRDTs, which require every replica to persist the internal state (including the unique ID for each character) and send it over the network, and which require that state to be loaded into memory in order to both generate and receive operations, even when there is no concurrency.
 This can use significant amounts of memory and can make documents slow to load.
 
-OT algorithms avoid the metadata overhead of CRDTs; similarly to eg-walker, they only need to persist the latest document state and the history of operations that may be concurrent to operations that might arrive in the future.
+OT algorithms avoid this internal state; similarly to eg-walker, they only need to persist the latest document state and the history of operations that are concurrent to operations that may arrive in the future.
 In both eg-walker and OT, the editing history/event graph can be discarded if we know that no event we may receive in the future will be concurrent with any existing event.
-However, OT algorithms have asymptotically worse performance than eg-walker in transforming concurrent operations.
+However, OT algorithms have asymptotically worse performance than eg-walker in transforming concurrent operations (see @complexity).
+Some OT algorithms are only able to handle restricted forms of event graphs, whereas eg-walker handles arbitrary DAGs.
 
 == Walking the event graph
 
-For the sake of clarity we first explain a simplified version of eg-walker that replays the entire event graph, does not discard its CRDT state along the way, and incurs CRDT overhead even for non-concurrent operations.
-In @clearing we show how to add the optimisation that allows us to replay only parts of the event graph.
+For the sake of clarity we first explain a simplified version of eg-walker that replays the entire event graph without discarding its internal state along the way, and that incurs CRDT overhead even for non-concurrent operations.
+In @partial-replay we show how the algorithm can be optimised to replay only a part of the event graph.
 
 First, we topologically sort the event graph in a way that keeps events on the same branch consecutive as much as possible: for example, in @topological-sort we first visit $e_"A1" ... e_"A4"$, then $e_"B1" ... e_"B4"$; we avoid alternating between branches, such as $e_"A1", e_"B1", e_"A2", e_"B2" ...$, even though that would also be a valid topological sort.
-For this we use a standard textbook algorithm @CLRS2009: do a depth-first traversal, and build up the topologically sorted list in reverse order while returning from the traversal (i.e. after visiting events that happened later).
-When choosing which branch to traverse, we use a greedy heuristic so that branches with fewer events tend to appear before branches with more events in the sorted order; this can improve performance but is not essential.
+For this we use a standard textbook algorithm @CLRS2009: perform a depth-first traversal starting from the oldest event, and build up the topologically sorted list in reverse order while returning from the traversal.
+When a node has multiple children, we choose their order based on a heuristic so that branches with fewer events tend to appear before branches with more events in the sorted order; this can improve performance but is not essential.
+We estimate the size of a branch by counting the number of edges from each event to the graph's frontier.
 
-The algorithm then processes the events one at a time in topologically sorted order, updating a state object and outputting a transformed operation for each event.
-The state object simultaneously captures the document at two versions: the version in which an event was generated (which we call the _prepare_ version), and the version in which all events seen so far have been applied (which we call the _effect_ version).
+The algorithm then processes the events one at a time in topologically sorted order, updating the internal state and outputting a transformed operation for each event.
+The internal state simultaneously captures the document at two versions: the version in which an event was generated (which we call the _prepare_ version), and the version in which all events seen so far have been applied (which we call the _effect_ version).
 If the prepare and effect versions are the same, the transformed operation is identical to the original one.
 In general, the prepare version represents a subset of the events of the effect version.
 // Due to the topological sorting it is not possible for the prepare version to be later than the effect version.
 
-The state object can be updated with three methods, each of which takes an event as argument:
+The internal state can be updated with three methods, each of which takes an event as argument:
 
-/ Apply: Updates both the prepare version and the effect version to include the given event, assuming that the current prepare version equals the parents of that event, and that the event has not previously been applied. This method interprets the event in the context of the prepare version, and outputs the operation representing how the effect version has been updated.
-/ Retreat: Updates the prepare version to remove the given event, assuming that the prepare version previously included that event.
-/ Advance: Updates the prepare version to add the given event, assuming that the prepare version previously did not include that event, but the effect version did.
+- $sans("apply")(e)$ updates the prepare version and the effect version to include $e$, assuming that the current prepare version equals $e.italic("parents")$, and that $e$ has not yet been applied. This method interprets $e$ in the context of the prepare version, and outputs the operation representing how the effect version has been updated.
+- $sans("retreat")(e)$ updates the prepare version to remove $e$, assuming the prepare version previously included $e$.
+- $sans("advance")(e)$ updates the prepare version to add $e$, assuming that the prepare version previously did not include $e$, but the effect version did.
 
 #figure(
   fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
@@ -457,70 +463,117 @@ The state object can be updated with three methods, each of which takes an event
     edge(e4, e8, "-|>")
   }),
   placement: top,
-  caption: [An event graph. Starting with document "hi", one user changes "hi" to "hey", while concurrently another user capitalises the "H". After the users merge to the state "Hey", one of the users appends an exclamation mark to produce "Hey!".],
+  caption: [An event graph. Starting with document "hi", one user changes "hi" to "hey", while concurrently another user capitalises the "H". After merging to the state "Hey", one of them appends an exclamation mark to produce "Hey!".],
 ) <graph-hi-hey>
 
-The effect version only moves forwards in time (through $italic("apply")$), whereas the prepare version can move both forwards and backwards.
-Consider the example event graph in @graph-hi-hey, and assume that the events $e_1 ... e_8$ are traversed in order of their subscript.
+The effect version only moves forwards in time (through $sans("apply")$), whereas the prepare version can move both forwards and backwards.
+Consider the example in @graph-hi-hey, and assume that the events $e_1 ... e_8$ are traversed in order of their subscript.
 These events can be processed as follows:
 
-1. Start in the empty state, and then call $italic("apply")(e_1)$, $italic("apply")(e_2)$, $italic("apply")(e_3)$, and $italic("apply")(e_4)$. This is valid because each event's parent version is the set of all events processed so far.
-2. Before we can apply $e_5$ we must rewind the prepare version to be $e_2$, which is the parent of $e_5$. We can do this by calling $italic("retreat")(e_4)$ and $italic("retreat")(e_3)$.
-3. Now we can call $italic("apply")(e_5)$, $italic("apply")(e_6)$, and $italic("apply")(e_7)$.
-4. The parents of $e_8$ are ${e_4, e_7}$; before we can apply $e_8$ we must therefore add $e_3$ and $e_4$ back into the prepare state again. We do this by calling $italic("advance")(e_3)$ and $italic("advance")(e_4)$.
-5. Finally, we can call $italic("apply")(e_8)$.
+1. Start in the empty state, and then call $sans("apply")(e_1)$, $sans("apply")(e_2)$, $sans("apply")(e_3)$, and $sans("apply")(e_4)$. This is valid because each event's parent version is the set of all events processed so far.
+2. Before we can apply $e_5$ we must rewind the prepare version to be $e_2$, which is the parent of $e_5$. We can do this by calling $sans("retreat")(e_4)$ and $sans("retreat")(e_3)$.
+3. Now we can call $sans("apply")(e_5)$, $sans("apply")(e_6)$, and $sans("apply")(e_7)$.
+4. The parents of $e_8$ are ${e_4, e_7}$; before we can apply $e_8$ we must therefore add $e_3$ and $e_4$ back into the prepare state again. We do this by calling $sans("advance")(e_3)$ and $sans("advance")(e_4)$.
+5. Finally, we can call $sans("apply")(e_8)$.
 
-In complex event graphs such as the one in @topological-sort it can be necessary to retreat and advance on the same event multiple times, but it is possible to process arbitrary DAGs this way.
-The general rule is: apply the events in topologically sorted order, but before applying each event, compute $G_"old" = sans("Events")(V_p)$ where $V_p$ is the current prepare version, and $G_"new" = sans("Events")(e.italic("parents"))$ where $e$ is the next event to be applied.
-We then call $italic("retreat")$ on each event in $G_"old" - G_"new"$ (in reverse order of their appearance in the topological sort), and call $italic("advance")$ on each event in $G_"new" - G_"old"$ (in topological sort order) before calling $italic("apply")(e)$.
+In complex event graphs such as the one in @topological-sort the same event may have to be retreated and advanced several times, but we can process arbitrary DAGs this way.
+In general, before applying the next event $e$ in topologically sorted order, compute $G_"old" = sans("Events")(V_p)$ where $V_p$ is the current prepare version, and $G_"new" = sans("Events")(e.italic("parents"))$.
+We then call $sans("retreat")$ on each event in $G_"old" - G_"new"$ (in reverse topological sort order), and call $sans("advance")$ on each event in $G_"new" - G_"old"$ (in topological sort order) before calling $sans("apply")(e)$.
+
+The following algorithm efficiently computes the events to retreat and advance when moving the prepare version from $V_p$ to $V'_p$.
+For each event in $V_p$ and $V'_p$ we insert the index of that event in the topological sort order into a priority queue, along with a tag indicating whether the event is in the old or the new prepare version.
+We then repeatedly pop the event with the greatest index off the priority queue, and enqueue the indexes of its parents along with the same tag.
+We stop the traversal when all entries in the priority queue are common ancestors of both $V_p$ and $V'_p$.
+Any events that were traversed from only one of the versions need to be retreated or advanced respectively.
 
 == Representing prepare and effect versions <prepare-effect-versions>
 
-The state object implements the $italic("apply")$, $italic("retreat")$, and $italic("advance")$ methods by maintaining a CRDT data structure.
-This structure consists of a linear sequence of records, one per character in the document (runs of characters with consecutive IDs and the same properties can be run-length encoded to save memory).
-A record is inserted into this sequence by $italic("apply")(e_i)$ for an insertion event $e_i$; subsequent deletion events and $italic("retreat")$/$italic("advance")$ calls may modify properties of the record, but records in the sequence are not removed or reordered once they have been inserted.
+The internal state implements the $sans("apply")$, $sans("retreat")$, and $sans("advance")$ methods by maintaining a CRDT data structure.
+This structure consists of a linear sequence of records, one per character in the document, including tombstones for deleted characters.
+Runs of characters with consecutive IDs and the same properties can be run-length encoded to save memory.
+A record is inserted into this sequence by $sans("apply")(e_i)$ for an insertion event $e_i$; subsequent deletion events and $sans("retreat")$/$sans("advance")$ calls may modify properties of the record, but records in the sequence are not removed or reordered once they have been inserted.
 
 When the event graph contains concurrent insertion operations, we use an existing CRDT algorithm to ensure that all replicas place the records in this sequence in the same order, regardless of the order in which they traverse the event graph.
 Any list CRDT could be used for this purpose; the main differences between algorithms are their performance and their interleaving characteristics @fugue.
 Our implementation of eg-walker uses a variant of the Yjs algorithm @yjs @Nicolaescu2016YATA that we conjecture to be maximally non-interleaving; we leave a detailed analysis of this algorithm to future work, since it is not core to this paper.
 
-Each record in this sequence contains the ID of the event that inserted the character, two integer state variables $s_p$ (the character's state in the prepare version) and $s_e$ (its state in the effect version), and any other fields required by the CRDT to determine the order of concurrent insertions.
-$s_p$ and $s_e$ are zero if the character is visible (inserted but not deleted) in the prepare and effect version respectively; a positive integer indicates how many times that character has been deleted by concurrent delete events.
-$s_p$ can also be -1 if the character has not yet been inserted in the prepare version, but $s_p$ cannot be less than -1 and $s_e$ cannot be negative.
+Each record in this sequence contains:
+- the ID of the event that inserted the character;
+- $s_p in {mono("NotInsertedYet"), mono("Ins"), mono("Del 1"), mono("Del 2"), ...}$, the character's state in the prepare version;
+- $s_e in {mono("Ins"), mono("Del")}$, the state in the effect version;
+- and any other fields required by the CRDT to determine the order of concurrent insertions.
 
 The rules for updating $s_p$ and $s_e$ are:
 
-- When a record is first inserted by $italic("apply")(e_i)$ with an insertion event $e_i$, it is initialised with $s_p = s_e = 0$.
-- Calling $italic("apply")(e_d)$ with a deletion event $e_d$ increments both $s_p$ and $s_e$ in the record representing the deleted character.
-- If $italic("retreat")(e_i)$ is called with an insertion event $e_i$, $s_p$ must be zero in the record affected by the event, and we move the affected character from $s_p = 0$ to $s_p = -1$. Conversely, $italic("advance")(e_i)$ moves from $s_p = -1$ to $s_p = 0$.
-- If $italic("retreat")(e_d)$ is called with a deletion event $e_d$, $s_p$ must be positive in the record affected by the event, and $s_p$ is decremented. Conversely, $italic("advance")(e_d)$ increments $s_p$.
+- When a record is first inserted by $sans("apply")(e_i)$ with an insertion event $e_i$, it is initialised with $s_p = s_e = mono("Ins")$.
+- If $sans("apply")(e_d)$ is called with a deletion event $e_d$, we set $s_e = mono("Del")$ in the record representing the deleted character. In the same record, if $s_p = mono("Ins")$ we update it to $mono("Del 1")$, and if $s_p = mono("Del") n$ it advances to $mono("Del") (n+1)$, as shown in @spv-state.
+- If $sans("retreat")(e_i)$ is called with insertion event $e_i$, we must have $s_p = mono("Ins")$ in the record affected by the event, and we update it to $s_p = mono("NotInsertedYet")$. Conversely, $sans("advance")(e_i)$ moves $s_p$ from $mono("NotInsertedYet")$ to $mono("Ins")$.
+- If $sans("retreat")(e_d)$ is called with a deletion event $e_d$, we must have $s_p = mono("Del") n$ in the affected record, and we update it to $mono("Del") (n-1)$ if $n>1$, or to $mono("Ins")$ if $n=1$. Calling $sans("advance")(e_d)$ performs the opposite.
 
 #figure(
-  fletcher.diagram(node-stroke: 0.5pt,
-    node((0.0,0), [_id_: 3\ _ch_: H\ $s_p$: 0\ $s_e$: 0]),
-    node((0.6,0), [_id_: 1\ _ch_: h\ $s_p$: 1\ $s_e$: 1]),
-    node((1.25,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
-    node((2.9,0), [_id_: 3\ _ch_: H\ $s_p$: -1\ $s_e$: 0]),
-    node((3.6,0), [_id_: 1\ _ch_: h\ $s_p$: 0\ $s_e$: 1]),
-    node((4.25,0), [_id_: 2\ _ch_: i\ $s_p$: 0\ $s_e$: 0]),
-    edge((1.8,0), (2.4,0), text(0.7em, $italic("retreat")(e_4)\ italic("retreat")(e_3)$), marks: "=>", thickness: 0.8pt, label-sep: 0.5em)
+  fletcher.diagram(spacing: (4mm, 4mm), node-stroke: 0.5pt, node-inset: 5mm,
+  {
+    let (nyi, ins, del1, del2, deln) = ((0, 0), (1, 0), (2, 0), (3, 0), (4, 0))
+    node(nyi, `NIY`)
+    node(ins, `Ins`)
+    node(del1, `Del 1`)
+    node(del2, `Del 2`)
+    node(deln, $dots.c$, shape: "rect")
+
+    node((-0.5, 0.8), [$sans("advance"):$], stroke: 0pt)
+    node((0.5, 0.8), [$italic("Insert")$], stroke: 0pt)
+    node((1.5, 0.8), [$italic("Delete")$], stroke: 0pt)
+    node((2.5, 0.8), [$italic("Delete")$], stroke: 0pt)
+    node((3.5, 0.8), [$italic("Delete")$], stroke: 0pt)
+    edge(nyi, ins, bend: 50deg, "-|>")
+    edge(ins, del1, bend: 50deg, "-|>")
+    edge(del1, del2, bend: 50deg, "-|>")
+    edge(del2, deln, bend: 50deg, "--|>")
+
+    node((-0.5, -0.8), [$sans("retreat"):$], stroke: 0pt)
+    node((0.5, -0.8), [$italic("Insert")$], stroke: 0pt)
+    node((1.5, -0.8), [$italic("Delete")$], stroke: 0pt)
+    node((2.5, -0.8), [$italic("Delete")$], stroke: 0pt)
+    node((3.5, -0.8), [$italic("Delete")$], stroke: 0pt)
+    edge(ins, nyi, bend: 50deg, "-|>")
+    edge(del1, ins, bend: 50deg, "-|>")
+    edge(del2, del1, bend: 50deg, "-|>")
+    edge(deln, del2, bend: 50deg, "--|>")
+  }),
+  placement: top,
+  caption: [State machine for internal state variable $s_p$.]
+) <spv-state>
+
+As a result, $s_p$ and $s_e$ are `Ins` if the character is visible (inserted but not deleted) in the prepare and effect version respectively; $s_p = mono("Del") n$ indicates that the character has been deleted by $n$ concurrent delete events in the prepare version; and $s_p = mono("NotInsertedYet")$ indicates that the insertion of the character has been retreated in the prepare version.
+$s_e$ does not count the number of deletions and does not have a $mono("NotInsertedYet")$ state since we never remove the effect of an operation from the effect version.
+
+#figure(
+  fletcher.diagram(node-stroke: 0.5pt, node-inset: 5pt, spacing: 0pt,
+    node((0,0), text(0.8em, [#v(5pt)$text("“H”")\ italic("id"): 3\ s_p: mono("Ins")\ s_e: mono("Ins")$]), shape: "rect"),
+    node((1,0), text(0.8em, [#v(5pt)$text("“h”")\ italic("id"): 1\ s_p: mono("Del 1")\ s_e: mono("Del")$]), shape: "rect"),
+    node((2,0), text(0.8em, [#v(5pt)$text("“i”")\ italic("id"): 2\ s_p: mono("Ins")\ s_e: mono("Ins")$]), shape: "rect"),
+    node((3,0), box(width: 14mm, height: 0mm), stroke: 0pt),
+    node((4,0), text(0.8em, [#v(5pt)$text("“H”")\ italic("id"): 3\ s_p: mono("NIY")\ s_e: mono("Ins")$]), shape: "rect"),
+    node((5,0), text(0.8em, [#v(5pt)$text("“h”")\ italic("id"): 1\ s_p: mono("Ins")\ s_e: mono("Del")$]), shape: "rect"),
+    node((6,0), text(0.8em, [#v(5pt)$text("“i”")\ italic("id"): 2\ s_p: mono("Ins")\ s_e: mono("Ins")$]), shape: "rect"),
+    edge((2.6,0), (3.4,0), text(0.7em, $sans("retreat")(e_4)\ sans("retreat")(e_3)$), marks: "=>", thickness: 0.8pt, label-sep: 0.5em)
   ),
   placement: top,
-  caption: [Left: the internal state after applying $e_1 ... e_4$ from @graph-hi-hey. Right: after $italic("retreat")(e_4)$ and $italic("retreat")(e_3)$, the prepare state is updated to mark "H" as "not yet inserted" (–1), and the deletion of "h" is undone. The effect state is unchanged.]
+  caption: [Left: the internal state after applying $e_1 ... e_4$ from @graph-hi-hey. Right: after $sans("retreat")(e_4)$ and $sans("retreat")(e_3)$, the prepare state is updated to mark "H" as `NotInsertedYet`, and the deletion of "h" is undone. The effect state is unchanged.]
 ) <crdt-state-1>
 
 For example, @crdt-state-1 shows the state after applying $e_1 ... e_4$ from @graph-hi-hey, and how that state is updated by retreating $e_4$ and $e_3$ before $e_5$ is applied.
 In the effect state, the lowercase "h" is marked as deleted, while the uppercase "H" and the "i" are visible.
-In the prepare state, by retreating $e_4$ and $e_3$ the "H" is marked as not yet inserted ($s_p = -1$), and the deletion of "h" is undone ($s_p = 0$).
+In the prepare state, by retreating $e_4$ and $e_3$ the "H" is marked as `NotInsertedYet`, and the deletion of "h" is undone ($s_p = mono("Ins")$).
 
 #figure(
-  fletcher.diagram(node-stroke: 0.5pt,
-    node((0.0,0), [_id_: 3\ _ch_: H\ $s_p$: 0\ $s_e$: 0]),
-    node((0.7,0), [_id_: 1\ _ch_: h\ $s_p$: 1\ $s_e$: 1]),
-    node((1.4,0), [_id_: 6\ _ch_: e\ $s_p$: 0\ $s_e$: 0]),
-    node((2.1,0), [_id_: 7\ _ch_: y\ $s_p$: 0\ $s_e$: 0]),
-    node((2.8,0), [_id_: 8\ _ch_: !\ $s_p$: 0\ $s_e$: 0]),
-    node((3.5,0), [_id_: 2\ _ch_: i\ $s_p$: 1\ $s_e$: 1])
+  fletcher.diagram(node-stroke: 0.5pt, node-inset: 5pt, spacing: 0pt,
+    node((0,0), text(0.8em, [#v(5pt)$text("“H”")\ italic("id"): 3\ s_p: mono("Ins")\ s_e: mono("Ins")$]), shape: "rect"),
+    node((1,0), text(0.8em, [#v(5pt)$text("“h”")\ italic("id"): 1\ s_p: mono("Del 1")\ s_e: mono("Del")$]), shape: "rect"),
+    node((2,0), text(0.8em, [#v(5pt)$text("“e”")\ italic("id"): 6\ s_p: mono("Ins")\ s_e: mono("Ins")$]), shape: "rect"),
+    node((3,0), text(0.8em, [#v(3.5pt)$text("“y”")\ italic("id"): 7\ s_p: mono("Ins")\ s_e: mono("Ins")$]), shape: "rect"),
+    node((4,0), text(0.8em, [#v(5pt)$text("“!”")\ italic("id"): 8\ s_p: mono("Ins")\ s_e: mono("Ins")$]), shape: "rect"),
+    node((5,0), text(0.8em, [#v(5pt)$text("“i”")\ italic("id"): 2\ s_p: mono("Del 1")\ s_e: mono("Del")$]), shape: "rect")
   ),
   placement: top,
   caption: [The internal eg-walker state after replaying all of the events in @graph-hi-hey.]
@@ -534,29 +587,29 @@ The figures include the character for the sake of readability, but the algorithm
 In the event graph, insertion and deletion operations specify the index at which they apply; in order to update eg-walker's internal state, we need to map these to the correct record in the sequence.
 Moreover, to produce the transformed operations, we need to map these internal IDs back to indexes again.
 
-A simple but inefficient algorithm would be: to apply a $italic("Delete")(i)$ operation we iterate over the sequence of records and pick the $i$th record with a prepare state of $s_p = 0$ (i.e., the $i$th among the characters that are visible in the prepare state, which is the document state in which the operation should be interpreted).
-Similarly, to apply $italic("Insert")(i, c)$ we skip over $i - 1$ records with $s_p = 0$ and insert the new record after the last skipped record (if there have been concurrent insertions at the same position, we may also need to skip over some records with $s_p = -1$, as determined by the list CRDT's insertion ordering).
+A simple but inefficient algorithm would be: to apply a $italic("Delete")(i)$ operation we iterate over the sequence of records and pick the $i$th record with a prepare state of $s_p = mono("Ins")$ (i.e., the $i$th among the characters that are visible in the prepare state, which is the document state in which the operation should be interpreted).
+Similarly, to apply $italic("Insert")(i, c)$ we skip over $i - 1$ records with $s_p = mono("Ins")$ and insert the new record after the last skipped record (if there have been concurrent insertions at the same position, we may also need to skip over some records with $s_p = mono("NotInsertedYet")$, as determined by the list CRDT's insertion ordering).
 
 To reduce the cost of this algorithm from $O(n)$ to $O(log n)$, where $n$ is the number of characters in the document, we construct a B-tree whose leaves, from left to right, contain the sequence of records representing character states.
-We extend the tree into an _order statistic tree_ @CLRS2009 (also known as _ranked B-tree_) by adding two integers to each node: the number of records with $s_p = 0$ contained within that subtree, and the number of records with $s_e = 0$ in that subtree.
-Every time the state variables are updated, we also update those numbers on the path from the updated record to the root.
+We extend the tree into an _order statistic tree_ @CLRS2009 (also known as _ranked B-tree_) by adding two integers to each node: the number of records with $s_p = mono("Ins")$ contained within that subtree, and the number of records with $s_e = mono("Ins")$ in that subtree.
+Every time $s_p$ or $s_e$ are updated, we also update those numbers on the path from the updated record to the root.
 As the tree is balanced, this can be done in $O(log n)$ time.
 
-Now it is easy to find the $i$th record with $s_p = 0$ in logarithmic time by starting at the root of the tree, and adding up the values in the subtrees that have been skipped.
-Moreover, once we have a record in the sequence we can efficiently determine its index in the effect state by going in the opposite direction: working upwards in the tree towards the root, and summing the numbers of records with $s_e = 0$ that lie in subtrees to the left of the starting record.
-This allows us to efficiently transform an operation from the prepare version into the effect version.
-If the character was already deleted in the effect version ($s_e > 0$), the transformed operation is a no-op.
+Now it is easy to find the $i$th record with $s_p = mono("Ins")$ in logarithmic time by starting at the root of the tree, and adding up the values in the subtrees that have been skipped.
+Moreover, once we have a record in the sequence we can efficiently determine its index in the effect state by going in the opposite direction: working upwards in the tree towards the root, and summing the numbers of records with $s_e = mono("Ins")$ that lie in subtrees to the left of the starting record.
+This allows us to efficiently transform the index of an operation from the prepare version into the effect version.
+If the character was already deleted in the effect version ($s_e = mono("Del")$), the transformed operation is a no-op.
 
-We use this process on every $italic("apply")(e)$, and then store the ID of the target record on the event $e$ in the event graph.
-For insertions, this is simply the ID of the event itself; for deletion events, it is the ID of the event that originally inserted the character being deleted.
-When we subsequently perform a $italic("retreat")(e)$ or $italic("advance")(e)$, that event $e$ must have already been applied, and therefore we must have previously stored the ID of the record it refers to.
-We can therefore ignore the operation index when retreating and advancing, and instead use the ID to look up the record to be updated.
-To this end we maintain a second B-tree that is keyed by event ID, and which points at the leaf nodes of the first B-tree.
+Besides the sequence of records, the internal state also includes a mapping from event ID to the ID of a record in the sequence.
+On every $sans("apply")(e)$ we use the above process to identify a target record in the sequence, and then we store the mapping from $e.italic("id")$ to the target record ID.
+When we subsequently perform a $sans("retreat")(e)$ or $sans("advance")(e)$, that event $e$ must have already been applied, and hence $e.italic("id")$ must appear in this mapping.
+We can therefore ignore the operation index when retreating and advancing, and instead use the event ID to look up the record to be updated.
+To this end we maintain a second B-tree that is keyed by record ID, and which points at the leaf nodes of the first B-tree.
 This tree allows us to advance or retreat in logarithmic time.
 
 == Clearing CRDT state <clearing>
 
-As described so far, the algorithm retains every insertion since document creation forever in its internal state, causing the state to become big, and requiring the entire event graph to be replayed in order to restore the state.
+As described so far, the algorithm retains every insertion since document creation forever in its internal state, consuming a lot of memory, and requiring the entire event graph to be replayed in order to restore the internal state.
 We now introduce a further optimisation that allows eg-walker to completely discard its internal state from time to time, and replay only a subset of the event graph.
 
 We define a version $V subset.eq G$ to be a _critical version_ in an event graph $G$ iff it partitions the graph into two subsets of events $G_1 = sans("Events")(V)$ and $G_2 = G - G_1$ such that all events in $G_1$ happened before all events in $G_2$:
@@ -572,13 +625,14 @@ This concept enables several key optimisations:
 - If the parents of the next event are equal to the version of the event graph processed so far, we just output the unmodified operation from the event as the transformed operation.
 - If both an event's version and its parent version are critical versions, there is no need to traverse the B-trees and update the CRDT state, since we would immediately discard that state anyway; we can just skip this work.
 
-These optimisations make it very fast to process documents that are mostly edited sequentially (e.g., because the authors took turns and did not write concurrently), since most of the event graph of such a document is a linear chain of critical versions.
+These optimisations make it very fast to process documents that are mostly edited sequentially (e.g., because the authors took turns and did not write concurrently, or because there is only a single author), since most of the event graph of such a document is a linear chain of critical versions.
+Moreover, the internal state can be discarded once replay is complete.
 
 If a replica receives events that are concurrent with existing events in its graph, but the replica has already discarded its internal state resulting from those events, it needs to rebuild some of that state.
 It can do this by identifying the most recent critical version that happened before the new event, replaying the existing events that happened after that critical version (in topologically sorted order), and finally applying the new events.
 Events from before that critical version do not need to be replayed.
 Since most editing histories have critical versions from time to time, this means that usually only a small subset of the event graph needs to be replayed.
-The root version $emptyset$ is always a critical version, so in the worst case this algorithm replays the entire event graph.
+In the worst case, this algorithm replays the entire event graph.
 
 == Partial event graph replay <partial-replay>
 
@@ -1194,45 +1248,6 @@ Before running _prepare_ on each event $i$, the algorithm first sets #sp on all 
 
 For efficiency, instead of traversing the entire tree of nodes before each event is visited, #sp is updated incrementally. As each event is visited, the set difference is computed between #vp (the version of the previously visited event) and $P_i$ (the parent version of the current event). The set difference returns a set of added events and a set of removed events. Each event added or removed from #vp modifies the state of the corresponding node in the state tree.
 
-#sp is updated on the corresponding node as follows:
-
-- If an insert event is added, #sp moves from `NotInsertedYet` to `Ins`
-- If a delete event is added, #sp on the delete event's target moves from `Ins` to `Del(1)` or `Del(n)` to `Del(n+1)`.
-- If an insert event is removed, #sp moves from `Ins` to `NotInsertedYet`
-- If a delete event is removed, #sp on the delete event's target moves from `Del(1)` to `Ins` or `Del(n)` to `Del(n-1)`.
-
-#figure(
-  fletcher.diagram(
-    // cell-size: 3mm,
-    spacing: (4mm, 4mm),
-    node-stroke: 0.5pt,
-    node-inset: 5mm,
-    // node-shape: "circle",
-  {
-    let (nyi, ins, del1, del2, deln) = ((0, 0), (1, 0), (2, 0), (3, 0), (4, 0))
-    node(nyi, "NYI") //, shape: "circle")
-    node(ins, "Ins", stroke: 1.1pt) //, shape: "circle")
-    node(del1, "Del(1)") //, shape: "circle")
-    node(del2, "Del(2)") //, shape: "circle")
-    node(deln, $dots.c$, shape: "rect") //, shape: "circle")
-
-    edge(nyi, ins, bend: 50deg, label: [\+ Ins], "->")
-    edge(ins, del1, bend: 50deg, label: [\+ Del], "->")
-    edge(del1, del2, bend: 50deg, label: [\+ Del], "->")
-    edge(del2, deln, bend: 50deg, label: [\+ Del], "-->")
-
-    edge(ins, nyi, bend: 50deg, label: [\- Ins], "->")
-    edge(del1, ins, bend: 50deg, label: [\- Del], "->")
-    edge(del2, del1, bend: 50deg, label: [\- Del], "->")
-    edge(deln, del2, bend: 50deg, label: [\- Del], "-->")
-
-    // edge(start, a, "-")
-    // edge(a, b, "-")
-    // edge(b, d, "-")
-    // edge(a, c, "-")
-  }),
-  caption: [State machine diagram for #sp]
-) <spv-state>
 
 
 // - At the start of the algorithm, store $vp = emptyset$. #vp stores the version at represented by #sp on all nodes in the tree.
@@ -1523,7 +1538,7 @@ There are 2 more ways we can speed up the system using @opt-traversal-claim and 
 
 During the traversal, the algorithm sometimes visit an event $i$ where the event's parent version $P_i$ is a critical version in the set visited events ($G = ceil(V_0 union V_m)$).
 
-In this case, because of the nature of critical events, all subsequently visited events must be causally after $P_i$. Because causally later events are unaffected by the state object, all information stored in the eg-walker state can be discarded. We reset the state to a list of dummy nodes.
+In this case, because of the nature of critical events, all subsequently visited events must be causally after $P_i$. Because causally later events are unaffected by the internal state, all information stored in the eg-walker state can be discarded. We reset the state to a list of dummy nodes.
 
 Also, any time the state does not contain any concurrent events, the transform function will have no effect on the event itself. The event already entirely describes its behaviour at its own parent version - so when the document is at the parent version, no transformation is needed. On its own, this fact wouldn't help much as we would still need to add the corresponding CRDT message to the eg-walker state. However, if both an event's version and its parent version are critical versions, the state doesn't matter (it will be cleared anyway). So the transform function can simply yield the original event data $e$ directly. We do not need to run the CRDT's _prepare_ or _effect_ functions at all.
 
