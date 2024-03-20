@@ -585,29 +585,29 @@ The figures include the character for the sake of readability, but the algorithm
 == Mapping indexes to character IDs
 
 In the event graph, insertion and deletion operations specify the index at which they apply; in order to update eg-walker's internal state, we need to map these to the correct record in the sequence.
-Moreover, to produce the transformed operations, we need to map these internal IDs back to indexes again.
+Moreover, to produce the transformed operations, we need to map the positions of these internal records back to indexes again.
 
 A simple but inefficient algorithm would be: to apply a $italic("Delete")(i)$ operation we iterate over the sequence of records and pick the $i$th record with a prepare state of $s_p = mono("Ins")$ (i.e., the $i$th among the characters that are visible in the prepare state, which is the document state in which the operation should be interpreted).
 Similarly, to apply $italic("Insert")(i, c)$ we skip over $i - 1$ records with $s_p = mono("Ins")$ and insert the new record after the last skipped record (if there have been concurrent insertions at the same position, we may also need to skip over some records with $s_p = mono("NotInsertedYet")$, as determined by the list CRDT's insertion ordering).
 
-To reduce the cost of this algorithm from $O(n)$ to $O(log n)$, where $n$ is the number of characters in the document, we construct a B-tree whose leaves, from left to right, contain the sequence of records representing character states.
+To reduce the cost of this algorithm from $O(n)$ to $O(log n)$, where $n$ is the number of characters in the document, we construct a B-tree whose leaves, from left to right, contain the sequence of records representing characters.
 We extend the tree into an _order statistic tree_ @CLRS2009 (also known as _ranked B-tree_) by adding two integers to each node: the number of records with $s_p = mono("Ins")$ contained within that subtree, and the number of records with $s_e = mono("Ins")$ in that subtree.
 Every time $s_p$ or $s_e$ are updated, we also update those numbers on the path from the updated record to the root.
-As the tree is balanced, this can be done in $O(log n)$ time.
+As the tree is balanced, this update takes $O(log n)$.
 
 Now it is easy to find the $i$th record with $s_p = mono("Ins")$ in logarithmic time by starting at the root of the tree, and adding up the values in the subtrees that have been skipped.
 Moreover, once we have a record in the sequence we can efficiently determine its index in the effect state by going in the opposite direction: working upwards in the tree towards the root, and summing the numbers of records with $s_e = mono("Ins")$ that lie in subtrees to the left of the starting record.
 This allows us to efficiently transform the index of an operation from the prepare version into the effect version.
 If the character was already deleted in the effect version ($s_e = mono("Del")$), the transformed operation is a no-op.
 
-Besides the sequence of records, the internal state also includes a mapping from event ID to the ID of a record in the sequence.
-On every $sans("apply")(e)$ we use the above process to identify a target record in the sequence, and then we store the mapping from $e.italic("id")$ to the target record ID.
+Besides the sequence of records, the internal state also includes a mapping from event ID to the record in the sequence affected by that event.
+On every $sans("apply")(e)$ we use the above process to identify the target record in the sequence, and then we store the mapping from $e.italic("id")$ to the target record ID.
 When we subsequently perform a $sans("retreat")(e)$ or $sans("advance")(e)$, that event $e$ must have already been applied, and hence $e.italic("id")$ must appear in this mapping.
 We can therefore ignore the operation index when retreating and advancing, and instead use the event ID to look up the record to be updated.
 To this end we maintain a second B-tree that is keyed by record ID, and which points at the leaf nodes of the first B-tree.
 This tree allows us to advance or retreat in logarithmic time.
 
-== Clearing CRDT state <clearing>
+== Clearing the internal state <clearing>
 
 As described so far, the algorithm retains every insertion since document creation forever in its internal state, consuming a lot of memory, and requiring the entire event graph to be replayed in order to restore the internal state.
 We now introduce a further optimisation that allows eg-walker to completely discard its internal state from time to time, and replay only a subset of the event graph.
@@ -618,7 +618,6 @@ $ forall e_1 in G_1: forall e_2 in G_2: e_1 -> e_2. $
 Equivalently, $V$ is a critical version iff every event in the graph is either included in $V$ or happened after _all_ of the events in $V$:
 $ forall e_1 in G: e_1 in sans("Events")(V) or (forall e_2 in V: e_2 -> e_1). $
 If a version is critical, that does not guarantee that it will remain critical forever; it is possible for a critical version to become non-critical because a concurrent event is added to the graph.
-
 This concept enables several key optimisations:
 
 - If the version of the event graph processed so far is critical, we can discard all of the internal state (including both B-trees and all $s_p$ and $s_e$ values), and replace it with a placeholder as explained in @partial-replay.
@@ -636,28 +635,30 @@ In the worst case, this algorithm replays the entire event graph.
 
 == Partial event graph replay <partial-replay>
 
-Assume that we want to add event $e_"new"$ to the event graph $G$, that $V_"curr" = sans("Version")(G)$ is the current document reflecting all events except $e_"new"$, and that $V_"crit" eq.not V_"curr"$ is the latest critical version in $G union {e_"new"}$ that happened before both $e_"new"$ and $V_"curr"$.
+Assume that we want to add event $e_"new"$ to the event graph $G$, that $V_"curr" = sans("Version")(G)$ is the current document version reflecting all events except $e_"new"$, and that $V_"crit" eq.not V_"curr"$ is the latest critical version in $G union {e_"new"}$ that happened before both $e_"new"$ and $V_"curr"$.
 Further assume that we have discarded the internal state, so the only information we have is the latest document state at $V_"curr"$ and the event graph; in particular, without replaying the entire event graph we do not know the document state at $V_"crit"$.
 
-However, a key insight of eg-walker is that the full document state at $V_"crit"$ is not needed; all we need is enough state to transform $e_"new"$ to apply to the document at $V_"curr"$, and this state can be obtained by replaying only the events since $V_"crit"$, that is, $G - sans("Events")(V_"crit")$, in topologically sorted order.
+However, a key insight in the design of eg-walker is that the exact internal state at $V_"crit"$ is not needed; all we need is enough state to transform $e_"new"$ and rebase it onto the document at $V_"curr"$.
+This internal state can be obtained by replaying the events since $V_"crit"$, that is, $G - sans("Events")(V_"crit")$, in topologically sorted order.
 For example, using the graph in @topological-sort, say the current state is $G = {e_"A1" ... e_"A5", e_"B1" ... e_"B4"}$, so $V_"curr" = {e_"A5", e_"B4"}$, and the new event $e_"new" = e_"C1"$.
-Then ${e_"A1"}$ is the most recent critical version.
+Then $V_"crit" = {e_"A1"}$ is the most recent critical version.
 
-Before replaying the events, we initialise the internal state with a single placeholder record that represents the range of indexes $[0, infinity]$ of the document state at $V_"crit"$ (we do not know the exact length of the document at that version, but we can still have a placeholder for arbitrarily many indexes).
+The algorithm then works as follows:
+
+1. We initialise a new internal state corresponding to version $V_"crit"$. Since we do not know the the document state at this version, we start with a single placeholder record representing the unknown document content.
+2. We update the internal state by replaying events from $V_"crit"$ to $V_"curr"$, but we do not output transformed operations during this stage.
+3. Finally, we replay the new event $e_"new"$ and output the transformed operation. If we received a batch of new events, we replay them in topologically sorted order.
+
+The placeholder record we start with in step 1 represents the range of indexes $[0, infinity]$ of the document state at $V_"crit"$ (we do not know the length of the document at that version, but we can still have a placeholder for arbitrarily many indexes).
 Placeholders are counted as the number of characters they represent in the order statistic tree construction, and they have the same length in both the prepare and the effect versions.
 We then apply events as follows:
 
-- Applying an insertion at index $i$ creates a record with $s_p = s_e = 0$ and the ID of the insertion event. We map the index to a record in the sequence using the prepare state as usual; if $i$ falls within a placeholder for range $[j, k]$, we split it into a placeholder for $[j, i-1]$, followed by the new record, followed by a placeholder for $[i, k]$. Placeholders for empty ranges are omitted.
-- Applying a deletion at index $i$: if the deleted character was inserted prior to $V_"crit"$, the index must fall within a placeholder with some range $[j, k]$. We split it into a placeholder for $[j, i-1]$, followed by a new record with $s_p = s_e = 1$, followed by a placeholder for $[i+1, k]$. The new record has a placeholder ID that only needs to be unique within the local replica, and need not be consistent across replicas.
+- Applying an insertion at index $i$ creates a record with $s_p = s_e = mono("Ins")$ and the ID of the insertion event. We map the index to a record in the sequence using the prepare state as usual; if $i$ falls within a placeholder for range $[j, k]$, we split it into a placeholder for $[j, i-1]$, followed by the new record, followed by a placeholder for $[i, k]$. Placeholders for empty ranges are omitted.
+- Applying a deletion at index $i$: if the deleted character was inserted prior to $V_"crit"$, the index must fall within a placeholder with some range $[j, k]$. We split it into a placeholder for $[j, i-1]$, followed by a new record with $s_p = mono("Del 1")$ and $s_e = mono("Del")$, followed by a placeholder for $[i+1, k]$. The new record has a placeholder ID that only needs to be unique within the local replica, and need not be consistent across replicas.
 - Applying a deletion of a character inserted since $V_"crit"$ updates the record created by the insertion.
 
-Before applying an event we retreat and advance as before.
-The algorithm never needs to retreat or advance an event that happened before $V_"crit"$, therefore we can rely on every retreated or advanced event to have a record ID that was assigned when we applied the event.
-
-While replaying events in $G$ we do not output transformed operations.
-When we have completed replaying up to $V_"curr"$, we next retreat/advance to the parent version of $e_"new"$, apply $e_"new"$, and output a transformed version of that event.
-We do this in the same way as before, by starting at the updated record and then moving upwards in the B-tree, adding up the preceding number of characters in the effect version (including placeholders).
-Events subsequent to $e_"new"$ can now be processed using the state we constructed, without having to repeat the replay.
+Before applying an event we retreat and advance as usual.
+The algorithm never needs to retreat or advance an event that happened before $V_"crit"$, therefore every retreated or advanced event ID must exist in the mapping from event ID to internal state record.
 
 If there are concurrent insertions at the same position, we invoke the CRDT algorithm to place them in a consistent order as discussed in @prepare-effect-versions.
 Since all concurrent events must be after $V_"crit"$, they are included in the replay.
@@ -668,7 +669,7 @@ When we are seeking for the insertion position, we never need to seek past a pla
 Say we have two users who have been working offline, generating $k$ and $m$ events respectively.
 When they come online and merge their event graphs, the latest critical version is immediately prior to the branching point.
 If the branch of $k$ events comes first in the topological sort, the replay algorithm first applies $k$ events, then retreats $k$ events, applies $m$ events, and finally advances $k$ events again.
-Asymptotically, $O(k+m)$ calls to apply/retreat/advance are required regardless of the order in which the branches are traversed, although in practice the algorithm is faster if $k<m$ since we don't need to retreat/advance on the branch that is visited last.
+Asymptotically, $O(k+m)$ calls to apply/retreat/advance are required regardless of the order of traversal, although in practice the algorithm is faster if $k<m$ since we don't need to retreat/advance on the branch that is visited last.
 
 Each apply/retreat/advance requires one or two traversals of the order statistic tree, and at most one traversal of the ID-keyed B-tree.
 The upper bound on the number of entries in each tree (including placeholders) is $2(k+m)+1$, since each event generates at most one new record and one placeholder split.
