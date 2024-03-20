@@ -248,7 +248,7 @@ The events $e_5$ and $e_6$ are concurrent, and the frontier of this graph is the
 
 The event graph for a substantial document, such as a research paper, may contain hundreds of thousands of events.
 It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs, and many portions of a typical event graph are linear, with each event having one parent and one child.
-We describe the storage format in more detail in Section TODO.
+We describe the storage format in more detail in @storage.
 
 == Document versions <versions>
 
@@ -310,7 +310,7 @@ Eg-walker is a collaborative text editing algorithm based on the idea of replayi
 The algorithm builds on a replication layer that ensures that all non-crashed replicas eventually receive every event that any replica adds to the graph.
 The state of each replica consists of three parts:
 
-1. *Event graph:* Each replica stores a copy of the event graph on disk, in a format described in Section TODO.
+1. *Event graph:* Each replica stores a copy of the event graph on disk, in a format described in @storage.
 2. *Document state:* The current sequence of characters in the document with no further metadata. On disk this is simply a plain text file; in memory it may be represented as a rope @Boehm1995, piece table @vscode-buffer, or similar structure to support efficient insertions and deletions.
 3. *Internal state:* A temporary CRDT structure that eg-walker uses to merge concurrent edits. It is not persisted or replicated, and it is discarded when the algorithm finishes running.
 
@@ -625,7 +625,7 @@ This concept enables several key optimisations:
 - If both an event's version and its parent version are critical versions, there is no need to traverse the B-trees and update the CRDT state, since we would immediately discard that state anyway; we can just skip this work.
 
 These optimisations make it very fast to process documents that are mostly edited sequentially (e.g., because the authors took turns and did not write concurrently, or because there is only a single author), since most of the event graph of such a document is a linear chain of critical versions.
-Moreover, the internal state can be discarded once replay is complete.
+Moreover, the internal state can be discarded once replay is complete, although it is also possible to retain the internal state for transforming future events.
 
 If a replica receives events that are concurrent with existing events in its graph, but the replica has already discarded its internal state resulting from those events, it needs to rebuild some of that state.
 It can do this by identifying the most recent critical version that happened before the new event, replaying the existing events that happened after that critical version (in topologically sorted order), and finally applying the new events.
@@ -678,6 +678,23 @@ Overall, the cost of merging branches with $k$ and $m$ events is therefore $O((k
 
 To determine the worst-case complexity of replaying an event graph with $n$ events, note that each event is applied exactly once, and before each event we can at most retreat or advance each prior event once.
 The overall worst-case complexity of the algorithm is therefore $O(n^2 log n)$; however, this case is unlikely to occur in realistic collaborative text editing scenarios.
+
+== Storing the event graph <storage>
+
+The event graph can be stored on disk in a very compact way by using a few compression tricks that take advantage of the ways that people typically write text documents: namely, they tend to insert or delete consecutive sequences of characters, and less frequently hit backspace or move the cursor to a new location.
+Eg-walker's event graph storage format is inspired by the Automerge CRDT library @automerge-storage @automerge-columnar, which in turn uses ideas from column-oriented databases @Abadi2013 @Stonebraker2005.
+
+We topologically sort the events in the graph; different replicas may sort the set differently, but locally to one replica we can identify an event by its index in this sorted order.
+Then we store different properties of events in separate byte sequences called _columns_, which are then combined into one file with a simple header.
+The columns are:
+
+- _Event type, start position, and run length._ For example, "the first 23 events are insertions at consecutive indexes starting from index 0, the next 10 events are deletions at consecutive indexes starting from index 7," and so on. We encode this using a variable-length binary encoding of integers, which represents small numbers in one byte, larger numbers in two bytes, etc.
+- _Inserted content._ An insertion event contains exactly one character (a Unicode scalar value), and a deletion does not. We can simply concatenate the UTF-8 encoding of the characters for insertion events in the same order as they appear in the first column.
+- _Parents._ By default we assume that every event has exactly one parent, namely its predecessor in the topological sort. Any events for which this is not true are listed explicitly, for example: "the first event has zero parents; the 153rd event has two parents, namely events numbers 31 and 152;" and so on.
+- _Event IDs._ Each event is uniquely identified by a pair of a replica ID and a per-replica sequence number. This column stores runs of event IDs, for example: "the first 1085 events are from replica $A$, starting with sequence number 0; the next 595 events are from replica $B$, starting with sequence number 0;" and so on.
+
+We send the same data format over the network when replicating the entire event graph.
+When sending a subset of events over the network (e.g., a single event during real-time collaboration), references to parent events outside of that subset need to be encoded using the $(italic("replicaID"), italic("seqNo"))$ event IDs, but otherwise a similar encoding can be used.
 
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 

@@ -90,6 +90,13 @@ automerge-storage:
   # author: ["Jahns, Kevin"]
   url: https://automerge.org/automerge-binary-format-spec/
 
+automerge-columnar:
+  type: web
+  title: "Experiment: columnar data encoding for Automerge"
+  author: ["Kleppmann, Martin"]
+  date: 2019-07-02
+  url: https://github.com/automerge/automerge-perf/blob/master/columnar/README.md
+
 crdt-papers:
   type: web
   title: CRDT Papers
