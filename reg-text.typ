@@ -926,14 +926,16 @@ These approaches therefore generally require manual merge conflict resolution an
 
 = Conclusion
 
-Event graphs are a novel, exciting approach to building realtime collaborative editing applications. Our eg-walker algorithm builds on the foundation of existing CRDT based algorithms while alleviating some of the large downsides of CRDTs. In particular:
+Eg-walker is a new approach to collaborative text editing that has significant performance advantages over existing OT and CRDT algorithms.
+Compared to CRDTs, it uses less memory, files are smaller and faster to load, and edits from other users are merged much faster in documents with largely sequential editing.
+Compared to OT, large merges (e.g., from users who did a significant amount of work while offline) are much faster, both asymptotically and in practice, and peer-to-peer collaboration is robustly supported.
 
-- Eg-walker doesn't need all replicating peers to store and load a large CRDT based state object into memory during collaborative editing sessions. This CRDT state object generally grows without bound, and pruning it is very difficult. Eg-walker only needs to access historical events when merging - and even then, like OT based systems, it only needs to access events back to the last common version.
-- The file and network format used by CRDT based collaborative editing systems depends on the type definition of the CRDT state object. Different sequence based CRDTs (like Fugue@fugue, RGA@Roh2011RGA, YATA@Nicolaescu2016YATA and others) use different CRDT state formats. As a result, new CRDT algorithms require entirely new file formats and network formats to be written and deployed. By contrast, the event graph format is completely agnostic to the algorithm used to order concurrent edits.
+Moreover, since eg-walker stores the full keystroke-granularity editing history of a document, it allows applications to show that history to the user, and to restore arbitrary past versions of a document.
+The only downsides we have found with eg-walker is that it is more complex to implement, and it is somewhat slower than an optimised CRDT on event graphs with a high degree of concurrency (though easily fast enough for practical use, with merging throughput of over 1 million events/sec).
 
-Remarkably, eg-walker achieves this despite having excellent real-world performance. Even in our most complex data sets, we were able to merge over 1 million run-length encoded text editing events per second. When editing traces have linear causal histories, our system significantly outperforms all other approaches - as the CRDT machinery is completely unneeded.
-
-We think this approach is a fascinating direction for future research in the field of realtime collaborative editing. We sincerely hope others build on this work, and find it as interesting and useful as we have.
+The underlying event graph is a straightforward representation of the edits that have occurred, which is easy to replicate over any network, and which is not specific to the eg-walker algorithm.
+We therefore expect that the same data format will be able to support future collaborative editing algorithms as well, without requiring the data format to be changed.
+We also believe that eg-walker can be extended to other file types such as rich text, graphics, or spreadsheets, and we believe that this is a promising direction for future research in realtime editing.
 
 #if not anonymous [
   #heading(numbering: none, [Acknowledgements])
