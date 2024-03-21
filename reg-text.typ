@@ -733,10 +733,6 @@ Version control systems such as Git, as well as differential synchronization @Fr
 Applying patches relies on heuristics, such as searching for some amount of context before and after the modified text passage, which can apply the patch in the wrong place if the same context exists in multiple locations, and which can fail if the context has concurrently been modified.
 These approaches therefore generally require manual merge conflict resolution and don't ensure automatic replica convergence.
 
-
-// A working typescript implementation of eg-walker is provided in our _reference-reg_ repository @reference-reg. This library is fully featured, but missing many optimisations in order to keep the code simple and easy to understand. We also provide a much more fully featured implementation of eg-walker in our _diamond types_ repository @dt. This is the implementation benchmarked in @benchmarking.
-
-
 /*
 #import "@preview/algorithmic:0.1.0"
 #import algorithmic: algorithm
@@ -776,88 +772,18 @@ These approaches therefore generally require manual merge conflict resolution an
 
 = Evaluation <benchmarking>
 
-In @ff-memory we see the effect this has on memory size while processing one of our real-world editing traces. The editing trace contains many critical events as the document goes in and out of sync. With fast forward optimisations enabled, the eg-walker state size stays extremely small.
-
-#figure(
-  charts.ff_chart,
-  caption: [
-    A comparison of the eg-walker state size while processing the _"friendsforever"_ data set, with and without fast forward optimisations enabled. //When the state is never cleared, the state grows linearly throughout the test. When the state is cleared at critical versions, it stays very small throughout this test.
-
-    // Smaller is better.
-  ],
-  kind: image,
-) <ff-memory>
-
-@speed-ff shows the performance difference this optimisation makes in our various test cases. The _git-makefile_ editing trace does not contain any critical events - so performance is unchanged. In comparison, the fully sequential editing traces are processed approximately 15x faster as a result.
-
-#figure(
-  charts.speed_ff,
-  caption: [
-    Performance of dt-egwalker algorithm with and without
-    // Smaller is better.
-  ],
-  kind: image,
-) <speed-ff>
-
-
-// // TODO: Would it be worth making a line graph out of this?
-// #figure(
-//   table(
-//     columns: (auto, auto, auto, auto),
-//     [*Dataset*], [*Before (ms)*], [*After (ms)*], [*Speedup*],
-//     [automerge-perf], [3.94], [0.26], [*15x*],
-//     [seph-blog1], [7.17], [0.413], [*16.6x*],
-//     [friendsforever], [3.50], [2.82], [*XXX*],
-//     [ETC FILL ME OUT!]
-//   ),
-//   // canvas(length: 1cm, {
-
-//   // }),
-//   caption: [
-//     Performance comparison of _transformPartial_ with and without clearing and fast forward optimisations. All other optimisations listed in this paper are enabled. The largest gains are in the purely linear tests (automerge-perf and seph-blog1) as, for a purely linear event graph, no state needs to be constructed at all.
-//   ]
-// )
-
-
-We were concerned that eg-walker would be too slow for practical use. To this end, we wrote a highly optimised implementation of eg-walker in rust in the Diamond Types collaborative editing library @dt. This implementation (hereafter _dt-egwalker_) performs quite well. Compared to equivalent, contemporary CRDT implementations, our eg-walker implementation is quite fast.
-
-Eg-walker is particularly fast for linear or mostly-linear data sets where CRDT data structure does not need to be generated at all. But we suspect the algorithm scales worse than CRDTs when datasets have extremely high concurrency (eg 20+ concurrent replicas all making changes while offline). Luckily, editing scenarios like that seem extremely rare in practice.
-
-Contemporary CRDT libraries vary wildly in performance. As @chart-one-local shows, we see a 500x difference in performance between the best performing and worst performing library we tested. In order to fairly evaluate dt-egwalker, we ended up writing our own optimised CRDT implementation in the _dt-crdt_ library@dt-crdt. This library shares its language, code style, data structures and optimisations with _dt-egwalker_ in order to achieve (as much as possible) a like-for-like comparison with diamond types. The optimisations are documented here @crdts-go-brrr.
-
-#figure(
-  text(8pt, charts.one_local),
-  caption: [
-    Speed locally applying the 'seph-blog1' trace to a CRDT object using various contemporary CRDTs libraries. Yjs@yjs is 500x slower than Cola@cola in this test. (2056ms vs 4ms). Cola is faster than dt-crdt due to its GTree@cola-gtree implementation using local cursor caching. When this is disabled (_cola-nocursor_), performance is remarkably similar to dt-crdt. Yjs performs much better when processing remote events.
-    // Comparative speed of DT and DT-crdt algorithms processing remote data, measured in millions of run-length encoded events processed per second.
-  ],
-  kind: image,
-) <chart-one-local>
-
-We evaluate our system in 2 categories:
-
-/ Speed: We measure the time taken to convert all events or CRDT messages in a document's history into the resulting document state. Messages are sent in chronological order and fully run-length encoded where possible - as they would be when reading items from disk or (in bulk) over the network.
-/ Disk space: How large are editing traces or CRDT documents on disk?
-// / Memory footprint: How much resident RAM does our system use while editing a document?
-
-Event graphs also have a different resident memory profile, but we do not evaluate memory usage in this paper.
-
-// Eg-walker is at a natural disadvantage
-
-We do not present local speed measurements - ie, ingesting events from a local editor and (in the CRDT case) converting those events into CRDT messages. Eg-walker is much faster in this case, as no conversion needs to take place. But all of the systems we measure here are fast enough that this is not a bottleneck.
+// TODO: anonymise the references to repos for the conference submission
+We implemented two versions of eg-walker: one in TypeScript that is optimised for code simplicity @reference-reg, and one in Rust (as part of the _Diamond Types_ library @dt) that is optimised for performance.
+The TypeScript implementation omits the B-trees, run-length encoding, and other optimisations, but its behaviour is equivalent to the Rust implementation.
+The benchmarks in this section use the Rust version.
 
 == Editing traces
 
-Humans don't edit documents randomly. We tend to type in runs, use the backspace and delete characters interchangeably (and idiosyncratically). And we select, move, copy and paste text. Good collaborative text libraries take advantage of the features of human generated text to optimize processing - using internal run-length encoding for inserts, deletes and backspace operations, and various other tricks. To properly benchmark our libraries, its important to use input data sets that capture these real editing features.
-
-Accurately capturing these features in a random data generator is difficult. Instead, we benchmark our system using a set of real, recorded editing traces from actual editing sessions. The traces are licensed for public use, and published on GitHub @editing-traces.
-
-We use 2 editing traces from each of the following 3 categories, representing different classes of text editing scenarios:
-
-/ Sequential Traces: A single user editing a document. Changes are performed in a purely linear sequence through time. We use the _automerge-perf_ trace [REF] and _seph-blog1_ trace (a recording of [CRDTS GO BRRR] from @editing-traces).
-/ Concurrent Traces: Multiple users concurrently editing the same document in realtime. We use the _friendsforever_ and _clownschool_ traces from @editing-traces.
-/ Asynchronous Traces: Multiple users concurrently editing a document _asynchronously_. Unfortunately, we don't have any character-by-character editing traces made this way yet, so we've written a script to reconstruct traces from individual files in git repositories. We've extracted a trace for `Makefile` from the git repository for git itself, and `src/node.cc` from the git repository for nodejs [REF]. These are some of the most edited files from their respective git repositories. Both of these files contain some extremely complex event graphs, with large merges of 6 more items.
-
+// TODO: add node_nodecc and git-makefile to editing-traces repo
+// TODO: anonymise the editing-traces repo for the conference submission
+In order to ensure our benchmarks are meaningful, we collected a dataset of text editing traces from real documents, which we have made freely available on GitHub @editing-traces.
+The traces we use are listed in @traces-table.
+There are three types:
 
 #let stats_for(name, type) = {
   let data = json("results/stats_" + name + ".json")
@@ -871,31 +797,71 @@ We use 2 editing traces from each of the following 3 categories, representing di
   )
 }
 
-// TODO: This is a bit ugly in column format.
-#text(6pt, [
 #figure(
-  table(
+  text(9pt, table(
     columns: (auto, auto, auto, auto, auto, auto),
     align: (center, center, right, right, right, right),
-    [*Dataset*], [*Type*], [*\# Events (k)*], [*Concurrency*], [*EG RLE count*], [*\# Agents*],
-    // [automerge-perf], [sequential], [259 778], [0], [1], [1],
-    // [seph-blog1], [sequential], [368 209], [0], [1], [1],
-    // [friendsforever], [concurrent], [26 078], [0.45], [*3685*], [2],
-    // [clownschool], [concurrent], [24 326], [0.44], [*5346*], [2],
-    // [node-node_cc], [async], [947 337], [0.10], [101], [194],
-    // [git-Makefile], [async], [348 819], [*6.11*], [1215], [299],
-    ..stats_for("automerge-paper", "sequential"),
-    ..stats_for("seph-blog1", "sequential"),
-    ..stats_for("egwalker", "sequential"),
-    ..stats_for("friendsforever", "concurrent"),
-    ..stats_for("clownschool", "concurrent"),
+    stroke: none,
+    table.hline(stroke: 0.8pt),
+    table.header([*Name*], [*Type*], [*Events (k)*], [*Avg. width*], [*Runs*], [*Replicas*]),
+    table.hline(stroke: 0.4pt),
+    ..stats_for("automerge-paper", "seq"),
+    ..stats_for("seph-blog1", "seq"),
+    ..stats_for("egwalker", "seq"),
+    ..stats_for("friendsforever", "conc"),
+    ..stats_for("clownschool", "conc"),
     ..stats_for("node_nodecc", "async"),
     ..stats_for("git-makefile", "async"),
-  ),
+    table.hline(stroke: 0.8pt),
+  )),
+  placement: top,
   caption: [
-    Various size measurements for the evaluation datasets. \# Events is the total number of inserted + deleted characters in the trace. Concurrency is an estimate of concurrency - during a BFS traversal of the graph, this shows the mean number of edits concurrent with each inserted or deleted character in the trace. EG RLE count is the number of nodes in the event graph when "runs" of trivial nodes (with 1 parent and 1 child) are joined together. \# Agents is the number of "user agents" which contributed to a trace. For traces from git, this is the number of unique authors which have touched the file.
+    The text editing traces used in our evaluation. _Events_: total number of inserted and deleted characters (in thousands). _Average width_: mean number of events concurrent with each event in the trace. _Runs_: number of sequential runs (sequence of events with one parent and one child). _Replicas_: number of users who contributed.
   ]
-)])
+) <traces-table>
+
+/ Sequential Traces: ("seq"): Keystroke-granularity history of a single user writing a document, collected using an instrumented text editor. These traces contain no concurrency. We use the LaTeX source of a journal paper @Kleppmann2017 @automerge-perf and the text of an 8,800-word blog post @crdts-go-brrr.
+/ Concurrent Traces: ("conc"): Multiple users concurrently editing the same document in realtime, recorded with keystroke granularity. We added 0.5–1 second of artificial latency between the collaborating users to increase the incidence of concurrent operations.
+/ Asynchronous Traces: ("async"): We reconstruct an editing trace for a file in a Git repository, with concurrency mirroring the branching/merging of the Git commits. Since Git does not record keystrokes, we generate the minimal edit operations required for each commit's diff. We use `Makefile` from the Git repository for Git itself @git-makefile, and `src/node.cc` from the Git repository for Node.js @node-src-nodecc. These are some of the most-edited files in their respective repositories, with complex event graphs containing merges of 6 more branches.
+
+== Eg-walker compared to CRDTs
+
+The main performance advantage of eg-walker over CRDTs lies in the fact that we can clear the internal state and skip all of the internal state manipulation on critical versions, as discussed in @clearing.
+To quantify this effect, we compare eg-walker's performance with a version of the algorithm that has these optimisations disabled while replaying an event graph.
+@ff-memory shows the memory usage over the course of replaying one trace, and @speed-ff shows the ratio of runtimes between the unoptimised and the optimised versions for several traces.
+
+// TODO: what is the unit ("state size") of the y axis of this chart?
+#figure(
+  charts.ff_chart,
+  caption: [
+    A comparison of the eg-walker state size while processing the _"friendsforever"_ data set, with and without internal state clearing enabled.
+  ],
+  kind: image,
+  placement: top,
+) <ff-memory>
+
+#figure(
+  charts.speed_ff,
+  caption: [
+    Performance of dt-egwalker algorithm with and without the optimisations from @clearing.
+  ],
+  kind: image,
+  placement: top,
+) <speed-ff>
+
+The _git-makefile_ editing trace does not contain any critical events, so performance is unchanged, whereas the fully sequential editing traces are processed approximately 15x faster with this optimisation.
+The concurrent trace used in @ff-memory has frequently occurring critical versions, allowing the optimisation to keep the internal state small.
+
+Contemporary CRDT libraries vary wildly in performance. As @chart-one-local shows, we see a 500x difference in performance between the best performing and worst performing library we tested. In order to fairly evaluate dt-egwalker, we ended up writing our own optimised CRDT implementation in the _dt-crdt_ library @dt-crdt. This library shares its language, code style, data structures and optimisations with _dt-egwalker_ in order to achieve (as much as possible) a like-for-like comparison with diamond types. The optimisations are documented here @crdts-go-brrr.
+
+#figure(
+  text(8pt, charts.one_local),
+  caption: [
+    Speed locally applying the 'seph-blog1' trace to a CRDT object using various contemporary CRDTs libraries. Yjs@yjs is 500x slower than Cola@cola in this test. (2056ms vs 4ms). Cola is faster than dt-crdt due to its GTree@cola-gtree implementation using local cursor caching. When this is disabled (_cola-nocursor_), performance is remarkably similar to dt-crdt. Yjs performs much better when processing remote events.
+    // Comparative speed of DT and DT-crdt algorithms processing remote data, measured in millions of run-length encoded events processed per second.
+  ],
+  kind: image,
+) <chart-one-local>
 
 
 == Speed

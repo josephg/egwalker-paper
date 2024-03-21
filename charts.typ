@@ -41,8 +41,8 @@
     x-label: "Events processed (in thousands)",
     y-label: [Eg-walker state size],
     {
-      plot.add(scale_data("results/xf-friendsforever-ff.json", 0.001), label: [Optimization on])
-      plot.add(scale_data("results/xf-friendsforever-noff.json", 0.001), label: [Optimization off])
+      plot.add(scale_data("results/xf-friendsforever-noff.json", 0.001), label: [without optimisations])
+      plot.add(scale_data("results/xf-friendsforever-ff.json", 0.001), label: [with optimisations])
     }
   )
 })
@@ -235,11 +235,11 @@
     //   plot-style: black
     // ),
     labels: (
-      [without FF optimizations],
-      [with FF optimizations]
+      [without optimisations],
+      [with optimisations]
     ),
     // x-unit: [x],
-    x-label: text(10pt, [Normalised speed replaying event graph. More is better.]),
+    x-label: text(10pt, [Normalised speed replaying event graph (higher is better).]),
     (
       bar_for_ff("automerge-paper"),
       bar_for_ff("seph-blog1"),

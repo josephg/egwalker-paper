@@ -97,6 +97,13 @@ automerge-columnar:
   date: 2019-07-02
   url: https://github.com/automerge/automerge-perf/blob/master/columnar/README.md
 
+automerge-perf:
+  type: web
+  title: Benchmarking resources for Automerge
+  author: ["Kleppmann, Martin"]
+  date: 2020
+  url: https://github.com/automerge/automerge-perf
+
 crdt-papers:
   type: web
   title: CRDT Papers
@@ -113,6 +120,7 @@ crdts-go-brrr:
   type: blog
   title: "5000x faster CRDTs: An Adventure in Optimization"
   author: ["Gentle, Joseph"]
+  date: 2021-07-31
   url: https://josephg.com/blog/crdts-go-brrr/
 
 crdts-hard-parts:
@@ -125,29 +133,12 @@ crdts-hard-parts:
     - type: Conference
       title: "Hydra distributed computing conference"
 
-# rga:
-#   type: article
-#   author: ["Roh, Hyun-Gul", "Jeon, Myeongjae", "Kim, Jin-Soo", "Lee, Joonwon"]
-#   title: "Replicated Abstract Data Types: Building Blocks for Collaborative Applications"
-#   serial-number:
-#     doi: "10.1016/j.jpdc.2010.12.006"
-#     issn: 0743-7315
-#   date: 2011
+git-makefile:
+  type: web
+  title: Makefile for Git
+  url: https://github.com/git/git/blob/master/Makefile
 
-# @article{Roh2011RGA,
-#   author = {Roh, Hyun-Gul and Jeon, Myeongjae and Kim, Jin-Soo and Lee, Joonwon},
-#   title = {Replicated Abstract Data Types: Building Blocks for Collaborative Applications},
-#   journal = {Journal of Parallel and Distributed Computing},
-#   volume = {71},
-#   number = {3},
-#   month = mar,
-#   year = {2011},
-#   issn = {0743-7315},
-#   pages = {354--368},
-#   publisher = {Elsevier},
-#   doi = {10.1016/j.jpdc.2010.12.006},
-#   pdf = {http://csl.snu.ac.kr/papers/jpdc11.pdf},
-#   keywords = {text-editing, RGA}
-# }
-
-
+node-src-nodecc:
+  type: web
+  title: "Node.js source code: src/node.cc"
+  url: https://github.com/nodejs/node/blob/main/src/node.cc
