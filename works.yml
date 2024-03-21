@@ -79,15 +79,12 @@ jsonjoy:
 automerge:
   type: web
   title: "Automerge CRDT"
-  author: ["Kleppmann, Martin", "et al"]
-  # author: ["Jahns, Kevin"]
   url: https://automerge.org/
 
 automerge-storage:
   type: web
   title: "Automerge Binary Document Format"
   author: ["Good, Alex", "Jeffery, Andrew"]
-  # author: ["Jahns, Kevin"]
   url: https://automerge.org/automerge-binary-format-spec/
 
 automerge-columnar:

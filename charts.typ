@@ -123,7 +123,7 @@
 //     ),
 //     // bar-style: palette.tango,
 //     // x-unit: [x],
-//     x-label: text(10pt)[Local speed in Mevents / sec processed. More is better],
+//     x-label: [Local speed in Mevents / sec processed (higher is better)],
 //     x-max: 75,
 //     x-min: -0.08,
 //     x-tick-step: 10,
@@ -180,13 +180,13 @@
     //   plot-style: black
     // ),
     labels: (
-      [eg-walker (dt)],
-      [crdt (dt-crdt)],
-      [automerge]
+      [eg-walker],
+      [dt-crdt],
+      // [automerge]
       // [dt-crdt], [dt]
     ),
     // x-unit: [x],
-    x-label: text(10pt, [Remote speed in Mevents / sec processed. More is better]),
+    x-label: [Replay/merge throughput in Mevents/sec (higher is better)],
     (
       bar_for_remote("automerge-paper"),
       bar_for_remote("seph-blog1"),
@@ -239,7 +239,7 @@
       [with optimisations]
     ),
     // x-unit: [x],
-    x-label: text(10pt, [Normalised speed replaying event graph (higher is better).]),
+    x-label: [Normalised replay throughput (higher is better)],
     (
       bar_for_ff("automerge-paper"),
       bar_for_ff("seph-blog1"),
@@ -309,7 +309,7 @@
     ),
     // bar-style: palette.tango,
     // x-unit: [x],
-    x-label: text(10pt)[Local speed in Mevents / sec processed. More is better],
+    x-label: [Local speed in Mevents / sec processed. More is better],
     x-max: 90,
     x-min: -0.08,
     x-tick-step: 10,
@@ -392,7 +392,7 @@
     ),
     // bar-style: palette.tango,
     // x-unit: [x],
-    x-label: text(10pt)[Local speed in Mevents / second. More is better.],
+    x-label: [Local event replay throughput in Mevents/sec (higher is better)],
     x-max: 35,
     x-min: -0.02,
     x-tick-step: 10,
@@ -446,7 +446,7 @@
       // [crdt (dt-crdt)], [eg-walker (dt)], [automerge], [yjs]
     ),
     // x-unit: [x],
-    x-label: text(10pt, [Remote speed in Mevents / sec processed. More is better]),
+    x-label: [Merge throughput in Mevents/sec (higher is better)],
     (
       "automerge-paper",
       "seph-blog1",
@@ -500,10 +500,10 @@
       // [(raw document)],
       // [(insert length)],
       // [dt-uncompressed], [automerge-uncompressed],
-      [DT (full)], [Automerge]
+      [Eg-walker (full)], [Automerge]
     ),
     // x-unit: [x],
-    x-label: text(8pt, [Ratio of resulting file size to inserted content length. (Smaller is better)]),
+    x-label: [Ratio of file size to inserted text content length (lower is better)],
     // x-label: text(10pt, [% file size overhead compared to total inserted content length. (Smaller is better)]),
     (
       "automerge-paper",
@@ -611,11 +611,11 @@
     // ),
     labels: (
       // [(raw document)],
-      [DT (small)], [Yjs],
+      [Eg-walker (small)], [Yjs],
       // [crdt (dt-crdt)], [eg-walker (dt)], [automerge], [yjs]
     ),
     // x-unit: [x],
-    x-label: text(8pt, [Ratio of file size to stored document length. (Smaller is better)]),
+    x-label: [Ratio of file size to current document length (lower is better)],
     // x-label: text(10pt, [% file size overhead compared to final document length. (Smaller is better)]),
     (
       "automerge-paper",
