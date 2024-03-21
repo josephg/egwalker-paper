@@ -697,80 +697,9 @@ The columns are:
 We send the same data format over the network when replicating the entire event graph.
 When sending a subset of events over the network (e.g., a single event during real-time collaboration), references to parent events outside of that subset need to be encoded using the $(italic("replicaID"), italic("seqNo"))$ event IDs, but otherwise a similar encoding can be used.
 
-// Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
-
-= Related Work <related-work>
-
-Eg-walker is an example of a _pure operation-based CRDT_ @polog, which is a family of algorithms that capture a DAG (or partially ordered log) of operations in the form they were generated, and define the current state as a query over that log.
-However, existing publications on pure operation-based CRDTs @Almeida2023 @Bauwens2023 consider only datatypes such as maps, sets, and registers; eg-walker adds a list/text datatype to this family.
-
-MRDTs @Soundarapandian2022 are similarly based on a DAG, and use a three-way merge function to combine two branches since their lowest common ancestor; if the LCA is not unique, a recursive merge is used.
-MRDTs for various datatypes have been defined, but so far none offers text with arbitrary insertion and deletion.
-
-Toomim's _time machines_ approach @time-machines shares a conceptual foundation with eg-walker: both are based on traversing an event graph, with operations being transformed from the form in which they were originally generated into a form that can be applied in topologically sorted order to obtain the current document state.
-Toomim also points out that CRDTs can be used to perform this transformation.
-Eg-walker is a concrete, optimised implementation of the time machine approach; novel contributions of eg-walker include updating the prepare version by retreating and advancing, as well as the details of partial event graph replay.
-
-Eg-walker can also be regarded as an _operational transformation_ (OT) algorithm @Ellis1989, since it takes operations that insert or delete characters at some index, and transforms them into operations that can be applied to the local replica state to have an effect equivalent to the original operation in the state in which it was generated.
-OT has a long lineage of research, tracing back to several seminal papers in the 1990s @Nichols1995 @Ressel1996 @Sun1998.
-To our knowledge, all existing OT algorithms follow a pattern of two sub-algorithms: a set of _transformation functions_ that transform one operation with regard to one other, concurrent operation, and a _control algorithm_ that traverses an editing history and invokes the necessary transformation functions.
-A problem with this architecture is that when two replicas have diverged and each performed $n$ operations, merging their states unavoidably has a cost of at least $O(n^2)$, as each operation from one branch needs to be transformed with respect to all of the operations on the other branch; in some OT algorithms the cost is cubic or even worse @Li2006 @Roh2011RGA @Sun2020OT.
-Eg-walker departs from the transformation function/control algorithm architecture and instead performs transformations using an internal CRDT state, which reduces the merging cost to $O(n log n)$ in most cases; the theoretical upper bound of $O(n^2 log n)$ is unlikely to occur in practical editing histories.
-
-Moreover, most practical implementations of OT require a central server to impose a total order on operations.
-Although it is possible to perform OT in a peer-to-peer context without a central server @Sun2020OT, several early published peer-to-peer OT algorithms later turned out to be flawed @Imine2003 @Oster2006TTF, leaving OT with a reputation of being difficult to reason about @Levien2016.
-We have not formally evaluated the ease of understanding eg-walker, but we believe that it is easier to establish the correctness of our approach compared to distributed OT algorithms.
-
-Other prominent collaborative text editing algorithms belong to the _conflict-free replicated data types_ (CRDTs) family @Shapiro2011, with early examples including RGA @Roh2011RGA, Treedoc @Preguica2009, and Logoot @Weiss2010, and Fugue @fugue being more recent.
-To our knowledge, all existing CRDTs for text work by assigning every character a unique ID, and translating index-based insertions and deletions into ID-based addressing.
-These unique IDs need to be persisted for the lifetime of the document and sent to all replicas, increasing I/O costs, and they need to be held in memory when a document is being edited, causing memory overhead.
-In contrast, eg-walker uses unique IDs only transiently during replay but does not persist or replicate them, and it can free all of its internal state whenever a critical version is reached.
-Eg-walker does need to store the event graph as long as concurrent operations may arrive, but this takes less space than CRDT metadata, and it only needs to be memory-resident to handle concurrent operations; most of the time the event graph can remain on disk.
-
-Gu et al.'s _mark & retrace_ method @Gu2005 is superficially similar to eg-walker, but it differs in several important details: it builds a CRDT-like structure containing the entire editing history, not only the parts being merged, and its ordering of concurrent insertions is prone to interleaving.
-
-Version control systems such as Git, as well as differential synchronization @Fraser2009, perform merges by diffing the old and new states on one branch, and applying the diff to the other branch.
-Applying patches relies on heuristics, such as searching for some amount of context before and after the modified text passage, which can apply the patch in the wrong place if the same context exists in multiple locations, and which can fail if the context has concurrently been modified.
-These approaches therefore generally require manual merge conflict resolution and don't ensure automatic replica convergence.
-
-/*
-#import "@preview/algorithmic:0.1.0"
-#import algorithmic: algorithm
-
-#algorithm({
-  import algorithmic: *
-  Function("ResetState", args: ("state",), {
-    Assign[state][dummy data]
-  })
-
-  Function("TransformPartial", args: ($G$, $V_0$, $V_m$), {
-    Assign[$s$][(dummy data)]
-    Assign[$C$][$"greatestCommonVersion"(G)$]
-
-    For(cond: [Event $(i, e_i, P_i) in "inOrderTraversal"(G, "from:" C, "to:" V_0)$], {
-      // Cmt[As above]
-      Fn[setPrepareVersion][$s$, $P_i$]
-      Assign([$m$], FnI[prepare][$s$, $i$, $e_i$])
-      Fn[effect][$s$, $m$]
-    })
-    For(cond: [Event $(i, e_i, P_i) in "inOrderTraversal"(G, "from:" V_0, "to:" V_0 union V_m)$], {
-      If(cond: [$"isCriticalVersion"(P_i)$], {
-        Assign[$s$][(dummy data)]
-        If(cond: [$"isCriticalVersion"({i})$], {
-          State[#smallcaps("yield") $e_i$]
-          State(smallcaps("Continue"))
-        })
-      })
-
-      Fn[setPrepareVersion][$s$, $P_i$]
-      Assign([$m$], FnI[prepare][$s$, $i$, $e_i$])
-      State[#smallcaps("yield") #FnI[effect][$s$, $m$]]
-    })
-  })
-})
-*/
-
 = Evaluation <benchmarking>
+
+// Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 
 // TODO: anonymise the references to repos for the conference submission
 We implemented two versions of eg-walker: one in TypeScript that is optimised for code simplicity @reference-reg, and one in Rust (as part of the _Diamond Types_ library @dt) that is optimised for performance.
@@ -960,6 +889,40 @@ We show the resulting file size with and without deleted character storage, for 
   kind: image,
 ) <chart-dt-vs-yjs>
 
+= Related Work <related-work>
+
+Eg-walker is an example of a _pure operation-based CRDT_ @polog, which is a family of algorithms that capture a DAG (or partially ordered log) of operations in the form they were generated, and define the current state as a query over that log.
+However, existing publications on pure operation-based CRDTs @Almeida2023 @Bauwens2023 consider only datatypes such as maps, sets, and registers; eg-walker adds a list/text datatype to this family.
+
+MRDTs @Soundarapandian2022 are similarly based on a DAG, and use a three-way merge function to combine two branches since their lowest common ancestor; if the LCA is not unique, a recursive merge is used.
+MRDTs for various datatypes have been defined, but so far none offers text with arbitrary insertion and deletion.
+
+Toomim's _time machines_ approach @time-machines shares a conceptual foundation with eg-walker: both are based on traversing an event graph, with operations being transformed from the form in which they were originally generated into a form that can be applied in topologically sorted order to obtain the current document state.
+Toomim also points out that CRDTs can be used to perform this transformation.
+Eg-walker is a concrete, optimised implementation of the time machine approach; novel contributions of eg-walker include updating the prepare version by retreating and advancing, as well as the details of partial event graph replay.
+
+Eg-walker can also be regarded as an _operational transformation_ (OT) algorithm @Ellis1989, since it takes operations that insert or delete characters at some index, and transforms them into operations that can be applied to the local replica state to have an effect equivalent to the original operation in the state in which it was generated.
+OT has a long lineage of research, tracing back to several seminal papers in the 1990s @Nichols1995 @Ressel1996 @Sun1998.
+To our knowledge, all existing OT algorithms follow a pattern of two sub-algorithms: a set of _transformation functions_ that transform one operation with regard to one other, concurrent operation, and a _control algorithm_ that traverses an editing history and invokes the necessary transformation functions.
+A problem with this architecture is that when two replicas have diverged and each performed $n$ operations, merging their states unavoidably has a cost of at least $O(n^2)$, as each operation from one branch needs to be transformed with respect to all of the operations on the other branch; in some OT algorithms the cost is cubic or even worse @Li2006 @Roh2011RGA @Sun2020OT.
+Eg-walker departs from the transformation function/control algorithm architecture and instead performs transformations using an internal CRDT state, which reduces the merging cost to $O(n log n)$ in most cases; the theoretical upper bound of $O(n^2 log n)$ is unlikely to occur in practical editing histories.
+
+Moreover, most practical implementations of OT require a central server to impose a total order on operations.
+Although it is possible to perform OT in a peer-to-peer context without a central server @Sun2020OT, several early published peer-to-peer OT algorithms later turned out to be flawed @Imine2003 @Oster2006TTF, leaving OT with a reputation of being difficult to reason about @Levien2016.
+We have not formally evaluated the ease of understanding eg-walker, but we believe that it is easier to establish the correctness of our approach compared to distributed OT algorithms.
+
+Other prominent collaborative text editing algorithms belong to the _conflict-free replicated data types_ (CRDTs) family @Shapiro2011, with early examples including RGA @Roh2011RGA, Treedoc @Preguica2009, and Logoot @Weiss2010, and Fugue @fugue being more recent.
+To our knowledge, all existing CRDTs for text work by assigning every character a unique ID, and translating index-based insertions and deletions into ID-based addressing.
+These unique IDs need to be persisted for the lifetime of the document and sent to all replicas, increasing I/O costs, and they need to be held in memory when a document is being edited, causing memory overhead.
+In contrast, eg-walker uses unique IDs only transiently during replay but does not persist or replicate them, and it can free all of its internal state whenever a critical version is reached.
+Eg-walker does need to store the event graph as long as concurrent operations may arrive, but this takes less space than CRDT metadata, and it only needs to be memory-resident to handle concurrent operations; most of the time the event graph can remain on disk.
+
+Gu et al.'s _mark & retrace_ method @Gu2005 is superficially similar to eg-walker, but it differs in several important details: it builds a CRDT-like structure containing the entire editing history, not only the parts being merged, and its ordering of concurrent insertions is prone to interleaving.
+
+Version control systems such as Git, as well as differential synchronization @Fraser2009, perform merges by diffing the old and new states on one branch, and applying the diff to the other branch.
+Applying patches relies on heuristics, such as searching for some amount of context before and after the modified text passage, which can apply the patch in the wrong place if the same context exists in multiple locations, and which can fail if the context has concurrently been modified.
+These approaches therefore generally require manual merge conflict resolution and don't ensure automatic replica convergence.
+
 
 = Conclusion
 
@@ -1081,6 +1044,43 @@ All time based measurements are based on the mean of at least 100 test iteration
 )
 
 Cola with cursor optimisation removed is available at `https://github.com/josephg/cola-nocursors/`. //#link(https://github.com/josephg/cola-nocursors/).
+
+/*
+#import "@preview/algorithmic:0.1.0"
+#import algorithmic: algorithm
+
+#algorithm({
+  import algorithmic: *
+  Function("ResetState", args: ("state",), {
+    Assign[state][dummy data]
+  })
+
+  Function("TransformPartial", args: ($G$, $V_0$, $V_m$), {
+    Assign[$s$][(dummy data)]
+    Assign[$C$][$"greatestCommonVersion"(G)$]
+
+    For(cond: [Event $(i, e_i, P_i) in "inOrderTraversal"(G, "from:" C, "to:" V_0)$], {
+      // Cmt[As above]
+      Fn[setPrepareVersion][$s$, $P_i$]
+      Assign([$m$], FnI[prepare][$s$, $i$, $e_i$])
+      Fn[effect][$s$, $m$]
+    })
+    For(cond: [Event $(i, e_i, P_i) in "inOrderTraversal"(G, "from:" V_0, "to:" V_0 union V_m)$], {
+      If(cond: [$"isCriticalVersion"(P_i)$], {
+        Assign[$s$][(dummy data)]
+        If(cond: [$"isCriticalVersion"({i})$], {
+          State[#smallcaps("yield") $e_i$]
+          State(smallcaps("Continue"))
+        })
+      })
+
+      Fn[setPrepareVersion][$s$, $P_i$]
+      Assign([$m$], FnI[prepare][$s$, $i$, $e_i$])
+      State[#smallcaps("yield") #FnI[effect][$s$, $m$]]
+    })
+  })
+})
+*/
 
 /*
 == Example optimised version_contains_ID function <example-localid-algorithm>
