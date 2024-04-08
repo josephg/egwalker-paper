@@ -178,16 +178,18 @@ However, unlike existing algorithms, we only invoke the CRDT to perform merges, 
 Moreover, we use the CRDT only temporarily for merges; we never write CRDT data to disk and never send it over the network.
 
 The fact that both sequential operations and large merges are fast makes Eg-walker suitable for both real-time collaboration and offline work.
-Moreover, since Eg-walker assumes no central server, it can be used over a peer-to-peer network.
+Eg-walker also assumes no central server, so it can be used over a peer-to-peer network.
 Although all existing CRDTs and a few OT algorithms can be used peer-to-peer, most of them have poor performance compared to the centralised OT used in production software such as Google Docs.
 In contrast, Eg-walker's performance matches or surpasses that of centralised algorithms.
 It therefore paves the way towards the widespread adoption of peer-to-peer collaboration software, and perhaps overcoming the dominance of centralised cloud software that exists in the market today.
 
 In this paper we focus on collaborative editing of plain text files, although we believe that our approach could be generalised to other file types such as rich text, spreadsheets, graphics, presentations, CAD drawings, etc.
+
 This paper makes the following contributions:
 
 - TODO
-- In @benchmarking we evaluate the performance of eg-walker, comparing it to equivalent CRDT based approaches on file size, CPU time and memory usage in real world editing environments. Eg-walker is faster and smaller than equivalent CRDT based approaches in our real world data sets. However, it scales worse than CRDTs in extremely concurrent environments (eg very complex git editing histories).
+- We introduce the eg-walker algorithm.
+- In @benchmarking we evaluate the performance of eg-walker, comparing it to equivalent CRDT based approaches on file size, CPU time and memory usage in real world editing environments. Eg-walker is usually faster and smaller than equivalent CRDT based approaches in our real world data sets. However, in our testing we have found modern CRDTs outperform eg-walker in case of extreme concurrency (for example, very complex git editing histories).
 
 = Background
 
@@ -222,7 +224,8 @@ Whenever a user performs an operation, a new event containing that operation is 
 The new event and its parent edges are then replicated over the network, and each replica adds them to its copy of the graph.
 If any parent events are missing, the replica waits for them to arrive before adding them to the graph; the result is a simple causal broadcast protocol @Birman1991 @Cachin2011.
 Two replicas can merge their event graphs by simply taking the union of their sets of events.
-An event in the graph is immutable; it always represents the operation as it was originally generated, not some transformed operation.
+Events in the graph are immutable.
+They always represents the operation as it was originally generated, and not as a result of any transformation operation.
 
 #figure(
   fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
@@ -247,7 +250,8 @@ For example, @graph-example shows the event graph corresponding to @two-inserts.
 The events $e_5$ and $e_6$ are concurrent, and the frontier of this graph is the set of events ${e_5, e_6}$.
 
 The event graph for a substantial document, such as a research paper, may contain hundreds of thousands of events.
-It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs, and many portions of a typical event graph are linear, with each event having one parent and one child.
+It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs.
+Many portions of a typical event graph are linear, with each event having one parent and one child.
 We describe the storage format in more detail in @storage.
 
 == Document versions <versions>
@@ -257,8 +261,9 @@ Due to convergence, any two replicas that have the same set of events must be in
 Therefore, the document state (sequence of characters) resulting from $G$ must be $sans("replay")(G)$, where $sans("replay")$ is some pure (deterministic and non-mutating) function.
 In principle, any pure function of the set of events results in convergence, although a $sans("replay")$ function that is useful for text editing must satisfy additional criteria (see @characteristics).
 
-In order to correctly interpret an operation such as $italic("Delete")(i)$, we need to determine which character was at index $i$ at the time when the operation was generated.
-Let $e_i$ be an event; the document state when $e_i$ was generated must be $sans("replay")(G_i)$, where $G_i$ is the set of events that were known to the generating replica at the time when $e_i$ was generated (not including $e_i$ itself).
+Consider an event, like $italic("Delete")(i)$. This event deletes the character at position $i$ in the document. In order to correctly interpret this event, we need to determine which character was at index $i$ at the time when the operation was generated.
+
+More generally, let $e_i$ be some event. The document state when $e_i$ was generated must be $sans("replay")(G_i)$, where $G_i$ is the set of events that were known to the generating replica at the time when $e_i$ was generated (not including $e_i$ itself).
 By definition, the parents of $e_i$ are the frontier of $G_i$, and thus $G_i$ is the set of all events that happened before $e_i$, i.e., $e_i$'s parents and all of their ancestors.
 Therefore, the parents of $e_i$ unambiguously define the document state in which $e_i$ must be interpreted.
 
@@ -286,7 +291,7 @@ This allows us to separate the process of replicating the event graph from the a
 In fact, this is how _pure operation-based CRDTs_ @polog are formulated, as discussed in @related-work.
 
 In addition to determining the document state from an entire event graph, we need an _incremental update_ function.
-Say we have an existing event graph $G$ and document state $italic("doc") = sans("replay")(G)$, and an event $e$ from a remote replica is added to the graph.
+Say we have an existing event graph $G$ and corresponding document state $italic("doc") = sans("replay")(G)$. Then an event $e$ from a remote replica is added to the graph.
 We could rerun the function to obtain $italic("doc")' = sans("replay")(G union {e})$, but it would be inefficient to process the entire graph again.
 Instead, we need to efficiently compute the operation to apply to $italic("doc")$ in order to obtain $italic("doc")'$.
 For text documents, this incremental update is also described as an insertion or deletion at a particular index; however, the index may differ from that in the original event due to the effects of concurrent operations, and a deletion may turn into a no-op if the same character has also been deleted by a concurrent operation.
@@ -297,12 +302,16 @@ If there is concurrency, OT must transform each new event with regard to each ex
 
 In CRDTs, each event is first translated into operations that use unique IDs instead of indexes, and then these operations are applied to a data structure that reflects all of the operations seen so far (both concurrent operations and those that happened before).
 In order to update the text editor, these updates to the CRDT's internal structure need to be translated back into index-based insertions and deletions.
-Many CRDT papers elide this translation from unique IDs back to indexes, but it is important for practical applications:
+Many CRDT papers elide this translation from unique IDs back to indexes, but it is important for practical applications. // - such as updating specialised buffers inside text editors, and updating user cursor positions.
 
-- Text editors use specialised data structures such as piece trees @vscode-buffer to efficiently edit large documents, and integrating with these structures requires index-based operations. Incrementally updating these structures also enables syntax highlighting without having to repeatedly parse the whole file on every keystroke.
-- The user's cursor position in a document can be represented as an index; if another user changes text earlier in the document, index-based operations make it easy to update the cursor so that it remains in the correct position relative to the surrounding text.
+// Seph: If we want to cut down on the length of the paper, we could probably remove this.
+
+// - Text editors use specialised data structures such as piece trees @vscode-buffer to efficiently edit large documents, and integrating with these structures requires index-based operations. Incrementally updating these structures also enables syntax highlighting without having to repeatedly parse the whole file on every keystroke.
+// - The user's cursor position in a document can be represented as an index; if another user changes text earlier in the document, index-based operations make it easy to update the cursor so that it remains in the correct position relative to the surrounding text.
 
 Thus, regardless of whether the OT or the CRDT approach is used, a collaborative editing algorithm can be boiled down to an incremental update to an event graph: given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event.
+
+// (seph): ^-- this is a very bold statement.
 
 = The Event Graph Walker algorithm
 
@@ -315,10 +324,11 @@ The state of each replica consists of three parts:
 3. *Internal state:* A temporary CRDT structure that eg-walker uses to merge concurrent edits. It is not persisted or replicated, and it is discarded when the algorithm finishes running.
 
 Eg-walker can reconstruct the document state by replaying the entire event graph.
-It first performs a topological sort, as illustrated in @topological-sort, and then transforms each event so that the transformed insertions and deletions can be applied in topologically sorted order, starting with an empty document, to obtain the document state.
+It first performs a topological sort, as illustrated in @topological-sort. Then each event is transformed so that the transformed insertions and deletions can be applied in topologically sorted order, starting with an empty document, to obtain the document state.
 In Git parlance, this process "rebases" a DAG of operations into a linear operation history with the same effect.
 The input of the algorithm is the event graph, and the output is this topologically sorted sequence of transformed operations.
-In graphs with concurrent operations there are multiple possible sort orders, and eg-walker guarantees that the final document state is the same, regardless which of these orders is chosen.
+
+In graphs with concurrent operations there are multiple possible sort orders. Eg-walker guarantees that the final document state is the same, regardless which of these orders is chosen. However, the choice of sort order may affect the performance of the algorithm, as discussed in @complexity.
 
 #figure(
   fletcher.diagram(node-inset: 2pt, node-stroke: black, node-fill: black, {
@@ -391,7 +401,6 @@ In graphs with concurrent operations there are multiple possible sort orders, an
 ) <topological-sort>
 
 For example, the graph in @graph-example has two possible sort orders; eg-walker either first inserts "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first inserts "!" at index 4 followed by "l" at index 3 (like User 2 in @two-inserts); the final document state is "Hello!" either way.
-However, the choice of sort order affects the performance of the algorithm, as discussed in @complexity.
 
 Event graph replay easily extends to incremental updates for real-time collaboration: when a new event is added to the graph, it becomes the next element of the topologically sorted sequence.
 We can transform each new event in the same way as during replay, and apply the transformed operation to the current document state.
@@ -400,16 +409,25 @@ We can transform each new event in the same way as during replay, and apply the 
 
 Eg-walker ensures that the resulting document state is consistent with Attiya et al.'s _strong list specification_ @Attiya2016 (in essence, replicas converge to the same state and apply operations in the right place), and it is _maximally non-interleaving_ @fugue (i.e., concurrent sequences of insertions at the same position are placed one after another, and not interleaved).
 
-One way of achieving this goal would be to track the state of the document on each branch of the event graph, to translate each event into a corresponding CRDT operation (based on the document state in which that event was generated), and when branches in the event graph merge, to apply the CRDT operations from one branch to the other branch's state.
-Essentially, this approach simulates a network of communicating CRDT replicas and their states.
-However, doing this naively leads to poor performance, because the CRDT overhead is incurred on every operation.
+One way of achieving this goal would be to track the state of each branch of the document via a separate corresponding CRDT object.
+The CRDT for a given branch could be used to translate events from the event graph into the corresponding CRDT messages.
+When branches fork, the CRDT object would need to be cloned in memory.
+When branches merge, CRDT operations from one branch could be applied to the other branch's CRDT state.
+Essentially, this approach would simulate a network of communicating CRDT replicas and their states.
+This approach works as expected - however, it has terrible performance. For every concurrent branch in the event graph we need to store a complete clone of the CRDT's state.
 
-Eg-walker is able to achieve much better performance by skipping the CRDT entirely in portions of the event graph that have no concurrency (which, in many editing histories, is the vast majority of the graph), and using the CRDT only for concurrent events.
-When processing an event that has no concurrent events, eg-walker is able to discard all of the internal state accumulated so far, keeping the data structure small.
+// (Seph): We have benchmark data for this approach btw.
+
+Eg-walker improves on this approach in two ways:
+
+1. Eg-walker avoids the need to clone and merge multiple CRDT objects. Instead, the algorithm maintains a single carefully crafted data structure which can generate the corresponding CRDT operation for any visited event.
+2. In portions of the event graph that have no concurrency (which is the vast majority of events in many editing histories), events do not need to be transformed at all. In these cases, we skip the transformation process entirely and, remarkably, discard all of the internal state accumulated so far.
+
 A key contribution of eg-walker is that it can compute the correct transformed operations even though the internal state may reflect only a small part of the event graph.
 
 Moreover, eg-walker does not need the event graph and the internal state when generating new events, or when adding an event to the graph that happened after all existing events.
-Most of the time, we only need the current document state; the event graph can remain on disk without using any space in memory or any CPU time.
+Most of the time, we only need the current document state.
+The event graph can remain on disk without using any space in memory or any CPU time.
 The event graph is only required when handling concurrency, and even then we only have to replay the portion of the graph since the last ancestor that the concurrent operations had in common.
 
 Eg-walker's approach contrasts with existing CRDTs, which require every replica to persist the internal state (including the unique ID for each character) and send it over the network, and which require that state to be loaded into memory in order to both generate and receive operations, even when there is no concurrency.
@@ -422,12 +440,12 @@ Some OT algorithms are only able to handle restricted forms of event graphs, whe
 
 == Walking the event graph <graph-walk>
 
-For the sake of clarity we first explain a simplified version of eg-walker that replays the entire event graph without discarding its internal state along the way, and that incurs CRDT overhead even for non-concurrent operations.
+For the sake of clarity we first explain a simplified version of eg-walker that replays the entire event graph without discarding its internal state along the way. This approach incurs some CRDT overhead even for non-concurrent operations.
 In @partial-replay we show how the algorithm can be optimised to replay only a part of the event graph.
 
-First, we topologically sort the event graph in a way that keeps events on the same branch consecutive as much as possible: for example, in @topological-sort we first visit $e_"A1" ... e_"A4"$, then $e_"B1" ... e_"B4"$; we avoid alternating between branches, such as $e_"A1", e_"B1", e_"A2", e_"B2" ...$, even though that would also be a valid topological sort.
-For this we use a standard textbook algorithm @CLRS2009: perform a depth-first traversal starting from the oldest event, and build up the topologically sorted list in reverse order while returning from the traversal.
-When a node has multiple children, we choose their order based on a heuristic so that branches with fewer events tend to appear before branches with more events in the sorted order; this can improve performance but is not essential.
+First, we topologically sort the event graph in a way that keeps events on the same branch consecutive as much as possible: for example, in @topological-sort we first visit $e_"A1" ... e_"A4"$, then $e_"B1" ... e_"B4"$. We avoid alternating between branches, such as $e_"A1", e_"B1", e_"A2", e_"B2" ...$, even though that would also be a valid topological sort.
+For this we use a standard textbook algorithm @CLRS2009: perform a depth-first traversal starting from the oldest event, and build up the topologically sorted list in the order that events are visited.
+When a node has multiple children in the graph, we choose their order based on a heuristic so that branches with fewer events tend to appear before branches with more events in the sorted order; this can improve performance but is not essential.
 We estimate the size of a branch by counting the number of events that happened after each event.
 
 The algorithm then processes the events one at a time in topologically sorted order, updating the internal state and outputting a transformed operation for each event.
@@ -491,9 +509,10 @@ Any events that were traversed from only one of the versions need to be retreate
 The internal state implements the $sans("apply")$, $sans("retreat")$, and $sans("advance")$ methods by maintaining a CRDT data structure.
 This structure consists of a linear sequence of records, one per character in the document, including tombstones for deleted characters.
 Runs of characters with consecutive IDs and the same properties can be run-length encoded to save memory.
-A record is inserted into this sequence by $sans("apply")(e_i)$ for an insertion event $e_i$; subsequent deletion events and $sans("retreat")$/$sans("advance")$ calls may modify properties of the record, but records in the sequence are not removed or reordered once they have been inserted.
+A record is inserted into this sequence by $sans("apply")(e_i)$ for an insertion event $e_i$.
+Subsequent deletion events and $sans("retreat")$/$sans("advance")$ calls may modify properties of the record, but records in the sequence are not removed or reordered once they have been inserted.
 
-When the event graph contains concurrent insertion operations, we use an existing CRDT algorithm to ensure that all replicas place the records in this sequence in the same order, regardless of the order in which they traverse the event graph.
+When the event graph contains concurrent insertion operations, we use an existing CRDT algorithm to ensure that all replicas place the records in this sequence in the same order, regardless of the order in which the event graph is traversed.
 Any list CRDT could be used for this purpose; the main differences between algorithms are their performance and their interleaving characteristics @fugue.
 Our implementation of eg-walker uses a variant of the Yjs algorithm @yjs @Nicolaescu2016YATA that we conjecture to be maximally non-interleaving; we leave a detailed analysis of this algorithm to future work, since it is not core to this paper.
 
@@ -584,8 +603,9 @@ The figures include the character for the sake of readability, but the algorithm
 
 == Mapping indexes to character IDs
 
-In the event graph, insertion and deletion operations specify the index at which they apply; in order to update eg-walker's internal state, we need to map these to the correct record in the sequence.
-Moreover, to produce the transformed operations, we need to map the positions of these internal records back to indexes again.
+In the event graph, insertion and deletion operations specify the index at which they apply.
+In order to update eg-walker's internal state, we need to map these indexes to the correct record in the sequence - based on the state at $s_p$.
+Moreover, to produce the transformed operations, we need to map the positions of these internal records back to indexes again - this time based on the state at $s_e$.
 
 A simple but inefficient algorithm would be: to apply a $italic("Delete")(i)$ operation we iterate over the sequence of records and pick the $i$th record with a prepare state of $s_p = mono("Ins")$ (i.e., the $i$th among the characters that are visible in the prepare state, which is the document state in which the operation should be interpreted).
 Similarly, to apply $italic("Insert")(i, c)$ we skip over $i - 1$ records with $s_p = mono("Ins")$ and insert the new record after the last skipped record (if there have been concurrent insertions at the same position, we may also need to skip over some records with $s_p = mono("NotInsertedYet")$, as determined by the list CRDT's insertion ordering).
@@ -600,13 +620,30 @@ Moreover, once we have a record in the sequence we can efficiently determine its
 This allows us to efficiently transform the index of an operation from the prepare version into the effect version.
 If the character was already deleted in the effect version ($s_e = mono("Del")$), the transformed operation is a no-op.
 
-Besides the sequence of records, the internal state also includes a mapping from event ID to the record in the sequence affected by that event.
-On every $sans("apply")(e)$ we use the above process to identify the target record in the sequence, and then we store the mapping from $e.italic("id")$ to the target record ID.
+The above process allows $sans("apply")(e_i)$ to be performed efficiently.
+However, we also need to efficiently perform $sans("retreat")(e_i)$ and $sans("advance")(e_i)$ operations.
+Each of these operations modifies the prepare state $s_p$ of the record inserted or deleted by $e_i$.
+// For insert events, we modify the corresponding insert record with an _id_ of $i$, matching the event.
+// And for delete events, we modify the record of the item _deleted by_ the event.
+// Note that the event's index can't be used to locate the item, as the item's absolute position in the sequence may not match the event's index.
+The target record can't be looked up by its index. Instead, to find the item we maintain a second B-tree, mapping from each event's ID to the target record. The mapping stores a value depending on the type of the event:
+
+- For delete events, we store the ID of character _deleted by_ the event.
+- For insert events, we store a reference to the corresponding record in the sequence containing the inserted item. Specifically, we store a pointer to the leaf node in the first B-tree which contains the record. When nodes in the first B-tree are split, we update the pointers in the second B-tree accordingly.
+
+On every $sans("apply")(e)$, after updating the sequence as above, we update this mapping based on the event.
 When we subsequently perform a $sans("retreat")(e)$ or $sans("advance")(e)$, that event $e$ must have already been applied, and hence $e.italic("id")$ must appear in this mapping.
-We can therefore ignore the operation index when retreating and advancing, and instead use the event ID to look up the record to be updated.
-To this end we maintain a second B-tree that is keyed by record ID, and which points at the leaf nodes of the first B-tree.
-This tree allows us to advance or retreat in logarithmic time.
-When nodes in the first B-tree are split, we update the pointers in the second B-tree accordingly.
+
+This map allows us to advance or retreat in logarithmic time.
+
+// (Seph): I rewrote the above paragraph. This was your original text:
+// Besides the sequence of records, the internal state also includes a mapping from event ID to the record in the sequence affected by that event.
+// On every $sans("apply")(e)$ we use the above process to identify the target record in the sequence, and then we store the mapping from $e.italic("id")$ to the target record ID.
+// When we subsequently perform a $sans("retreat")(e)$ or $sans("advance")(e)$, that event $e$ must have already been applied, and hence $e.italic("id")$ must appear in this mapping.
+// We can therefore ignore the operation index when retreating and advancing, and instead use the event ID to look up the record to be updated.
+// To this end we maintain a second B-tree that is keyed by record ID, and which points at the leaf nodes of the first B-tree.
+// This tree allows us to advance or retreat in logarithmic time.
+// When nodes in the first B-tree are split, we update the pointers in the second B-tree accordingly.
 
 == Clearing the internal state <clearing>
 
@@ -619,15 +656,17 @@ $ forall e_1 in G_1: forall e_2 in G_2: e_1 -> e_2. $
 Equivalently, $V$ is a critical version iff every event in the graph is either included in $V$ or happened after _all_ of the events in $V$:
 $ forall e_1 in G: e_1 in sans("Events")(V) or (forall e_2 in V: e_2 -> e_1). $
 If a version is critical, that does not guarantee that it will remain critical forever; it is possible for a critical version to become non-critical because a concurrent event is added to the graph.
-This concept enables several key optimisations:
 
-- If the version of the event graph processed so far is critical, we can discard all of the internal state (including both B-trees and all $s_p$ and $s_e$ values), and replace it with a placeholder as explained in @partial-replay.
-- If the parents of the next event are equal to the version of the event graph processed so far, we just output the unmodified operation from the event as the transformed operation.
-- If both an event's version and its parent version are critical versions, there is no need to traverse the B-trees and update the CRDT state, since we would immediately discard that state anyway; we can just skip this work.
+A key insight in the design of eg-walker is that critical versions provide a firewall of sorts for how inserted items are ultimately ordered within the document. It is impossible for the events which happened at or before a critical version to affect how any event after the critical version is transformed. #footnote[This property holds for our most, but not all text based CRDTs. Notably, this property does not hold for the Peritext CRDT for collaborative rich text editing (@peritext) due to how peritext processes concurrent annotations.]
+
+This concept enables two key optimisations:
+
+- Any time the version of the event graph processed so far is critical, we can discard all of the internal state (including both B-trees and all $s_p$ and $s_e$ values), and replace it with a placeholder as explained in @partial-replay.
+- If both an event's version and its parent version are critical versions, there is no need to traverse the B-trees and update the CRDT state, since we would immediately discard that state anyway. In this case, the transformed version of the event will be identical to the original event, so the event can simply be emitted as-is.
 
 These optimisations make it very fast to process documents that are mostly edited sequentially (e.g., because the authors took turns and did not write concurrently, or because there is only a single author), since most of the event graph of such a document is a linear chain of critical versions.
-Moreover, the internal state can be discarded once replay is complete, although it is also possible to retain the internal state for transforming future events.
 
+Moreover, the internal state can be discarded once replay is complete, although it is also possible to retain the internal state for transforming future events.
 If a replica receives events that are concurrent with existing events in its graph, but the replica has already discarded its internal state resulting from those events, it needs to rebuild some of that state.
 It can do this by identifying the most recent critical version that happened before the new event, replaying the existing events that happened after that critical version (in topologically sorted order), and finally applying the new events.
 Events from before that critical version do not need to be replayed.
@@ -639,7 +678,7 @@ In the worst case, this algorithm replays the entire event graph.
 Assume that we want to add event $e_"new"$ to the event graph $G$, that $V_"curr" = sans("Version")(G)$ is the current document version reflecting all events except $e_"new"$, and that $V_"crit" eq.not V_"curr"$ is the latest critical version in $G union {e_"new"}$ that happened before both $e_"new"$ and $V_"curr"$.
 Further assume that we have discarded the internal state, so the only information we have is the latest document state at $V_"curr"$ and the event graph; in particular, without replaying the entire event graph we do not know the document state at $V_"crit"$.
 
-However, a key insight in the design of eg-walker is that the exact internal state at $V_"crit"$ is not needed; all we need is enough state to transform $e_"new"$ and rebase it onto the document at $V_"curr"$.
+Luckily, the exact internal state at $V_"crit"$ is not needed. All we need is enough state to transform $e_"new"$ and rebase it onto the document at $V_"curr"$.
 This internal state can be obtained by replaying the events since $V_"crit"$, that is, $G - sans("Events")(V_"crit")$, in topologically sorted order.
 For example, using the graph in @topological-sort, say the current state is $G = {e_"A1" ... e_"A5", e_"B1" ... e_"B4"}$, so $V_"curr" = {e_"A5", e_"B4"}$, and the new event $e_"new" = e_"C1"$.
 Then $V_"crit" = {e_"A1"}$ is the most recent critical version.
@@ -683,9 +722,9 @@ The overall worst-case complexity of the algorithm is therefore $O(n^2 log n)$; 
 == Storing the event graph <storage>
 
 The event graph can be stored on disk in a very compact way by using a few compression tricks that take advantage of the ways that people typically write text documents: namely, they tend to insert or delete consecutive sequences of characters, and less frequently hit backspace or move the cursor to a new location.
-Eg-walker's event graph storage format is inspired by the Automerge CRDT library @automerge-storage @automerge-columnar, which in turn uses ideas from column-oriented databases @Abadi2013 @Stonebraker2005.
+Eg-walker's event graph storage format is heavily inspired by the Automerge CRDT library @automerge-storage @automerge-columnar, which in turn uses ideas from column-oriented databases @Abadi2013 @Stonebraker2005. Some additional bit packing tricks were copied from the Yjs CRDT library @yjs.
 
-We topologically sort the events in the graph; different replicas may sort the set differently, but locally to one replica we can identify an event by its index in this sorted order.
+We first topologically sort the events in the graph. Different replicas may sort the set differently, but locally to one replica we can identify an event by its index in this sorted order.
 Then we store different properties of events in separate byte sequences called _columns_, which are then combined into one file with a simple header.
 The columns are:
 
@@ -693,6 +732,8 @@ The columns are:
 - _Inserted content._ An insertion event contains exactly one character (a Unicode scalar value), and a deletion does not. We simply concatenate the UTF-8 encoding of the characters for insertion events in the same order as they appear in the first column, and then LZ4-compress this string.
 - _Parents._ By default we assume that every event has exactly one parent, namely its predecessor in the topological sort. Any events for which this is not true are listed explicitly, for example: "the first event has zero parents; the 153rd event has two parents, namely events numbers 31 and 152;" and so on.
 - _Event IDs._ Each event is uniquely identified by a pair of a replica ID and a per-replica sequence number. This column stores runs of event IDs, for example: "the first 1085 events are from replica $A$, starting with sequence number 0; the next 595 events are from replica $B$, starting with sequence number 0;" and so on.
+
+The file format layers several more carefully written bit packing techniques. For example, runs of backspaces are encoded specially, to allow them to be run-length encoded. Event positions (indexes) are expressed relative to the end of the previous event. Replica IDs are deduplicated in the file, and so on.
 
 We send the same data format over the network when replicating the entire event graph.
 When sending a subset of events over the network (e.g., a single event during real-time collaboration), references to parent events outside of that subset need to be encoded using the $(italic("replicaID"), italic("seqNo"))$ event IDs, but otherwise a similar encoding can be used.
@@ -703,7 +744,7 @@ When sending a subset of events over the network (e.g., a single event during re
 
 // TODO: anonymise the references to repos for the conference submission
 We implemented two versions of eg-walker: one in TypeScript that is optimised for code simplicity @reference-reg, and one in Rust (as part of the _Diamond Types_ library @dt) that is optimised for performance.
-The TypeScript implementation omits the B-trees, run-length encoding, and other optimisations, but its behaviour is equivalent to the Rust implementation.
+The TypeScript implementation omits several optimisations, including internal run-length encoding and B-trees. But its behaviour is otherwise equivalent to the Rust implementation.
 The benchmarks in this section use the Rust version.
 Details of the hardware and software setup of our experiments are given in @benchmark-setup.
 
@@ -711,6 +752,7 @@ Details of the hardware and software setup of our experiments are given in @benc
 
 // TODO: add node_nodecc and git-makefile to editing-traces repo
 // TODO: anonymise the editing-traces repo for the conference submission
+
 In order to ensure our benchmarks are meaningful, we collected a dataset of text editing traces from real documents, which we have made freely available on GitHub @editing-traces.
 The traces we use are listed in @traces-table.
 There are three types:
@@ -733,7 +775,7 @@ There are three types:
     align: (center, center, right, right, right, right),
     stroke: none,
     table.hline(stroke: 0.8pt),
-    table.header([*Name*], [*Type*], [*Events (k)*], [*Avg. width*], [*Runs*], [*Replicas*]),
+    table.header([*Name*], [*Type*], [*Events (k)*], [*Conc*], [*Runs*], [*Replicas*]),
     table.hline(stroke: 0.4pt),
     ..stats_for("automerge-paper", "seq"),
     ..stats_for("seph-blog1", "seq"),
@@ -746,38 +788,28 @@ There are three types:
   )),
   placement: top,
   caption: [
-    The text editing traces used in our evaluation. _Events_: total number of inserted and deleted characters (in thousands). _Average width_: mean number of concurrent branches per event in the trace. _Runs_: number of sequential runs (linear event sequences without branching/merging). _Replicas_: number of users who added at least one event.
+    The text editing traces used in our evaluation. _Events_: total number of editing events, counting inserted and deleted characters (in thousands). _Average concurrency_: mean number of concurrent branches per event in the trace. _Runs_: number of sequential runs (linear event sequences without branching/merging). _Replicas_: number of users who added at least one event.
   ]
 ) <traces-table>
 
-/ Sequential Traces: ("seq"): Keystroke-granularity history of a single user writing a document, collected using an instrumented text editor. These traces contain no concurrency. We use the LaTeX source of a journal paper @Kleppmann2017 @automerge-perf and the text of an 8,800-word blog post @crdts-go-brrr.
+/ Sequential Traces: ("seq"): Keystroke-granularity history of a single user writing a document, collected using an instrumented text editor. These traces contain no concurrency. We use the LaTeX source of a journal paper @Kleppmann2017 @automerge-perf, the text of an 8,800-word blog post @crdts-go-brrr and the source for this article.
 / Concurrent Traces: ("conc"): Multiple users concurrently editing the same document in realtime, recorded with keystroke granularity. We added 0.5–1 second of artificial latency between the collaborating users to increase the incidence of concurrent operations.
-/ Asynchronous Traces: ("async"): We reconstruct an editing trace for a file in a Git repository, with concurrency mirroring the branching/merging of the Git commits. Since Git does not record individual keystrokes, we generate the minimal edit operations required for each commit's diff. We use `Makefile` from the Git repository for Git itself @git-makefile, and `src/node.cc` from the Git repository for Node.js @node-src-nodecc. These are some of the most-edited files in their respective repositories, with complex event graphs containing merges of six branches.
+/ Asynchronous Traces: ("async"): We reconstruct an editing trace for a file in a Git repository, with concurrency mirroring the branching/merging of the Git commits. Since Git does not record individual keystrokes, we generate the minimal edit operations required for each commit's diff. We use `Makefile` from the Git repository for Git itself @git-makefile, and `src/node.cc` from the Git repository for Node.js @node-src-nodecc. These are some of the most-edited files in their respective repositories, with complex event graphs containing merges of as many as six branches.
 
 The traces vary in size by more than an order of magnitude.
-To allow comparisons across traces, instead of reporting the runtime to replay an event graph, we report the replay throughput (in units of millions of events per second).
+To allow comparisons across traces, instead of reporting the runtime to replay an event graph, we report the replay throughput in units of millions of editing events per second.
+
 // TODO: is it millions of run-length encoded event sequences, or millions of individual events (as reported in @traces-table)?
 
-== Eg-walker compared to CRDTs
+== Eg-walker compared to existing CRDTs
 
 // TODO: anonymisation of this paragraph
 We compare eg-walker to several existing CRDT libraries: Automerge @automerge, Yjs @yjs, Cola @cola, and json-joy @jsonjoy.
-However, they vary wildly in performance: we observed a 500x difference between the best and worst performing library we tested.
+Although all libraries we tested are objectively very fast, they still vary wildly in absolute performance: we observed a 500x difference between the best and worst performing library.
 // Yjs is 500x slower than Cola in this test (2056ms vs 4ms).
 In order to fairly evaluate the algorithmic differences between eg-walker and CRDTs, rather than the implementation differences, we wrote our own optimised CRDT implementation, _dt-crdt_ @dt-crdt, using the same language (Rust), code style, data structures, and optimisations as eg-walker.
 The optimisations are documented in a blog post @crdts-go-brrr.
-@chart-one-local shows that the performance of dt-crdt is competitive with the best existing CRDT libraries when replaying one of our editing traces.
 
-// TODO: what exactly does this graph actually measure? only preparing ops, or also effect? Maybe it would be better to measure only effect (applying remote ops) by expanding <chart-all-remote> to show all CRDT libraries?
-// TODO: rather than removing the cursor caching optimisation from Cola, would it make sense to add it to dt-egwalker?
-#figure(
-  text(8pt, charts.one_local),
-  caption: [
-    Replay throughput for the seph-blog1 trace using various CRDTs libraries. Cola is faster than dt-crdt due to its GTree @cola-gtree implementation using local cursor caching. When this is disabled (_cola-nocursor_), performance is similar to dt-crdt. Yjs performs much better when processing remote events. Tested version numbers in @benchmark-setup.
-  ],
-  kind: image,
-  placement: top,
-) <chart-one-local>
 
 One performance-critical aspect of CRDTs is loading the internal state from disk into memory, which is required for viewing the current document state and making any changes.
 This can take a significant amount of CPU time and memory (*TODO: quantify*), even on highly optimised implementations.

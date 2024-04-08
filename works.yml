@@ -139,3 +139,10 @@ node-src-nodecc:
   type: web
   title: "Node.js source code: src/node.cc"
   url: https://github.com/nodejs/node/blob/main/src/node.cc
+
+peritext:
+  type: article
+  title: "Peritext: A CRDT for Rich-Text Collaboration"
+  author: ["Litt, Geoffrey", "Lim, Slim", "Kleppmann, Martin", "Van Hardenberg, Peter"]
+  date: 2021
+  url: https://www.inkandswitch.com/peritext/
