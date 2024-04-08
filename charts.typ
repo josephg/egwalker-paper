@@ -41,8 +41,8 @@
     x-label: "Events processed (in thousands)",
     y-label: [Eg-walker state size],
     {
-      plot.add(scale_data("results/xf-friendsforever-noff.json", 0.001), label: [without optimisations])
-      plot.add(scale_data("results/xf-friendsforever-ff.json", 0.001), label: [with optimisations])
+      plot.add(scale_data("results/xf-friendsforever-noff.json", 0.001), label: [without clearing])
+      plot.add(scale_data("results/xf-friendsforever-ff.json", 0.001), label: [with clearing])
     }
   )
 })
