@@ -803,25 +803,20 @@ To allow comparisons across traces, instead of reporting the runtime to replay a
 
 == Eg-walker compared to existing CRDTs
 
-// TODO: anonymisation of this paragraph
-We compare eg-walker to several existing CRDT libraries: Automerge @automerge, Yjs @yjs, Cola @cola, and json-joy @jsonjoy.
-Although all libraries we tested are objectively very fast, they still vary wildly in absolute performance: we observed a 500x difference between the best and worst performing library.
-// Yjs is 500x slower than Cola in this test (2056ms vs 4ms).
-In order to fairly evaluate the algorithmic differences between eg-walker and CRDTs, rather than the implementation differences, we wrote our own optimised CRDT implementation, _dt-crdt_ @dt-crdt, using the same language (Rust), code style, data structures, and optimisations as eg-walker.
-The optimisations are documented in a blog post @crdts-go-brrr.
+To evaluate the performance of eg-walker compared to existing CRDT algorithms, we've chosen 2 core, realistic measurements:
 
+/ Remote replay: This tests how fast each implementation can process the network format of a document, and recreate a local document state. For CRDT algorithms, the remote document state consists of the set of all CRDT messages. For eg-walker, the state is the event graph.
+/ File size: This measures how many bytes each system takes to encode the document's state, either to send over the network or store on disk.
 
-One performance-critical aspect of CRDTs is loading the internal state from disk into memory, which is required for viewing the current document state and making any changes.
-This can take a significant amount of CPU time and memory (*TODO: quantify*), even on highly optimised implementations.
-With eg-walker, loading a document is essentially "free", since we only need to load the current document state (a plain text file); viewing the document and making changes does not require the event graph.
+There are several other performance differences between the systems that we aren't measuring here:
 
-Eg-walker only needs to load and replay the event graph in order to merge events from remote replicas that are concurrent with events that already exist locally.
-The equivalent process in a CRDT is to integrate remote operations into the local state.
-During real-time collaboration, this is typically a small number of operations that are based on a version that is only slightly behind the local version; merging these operations is fast on both CRDTs and eg-walker, since eg-walker only has to replay a small subset of the event graph.
+- Time to process local editing events. CRDT implementations need to convert local editing events into their own internal CRDT message format. Eg-walker is much faster here, but all the algorithms we measured can process local edits many orders of magnitude faster than any user is capable of typing, so we don't consider this test particularly relevant in practice.
+- Time to merge individual changes received over the network. This is hard to measure in practice. Eg-walker will have much less stable performance: it will be faster to merge individual sequential changes, but much slower when merging long lived branches compared to CRDTs.
+- Resident memory usage during editing. CRDT implementations need to keep the CRDT state resident in memory while a user edits a document. Eg-walker does not - the equivalent CRDT state is only generated when replaying or merging remote operations. And then, only the relevant parts. However, our eg-walker implementation currently still keeps the event graph in memory anyway.
 
-A more demanding situation arises when a user has been working offline and sends an accumulated batch of operations to their collaborators, and the other replicas need to integrate that batch of remote operations into their local state.
-To simulate an extreme version of this scenario, we imagine that the work done offline is one of our entire edit traces, and we measure the time taken to integrate that work into another replica: eg-walker needs to replay the entire edit trace, and a CRDT needs to apply the equivalent set of CRDT operations from the remote replica.
-We do not include the time it took to generate the CRDT operations on the source replica, since that computation happens in the background as the user is typing.
+We've benchmarked our implementation of eg-walker against several existing CRDT libraries: Automerge @automerge, Yjs #footnote[We also tested Yrs, the rust rewrite of Yjs by the original authors. At the time of writing it performs worse than Yjs, so we have removed it from our data set.] @yjs, Cola @cola, and json-joy @jsonjoy. Unfortunately, the libraries we tested vary wildly in absolute performance. Despite implementing extremely similar algorithms, on some tests the best performing library performs about 500x faster than the worst. This makes it very hard to get a sense for how eg-walker compares to the equivalent CRDT - since our goal here is to compare the algorithms, not the implementations.
+
+To that end, we also wrote our own optimised CRDT implementation, _dt-crdt_ @dt-crdt, using the same language (Rust), code style, B-tree data structures, and optimisations as our eg-walker implementation. These optimisations are documented in more detail in a blog post @crdts-go-brrr.
 
 #figure(
   text(8pt, charts.speed_remote),
