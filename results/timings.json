@@ -1,88 +1,54 @@
 {
-  "dt_merge": {
-    "automerge-paper": 0.722922427131179,
-    "seph-blog1": 1.1579569052255565,
-    "clownschool": 4.234823877499999,
-    "friendsforever": 2.985119654117647,
-    "git-makefile": 15.4091557475,
-    "node_nodecc": 11.978059245999997,
-    "egwalker": 3.1492667781250003
+  "dt_merge": {},
+  "dt_merge_norm": {
+    "S1": 2.233842162608695,
+    "S2": 3.5874371592857153,
+    "S3": 3.209691571875,
+    "C1": 63.58506998,
+    "C2": 86.89043875,
+    "A1": 8.89416657166667,
+    "A2": 23.213675603333343
   },
-  "dt_local": {
-    "automerge-paper": 3.779710570714288,
-    "seph-blog1": 2.528102364000001,
-    "clownschool_flat": 0.44041816252664273,
-    "friendsforever_flat": 0.20407156684731598,
-    "egwalker": 7.57472164125
-  },
-  "dt_local_rle": {
-    "automerge-paper": 0.629357265757583,
-    "seph-blog1": 0.9599142991837412,
-    "clownschool_flat": 0.2242515214297995,
-    "friendsforever_flat": 0.1659580069307496,
-    "egwalker": 2.5862649449999977
-  },
+  "dt_local": {},
+  "dt_local_rle": {},
   "dt-crdt_process_remote_edits": {
-    "automerge-paper": 7.16465268375,
-    "seph-blog1": 7.267163748571431,
-    "clownschool": 2.1904978660869565,
-    "friendsforever": 1.8471285005530371,
-    "git-makefile": 13.7349791425,
-    "node_nodecc": 45.531077465,
-    "egwalker": 20.388143250000002
+    "S1": 18.90784435333333,
+    "S2": 20.7582344,
+    "S3": 18.280086563333338,
+    "C1": 60.02256028,
+    "C2": 71.43589504,
+    "A1": 41.44239791,
+    "A2": 26.183993620000003
   },
-  "dt-crdt_local": {
-    "automerge-paper": 21.273886019999996,
-    "seph-blog1": 15.130039285,
-    "clownschool_flat": 2.5173252575,
-    "friendsforever_flat": 0.908505980917241,
-    "egwalker": 42.526554865
-  },
-  "dt_ff_on": {
-    "automerge-paper": 0.24319341821815765,
-    "seph-blog1": 0.435778973414777,
-    "clownschool": 4.131100194615387,
-    "friendsforever": 2.8185659877777773,
-    "git-makefile": 14.06220203,
-    "node_nodecc": 8.749748785000001,
-    "egwalker": 1.1831036163838382
-  },
-  "dt_ff_off": {
-    "automerge-paper": 3.863642949999999,
-    "seph-blog1": 7.04797987125,
-    "clownschool": 4.900672292727271,
-    "friendsforever": 3.506519129999999,
-    "git-makefile": 14.099610945,
-    "node_nodecc": 30.012588405000002,
-    "egwalker": 19.77337838333334
-  },
-  "automerge_local": {
-    "automerge-paper": 128.45114919,
-    "seph-blog1": 178.40443912,
-    "clownschool_flat": 14.701853973333332,
-    "friendsforever_flat": 13.752826576666662,
-    "egwalker": 507.72701264999995
-  },
+  "dt-crdt_local": {},
+  "dt_ff_on": {},
+  "dt_ff_off": {},
+  "automerge_local": {},
   "automerge_remote": {
-    "automerge-paper": 144.37744858000002,
-    "seph-blog1": 176.56497234,
-    "clownschool": 676.61514948,
-    "friendsforever": 87.73340798000001,
-    "node_nodecc": 448.50248824,
-    "egwalker": 472.09824033
+    "S1": 473.07633954000005,
+    "S2": 568.28901495,
+    "S3": 468.93915211,
+    "C1": 112171.26871249001,
+    "A1": 438.54413325,
+    "A2": 579.20396751
   },
-  "cola_local": {
-    "automerge-paper": 6.1610234125,
-    "seph-blog1": 4.095725552727271,
-    "clownschool_flat": 0.9752274926570057,
-    "friendsforever_flat": 0.8568268368139288,
-    "egwalker": 12.996615539999999
+  "cola_local": {},
+  "cola-nocursor_local": {},
+  "ot": {
+    "S1": 0.08097696440386654,
+    "S2": 0.042912154661197015,
+    "S3": 0.0432535745345985,
+    "C1": 219.88978983,
+    "C2": 274.13183294,
+    "A1": 45.314036630000004
   },
-  "cola-nocursor_local": {
-    "automerge-paper": 18.258659700000003,
-    "seph-blog1": 12.244735005,
-    "clownschool_flat": 2.2488704266666657,
-    "friendsforever_flat": 2.21218457,
-    "egwalker": 35.952641854999996
+  "yjs_remote": {
+    "S1": 43.903934737556504,
+    "S2": 67.23701421621615,
+    "S3": 71.18478160431674,
+    "C1": 243.30649356000015,
+    "C2": 302.3050810200002,
+    "A1": 87.45808007894671,
+    "A2": 103.51942803000027
   }
 }
