@@ -4,6 +4,7 @@
 use std::iter::FromIterator;
 use smartstring::alias::{String as SmartString};
 use smallvec::{SmallVec, smallvec};
+use crate::OpSet;
 
 // mod editablestring;
 // use self::editablestring::EditableText;
@@ -83,13 +84,12 @@ impl TextOp {
     pub fn append_move(&mut self, c: OpComponent) {
         if c.is_noop() { return; }
 
-        // Clean this up once non-lexical lifetimes lands
-        if match (self.0.last_mut(), &c) {
+        match (self.0.last_mut(), &c) {
             (Some(Skip(a)), Skip(b))
-            | (Some(Del(a)), Del(b)) => { *a += b; false },
-            (Some(Ins(a)), Ins(b)) => { a.push_str(b); false },
-            _ => true
-        } { self.0.push(c); }
+            | (Some(Del(a)), Del(b)) => { *a += b; },
+            (Some(Ins(a)), Ins(b)) => { a.push_str(b); },
+            _ => { self.0.push(c); }
+        }
     }
 
     // By spec, text operations never end with (useless) trailing skip components.
@@ -233,7 +233,33 @@ impl TextOp {
     }
 }
 
-pub fn transform(op: &TextOp, other: &TextOp, is_left: bool) -> TextOp {
+pub fn transform_list(ops: &mut OpSet, other_ops: &[TextOp], is_left: bool) {
+    if cfg!(debug_assertions) {
+        for o in ops.iter() {
+            debug_assert!(o.is_valid());
+        }
+        for o in other_ops {
+            debug_assert!(o.is_valid());
+        }
+    }
+
+    for mut o2 in other_ops.iter().cloned() {
+        for i in 0..ops.len() {
+            let (a, b) = transform2(&ops[i], &o2, is_left);
+            ops[i] = a;
+            o2 = b;
+        }
+    }
+}
+
+pub fn transform2(a: &TextOp, b: &TextOp, is_left: bool) -> (TextOp, TextOp) {
+    (
+        transform1(a, b, is_left),
+        transform1(b, a, !is_left)
+    )
+}
+
+pub fn transform1(op: &TextOp, other: &TextOp, is_left: bool) -> TextOp {
     debug_assert!(op.is_valid() && other.is_valid());
 
     let mut result = TextOp::new();

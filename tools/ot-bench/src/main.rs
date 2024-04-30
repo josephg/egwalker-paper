@@ -1,25 +1,28 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 use std::ops::Range;
 use std::time::Duration;
 
 use criterion::{black_box, Criterion};
 use jumprope::{JumpRope, JumpRopeBuf};
-use ot_text::{compose, OpComponent, TextOp, transform};
-use ot_text::OpComponent::{Del, Ins, Skip};
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
 use smartstring::alias::String as SmartString;
 #[cfg(feature = "memusage")]
 use trace_alloc::measure_memusage;
 
+use ot_text::{compose, OpComponent, TextOp};
+use ot_text::OpComponent::{Del, Ins, Skip};
+
 use crate::cg::CausalGraph;
 use crate::frontier::Frontier;
+use crate::ot_text::transform_list;
 
 mod cg;
 mod frontier;
 mod ot_text;
+// mod ot_text_tp2;
 
 // #[derive(Clone, Debug)]
 // pub struct SimpleTextOp {
@@ -95,16 +98,16 @@ pub struct TraceExportTxn {
 #[derive(Clone, Debug)]
 struct OpChunk {
     agent: usize,
-    // ops: SmallVec<[TextOp; 2]>,
-    op: TextOp,
+    ops: OpSet,
+    // op: TextOp,
 }
 
 impl From<TraceExportTxn> for OpChunk {
     fn from(txn: TraceExportTxn) -> Self {
         Self {
             agent: txn.agent,
-            op: patches_to_text_op(txn.patches.into_iter()),
-            // ops: txn.patches.into_iter().map(|patch| patch.into()).collect()
+            // op: patches_to_text_op(txn.patches.into_iter()),
+            ops: txn.patches.into_iter().map(|patch| patch.into()).collect()
         }
     }
 }
@@ -114,12 +117,19 @@ impl From<TraceExportTxn> for OpChunk {
 // }
 
 
+type OpSet = SmallVec<[TextOp; 2]>;
+type MemoDict = HashMap<OpKey, OpSet>;
+// type MemoDict = HashMap<OpKey, TextOp>;
+// type MemoDict = rustc_hash::FxHashMap<OpKey, TextOp>;
+// type MemoDict = BTreeMap<OpKey, TextOp>;
+
 #[derive(Clone, Debug)]
 struct OperationData {
     graph: CausalGraph,
     end_content: String,
     ops: Vec<OpChunk>,
     dt_span: Vec<Range<usize>>,
+    // memo: MemoDict,
 }
 
 
@@ -135,6 +145,7 @@ impl From<TraceExportData> for OperationData {
             end_content: trace.end_content,
             dt_span: trace.txns.iter().map(|txn| txn._dt_span[0]..txn._dt_span[1]).collect(),
             ops: trace.txns.into_iter().map(|txn| txn.into()).collect(),
+            // memo: Default::default(),
         }
     }
 }
@@ -161,20 +172,18 @@ struct OpKey {
     v: Frontier,
 }
 
-type MemoDict = HashMap<OpKey, TextOp>;
-// type MemoDict = rustc_hash::FxHashMap<OpKey, TextOp>;
-// type MemoDict = BTreeMap<OpKey, TextOp>;
-
 
 impl OperationData {
     // fn op_at_version<'a, 'b: 'a>(&'b self, i: usize, v: &[usize], memo: &'a mut MemoDict) -> &'a TextOp {
-    fn op_at_version(&self, i: usize, v: &[usize], memo: &mut MemoDict) -> TextOp {
-        let op = &self.ops[i].op;
+    // fn borrow_ops_at_version<R, F: FnOnce(&[TextOp]) -> R>(&self, i: usize, v: &[usize], memo: &mut MemoDict, f: F) -> R {
+    fn borrow_ops_at_version<F: FnOnce(&[TextOp])>(&self, i: usize, v: &[usize], memo: &mut MemoDict, f: F) {
+        let ops = &self.ops[i].ops;
         let parents = &self.graph.entries[i].parents;
 
         if v == parents.0.as_slice() {
             // Ok - the operation already matches the expected version.
-            return op.clone();
+            f(ops);
+            return;
         }
 
         let key = OpKey {
@@ -182,50 +191,39 @@ impl OperationData {
             v: Frontier::from_unsorted(v),
         };
 
-        if let Some(op) = memo.get(&key) {
-            op.clone()
+        if let Some(ops) = memo.get(&key) {
+            f(ops);
         } else {
             // println!("calc {:?} --- {:?} at {:?}", key, self.dt_span[key.idx], key.v.0.iter().map(|v| self.dt_span[*v].clone()).collect::<Vec<_>>());
             let (a_only, added_idx) = self.graph.diff(parents.0.as_slice(), v);
             debug_assert!(a_only.is_empty());
 
             let mut parent_version = parents.clone();
-            let mut op = op.clone();
+            let mut ops = ops.clone();
 
             for other_idx in added_idx {
                 // We need to transform op by other_op.
-                let other_op_at_p = self.op_at_version(other_idx, parent_version.0.as_slice(), memo);
-                op = transform(&op, &other_op_at_p, other_idx < i);
+
+                // This code is pulled into a child function prevent infinite recursion in the compiler.
+                fn helper(s: &OperationData, ops: &mut OpSet, is_left: bool, other_idx: usize, v: &[usize], memo: &mut MemoDict) {
+                    s.borrow_ops_at_version(other_idx, v, memo, |other_op_at_p| {
+                        transform_list(ops, &other_op_at_p, is_left);
+                    });
+                }
+
+                helper(self, &mut ops, other_idx < i, other_idx, parent_version.0.as_slice(), memo);
+                // self.borrow_ops_at_version(other_idx, parent_version.0.as_slice(), memo, |other_op_at_p| {
+                //     transform_list(&mut ops, &other_op_at_p, other_idx < i);
+                // });
                 parent_version.advance_by(&self.graph, other_idx);
             }
 
             debug_assert_eq!(parent_version.0.as_slice(), v);
 
             // memo.entry(key).or_insert(op)
-            memo.insert(key, op.clone());
-            op
+            f(&ops);
+            memo.insert(key, ops);
         }
-
-        // let val = memo.entry(key).or_insert_with(move || {
-        //     let (a_only, added_idx) = self.graph.diff(parents.0.as_slice(), v);
-        //     debug_assert!(a_only.is_empty());
-        //
-        //     let mut parent_version = parents.clone();
-        //     let mut op = op.clone();
-        //
-        //     for other_idx in added_idx {
-        //         // We need to transform op by other_op.
-        //         let other_op_at_p = self.op_at_version(other_idx, parent_version.0.as_slice(), memo);
-        //         op = transform(&op, other_op_at_p, other_idx < i);
-        //         parent_version.advance_by(&self.graph, other_idx);
-        //     }
-        //
-        //     debug_assert_eq!(parent_version.0.as_slice(), v);
-        //
-        //     op
-        // });
-
-        // val
     }
 
     fn doc_at_version(&self, v: &[usize]) -> JumpRopeBuf {
@@ -238,17 +236,13 @@ impl OperationData {
 
         // Apply all the operations in order.
         for (_n, i) in idxs.into_iter().enumerate() {
-            // println!("n {n} / {:?}", self.dt_span[i]);
+            // println!("n {_n} / {:?}", self.dt_span[i]);
             // if _n % 30 == 0 { println!("n {_n} / {} memo size {:?}", num_to_process, memo.iter().count()); }
-            let op = self.op_at_version(i, doc_version.0.as_slice(), &mut memo);
-
-            apply(&op, &mut doc);
-
-            let key = OpKey {
-                idx: i,
-                v: doc_version.clone(),
-            };
-            memo.insert(key, op);
+            self.borrow_ops_at_version(i, doc_version.0.as_slice(), &mut memo, |ops| {
+                for op in ops {
+                    apply(op, &mut doc);
+                }
+            });
 
             doc_version.advance_by(&self.graph, i);
         }
@@ -289,7 +283,7 @@ fn load_data(filename: &str) -> OperationData {
 // }
 
 #[cfg(feature = "memusage")]
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct MemUsage {
     steady_state: usize,
     peak: usize,
@@ -300,19 +294,37 @@ struct MemUsage {
 // $ cargo run --release --features memusage
 #[cfg(feature = "memusage")]
 fn measure_memory() {
-    let mut usage = HashMap::new();
+    let filename = "../../results/ot_memusage.json";
+
+    let mut usage = std::fs::read(filename).and_then(|old_data| {
+        serde_json::from_slice(&old_data).map_err(std::io::Error::from)
+    }).unwrap_or_else(|err| {
+        eprintln!("Warning: Could not read old data from {filename}: {:?}", err);
+        HashMap::new()
+    });
+
+    // dbg!(&usage);
 
     // for name in ["S1", "S2", "S3", "C1", "C2", "A1"] {
+    // for name in ["A2"] {
     for name in ["S1", "S2", "S3", "C1", "C2", "A1", "A2"] {
         print!("{name}...");
+        std::io::stdout().flush().unwrap();
 
         let (peak, steady_state, _) = measure_memusage(|| {
             let test_data = load_data(name);
             let result = test_data.doc_at_version(test_data.graph.frontier.0.as_slice());
+            let r_str = result.to_string();
 
             // To maximally reduce the impact of a fragmented jumprope, I'll copy it into a new
             // rope. I could probably call clone(), but I don't trust it not to be clever somehow.
-            JumpRope::from(result.to_string())
+            let result = JumpRope::from(&r_str);
+
+            if test_data.end_content != r_str {
+                eprintln!("WARNING: {name} does not match expected document content")
+            }
+
+            result
         });
 
         println!(" peak memory: {peak} / steady state {steady_state}");
@@ -320,7 +332,6 @@ fn measure_memory() {
     }
 
     let json_out = serde_json::to_vec_pretty(&usage).unwrap();
-    let filename = "../../results/ot_memusage.json";
     std::fs::write(filename, json_out).unwrap();
     println!("JSON written to {filename}");
 }
