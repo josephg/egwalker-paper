@@ -1,0 +1,30 @@
+{
+  "S1": {
+    "yjs": 479716,
+    "automergeUncompressed": 877891
+  },
+  "S2": {
+    "yjs": 405648,
+    "automergeUncompressed": 1172911
+  },
+  "S3": {
+    "yjs": 347740,
+    "automergeUncompressed": 987713
+  },
+  "C1": {
+    "yjs": 2366731,
+    "automergeUncompressed": 3156582
+  },
+  "C2": {
+    "yjs": 2754319,
+    "automergeUncompressed": 3838675
+  },
+  "A1": {
+    "yjs": 380835,
+    "automergeUncompressed": 1323415
+  },
+  "A2": {
+    "yjs": 675478,
+    "automergeUncompressed": 1140281
+  }
+}

@@ -157,6 +157,8 @@ Due to the concurrent insertion at an earlier index, user 1 must insert the excl
 One way of solving this problem is to use _Operational Transformation_ (OT): when user 1 receives $italic("Insert")(4, \"!\")$ that operation is transformed with regard to the concurrent insertion at index 3, which increments the index at which the exclamation mark is inserted.
 OT is an old and widely-used technique: it was introduced in 1989 @Ellis1989, and the OT algorithm Jupiter @Nichols1995 forms the basis of real-time collaboration in Google Docs @DayRichter2010.
 
+
+// Seph: I'm not sure how much people care about the theoretical complexity of OT this early in the paper. Might be better to ground it in some real world benchmarking.
 OT is simple and fast in the case of @two-inserts, where each user performed only one operation since the last version they had in common.
 In general, if user 1 performed $k$ operations and user 2 performed $m$ operations since their last common version, merging their states using OT has a cost of at least $O(k m)$, since each of the $k$ operations must be transformed with respect to each of the $m$ operations and vice versa.
 Some OT algorithms have a complexity that is quadratic or even cubic in the number of operations performed by each user @Li2006 @Roh2011RGA @Sun2020OT.
@@ -166,7 +168,10 @@ _Conflict-free Replicated Data Types_ (CRDTs) have been proposed as an alternati
 The first CRDT for collaborative text editing appeared in 2006 @Oster2006WOOT, and over a dozen text CRDTs have been published since @crdt-papers.
 These algorithms work by giving each character a unique identifier, and using those IDs instead of integer indexes to identify the position of insertions and deletions in the document.
 This avoids having to transform operations (since IDs are not affected by concurrent operations), but storing and transmitting those IDs introduces overhead.
+// This can be slow and expensive.
 Moreover, some CRDT algorithms need to retain IDs of deleted characters (_tombstones_), which introduces further overhead.
+// The full set of IDs typically needs to be loaded into memory during editing sessions to allow edits to be converted to the CRDT's native format.
+// In our testing, we have found even industry leading CRDT algorithms (such as Automerge and Yjs)
 
 In this paper we propose _Event Graph Walker_ (Eg-walker), an approach to collaborative editing that combines the strengths of OT and CRDT in a single algorithm.
 Like OT, Eg-walker uses integer indexes to identify insertion and deletion positions, and it avoids the overheads of CRDTs at times when there is no concurrency.
@@ -709,7 +714,7 @@ Eg-walker's event graph storage format is inspired by the Automerge CRDT library
 
 We first topologically sort the events in the graph. Different replicas may sort the set differently, but locally to one replica we can identify an event by its index in this sorted order.
 Then we store different properties of events in separate byte sequences called _columns_, which are then combined into one file with a simple header.
-The columns are:
+Each column stores some different fields of the event data. The columns are:
 
 - _Event type, start position, and run length._ For example, "the first 23 events are insertions at consecutive indexes starting from index 0, the next 10 events are deletions at consecutive indexes starting from index 7," and so on. We encode this using a variable-length binary encoding of integers, which represents small numbers in one byte, larger numbers in two bytes, etc.
 - _Inserted content._ An insertion event contains exactly one character (a Unicode scalar value), and a deletion does not. We simply concatenate the UTF-8 encoding of the characters for insertion events in the same order as they appear in the first column, and then LZ4-compress this string.
@@ -730,10 +735,31 @@ When sending a subset of events over the network (e.g., a single event during re
 // TODO: anonymise the references to repos for the conference submission
 // Can use a service like https://anonymous.4open.science/
 
-We implemented two versions of eg-walker: one in TypeScript that is optimised for code simplicity @reference-reg, and one in Rust (as part of the _Diamond Types_ library @dt) that is optimised for performance.
-The TypeScript implementation omits several optimisations, including internal run-length encoding and B-trees, but its behaviour is otherwise equivalent to the Rust implementation.
+In this work we have benchmarked Eg-walker's performance on 3 criteria:
+
+/ Merge speed: The time taken to merge a large, complex set of changes from a remote peer.
+/ Memory usage: The amount of RAM used.
+/ Storage size: The size on disk to store the document's history.
+
+Eg-walker compares favorably on all of these metrics. In our testing, the algorithm merges changes faster than CRDTs in almost all cases. It scales well. Unlike OT, Eg-walker still performs well when there are a large amount of concurrent changes. And the resulting file sizes are smaller than all other evaluated formats.
+
+// Eg-walker also performs better than CRDTs in one other important
+
+Eg-walker also has one other large compared to the CRDT implementations presented here: In all the CRDT based implementations we studied, the system has a CPU and memory overhead that is paid every time the document is loaded from disk. By contrast, when an Eg-walker document is loaded from disk, no data beyond the document's current contents need to be loaded. Eg-walker only has a CPU and memory overhead when merging remote, concurrent changes. And even in this case, all RAM used returns to baseline levels after the changes have been merged in.
+
+only does work when merging concurrent changes. In our measurements below we compare the cost of loading a CRDT to the worst-case performance of Eg-walker.
+
+ Note CRDTs typically need to keep their "CRDT state" in memory during all editing operations - so they usually retain a relatively constant amount of RAM the entire time the document is loaded. Eg-walker - like OT based algorithms - generally have no fixed overhead while the document is loaded.
+
+
+We implemented two versions of eg-walker: one in TypeScript that is optimised for simplicity and readability @reference-reg, and one in Rust (as part of the _Diamond Types_ library @dt) that is optimised for performance.
+The TypeScript implementation omits several important optimisations, including internal run-length encoding and B-trees, but its behaviour is otherwise equivalent to the Rust implementation.
 The benchmarks in this section use the Rust version.
 Details of the hardware and software setup of our experiments are given in @benchmark-setup.
+
+To make a fair comparison, we have also implemented our own reference CRDT library using the same optimization tricks and data structures as our Eg-walker implementation. Our benchmarks show our home-grown CRDT library outperforms the industry standard libraries of Yjs and Automerge. They have nevertheless been included for completeness.
+
+We have also implemented a simple OT library for comparison. *TODO: SAY MORE ABOUT THIS?*
 
 == Editing traces
 
@@ -745,7 +771,7 @@ The traces we use are listed in @traces-table.
 There are three types:
 
 #let stats_for(name, type) = {
-  let data = json("results/stats_" + name + ".json")
+  let data = json("results/dataset_stats.json").at(name)
   (
     name,
     type,
@@ -764,13 +790,14 @@ There are three types:
     table.hline(stroke: 0.8pt),
     table.header([*Name*], [*Type*], [*Events (k)*], [*Conc*], [*Runs*], [*Replicas*]),
     table.hline(stroke: 0.4pt),
-    ..stats_for("automerge-paper", "seq"),
-    ..stats_for("seph-blog1", "seq"),
-    ..stats_for("egwalker", "seq"),
-    ..stats_for("friendsforever", "conc"),
-    ..stats_for("clownschool", "conc"),
-    ..stats_for("node_nodecc", "async"),
-    ..stats_for("git-makefile", "async"),
+
+    ..stats_for("S1", "seq"),
+    ..stats_for("S2", "seq"),
+    ..stats_for("S3", "seq"),
+    ..stats_for("C1", "conc"),
+    ..stats_for("C2", "conc"),
+    ..stats_for("A1", "async"),
+    ..stats_for("A2", "async"),
     table.hline(stroke: 0.8pt),
   )),
   placement: top,
@@ -824,7 +851,7 @@ Eg-walker processes over 1M events per second in all the traces we have.
 
 // TODO: add eg-walker to this chart (with the y axis fixed to 0-3 Mevents/sec)
 #figure(
-  text(8pt, charts.all_speed_remote),
+  text(8pt, charts.speed_remote),
   caption: [
     The speed of merging remote operations into a replica's local state in several CRDT implementations.
   ],
