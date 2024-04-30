@@ -1,0 +1,21 @@
+[package]
+name = "crdt-converter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+automerge = "0.5.5"
+serde = { version = "1.0.160", features = ["derive"] }
+serde_json = "1.0.96"
+smartstring = { version = "1.0.1", features = ["serde"] }
+smallvec = { version = "1.10.0", features = ["serde"] }
+criterion = { version = "0.5.1", features = ["html_reports"] }
+#diamond-types-crdt = { path = "../diamond-types/crates/diamond-types-crdt" }
+diamond-types-crdt = { path = "../../../diamond-types/crates/diamond-types-crdt" }
+rand = "0.8.5"
+yrs = "0.18.3"
+
+[profile.release]
+debug = true
