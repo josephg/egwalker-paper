@@ -1,0 +1,414 @@
+
+
+Loaded testing data from egwalker
+ (359052 patches in 355153 txns -> docsize 165126 chars)
+Document of length 165126
+Content memory size: 757.40 KiB
+(Efficient size: 161.26 KiB)
+-------- Operations RLE --------
+number of 64 byte entries: 54397
+allocated size: 4.19 MB
+(used size: 3.48 MB)
+ins: singles 7434, fwd 22965, rev 0, count 30399
+del: singles 7308, fwd 13060, rev 3630, count 23998
+Total keystrokes: 893954
+Insert content length 529552
+Delete content length 0
+-------- Client LV map RLE --------
+number of 32 byte entries: 1
+allocated size: 128 B
+(used size: 32 B)
+number of agents: 1
+-------- History RLE --------
+number of 72 byte entries: 1
+allocated size: 288 B
+(used size: 72 B)
+Graph entries: 1
+Num merges: 0
+Concurrency estimate: 0
+Branch size 165126
+---- Saving normally ----
+Inserted text length (uncompressed) 529552
+Compressed 529552 bytes in the file to 252498
+FileInfo length 9
+StartBranch length 0
+Patches length 103017
+== Total length 355551
+Regular file size 355551 bytes
+---- Saving smol mode ----
+End content length (uncompressed) 165128
+Compressed 165128 bytes in the file to 81632
+FileInfo length 9
+StartBranch length 0
+ExperimentalEndBranch length 12
+Patches length 103003
+== Total length 184685
+Smol size 184685
+---- Saving uncompressed ----
+Inserted text length (uncompressed) 529552
+FileInfo length 9
+StartBranch length 0
+Patches length 632570
+== Total length 632602
+Uncompressed size 632602
+---- Saving smol uncompressed ----
+End content length (uncompressed) 165128
+FileInfo length 9
+StartBranch length 0
+ExperimentalEndBranch length 165139
+Patches length 103003
+== Total length 268178
+Uncompressed size 268178
+Resulting document size 165126 characters
+
+
+Loaded testing data from automerge-paper
+ (259778 patches in 259778 txns -> docsize 104852 chars)
+Document of length 104852
+Content memory size: 449.34 KiB
+(Efficient size: 102.39 KiB)
+-------- Operations RLE --------
+number of 64 byte entries: 10731
+allocated size: 1.05 MB
+(used size: 686.78 kB)
+ins: singles 1202, fwd 5086, rev 0, count 6288
+del: singles 1828, fwd 448, rev 2167, count 4443
+Total keystrokes: 259778
+Insert content length 182315
+Delete content length 0
+-------- Client LV map RLE --------
+number of 32 byte entries: 1
+allocated size: 128 B
+(used size: 32 B)
+number of agents: 1
+-------- History RLE --------
+number of 72 byte entries: 1
+allocated size: 288 B
+(used size: 72 B)
+Graph entries: 1
+Num merges: 0
+Concurrency estimate: 0
+Branch size 104852
+---- Saving normally ----
+Inserted text length (uncompressed) 182315
+Compressed 182315 bytes in the file to 84990
+FileInfo length 9
+StartBranch length 0
+Patches length 21221
+== Total length 106247
+Regular file size 106247 bytes
+---- Saving smol mode ----
+End content length (uncompressed) 104852
+Compressed 104852 bytes in the file to 44397
+FileInfo length 9
+StartBranch length 0
+ExperimentalEndBranch length 12
+Patches length 21207
+== Total length 65654
+Smol size 65654
+---- Saving uncompressed ----
+Inserted text length (uncompressed) 182315
+FileInfo length 9
+StartBranch length 0
+Patches length 203537
+== Total length 203569
+Uncompressed size 203569
+---- Saving smol uncompressed ----
+End content length (uncompressed) 104852
+FileInfo length 9
+StartBranch length 0
+ExperimentalEndBranch length 104863
+Patches length 21207
+== Total length 126106
+Uncompressed size 126106
+Resulting document size 104852 characters
+
+
+Loaded testing data from seph-blog1
+ (137993 patches in 137154 txns -> docsize 56769 chars)
+Document of length 56769
+Content memory size: 279.32 KiB
+(Efficient size: 55.44 KiB)
+-------- Operations RLE --------
+number of 64 byte entries: 20054
+allocated size: 2.10 MB
+(used size: 1.28 MB)
+ins: singles 2503, fwd 8236, rev 0, count 10739
+del: singles 2705, fwd 5226, rev 1384, count 9315
+Total keystrokes: 368209
+Insert content length 212497
+Delete content length 0
+-------- Client LV map RLE --------
+number of 32 byte entries: 1
+allocated size: 128 B
+(used size: 32 B)
+number of agents: 1
+-------- History RLE --------
+number of 72 byte entries: 1
+allocated size: 288 B
+(used size: 72 B)
+Graph entries: 1
+Num merges: 0
+Concurrency estimate: 0
+Branch size 56769
+---- Saving normally ----
+Inserted text length (uncompressed) 212497
+Compressed 212497 bytes in the file to 119376
+FileInfo length 9
+StartBranch length 0
+Patches length 38381
+== Total length 157793
+Regular file size 157793 bytes
+---- Saving smol mode ----
+End content length (uncompressed) 56769
+Compressed 56769 bytes in the file to 32258
+FileInfo length 9
+StartBranch length 0
+ExperimentalEndBranch length 12
+Patches length 38367
+== Total length 70675
+Smol size 70675
+---- Saving uncompressed ----
+Inserted text length (uncompressed) 212497
+FileInfo length 9
+StartBranch length 0
+Patches length 250879
+== Total length 250911
+Uncompressed size 250911
+---- Saving smol uncompressed ----
+End content length (uncompressed) 56769
+FileInfo length 9
+StartBranch length 0
+ExperimentalEndBranch length 56780
+Patches length 38367
+== Total length 95183
+Uncompressed size 95183
+Resulting document size 56769 characters
+
+
+Loaded testing data from node_nodecc (334914 bytes)
+-------- Operations RLE --------
+number of 64 byte entries: 53622
+allocated size: 4.19 MB
+(used size: 3.43 MB)
+ins: singles 5868, fwd 20945, rev 0, count 26813
+del: singles 7326, fwd 19483, rev 0, count 26809
+Total keystrokes: 947337
+Insert content length 488767
+Delete content length 0
+-------- Client LV map RLE --------
+number of 32 byte entries: 924
+allocated size: 32.77 kB
+(used size: 29.57 kB)
+number of agents: 194
+-------- History RLE --------
+number of 72 byte entries: 91
+allocated size: 9.22 kB
+(used size: 6.55 kB)
+Graph entries: 101
+Num merges: 46
+Concurrency estimate: 0.098713554
+---- Saving normally ----
+Inserted text length (uncompressed) 488767
+Compressed 488767 bytes in the file to 222189
+FileInfo length 2806
+StartBranch length 0
+Patches length 110328
+== Total length 335351
+Regular file size 335351 bytes
+---- Saving smol mode ----
+End content length (uncompressed) 38142
+Compressed 38142 bytes in the file to 18030
+FileInfo length 2806
+StartBranch length 0
+ExperimentalEndBranch length 12
+Patches length 110314
+== Total length 131192
+Smol size 131192
+---- Saving uncompressed ----
+Inserted text length (uncompressed) 488767
+FileInfo length 2806
+StartBranch length 0
+Patches length 599096
+== Total length 601926
+Uncompressed size 601926
+---- Saving smol uncompressed ----
+End content length (uncompressed) 38142
+FileInfo length 2806
+StartBranch length 0
+ExperimentalEndBranch length 38153
+Patches length 110314
+== Total length 151301
+Uncompressed size 151301
+Resulting document size 38142 characters
+
+
+Loaded testing data from git-makefile (161979 bytes)
+-------- Operations RLE --------
+number of 64 byte entries: 15942
+allocated size: 1.05 MB
+(used size: 1.02 MB)
+ins: singles 1871, fwd 7335, rev 0, count 9206
+del: singles 1844, fwd 4892, rev 0, count 6736
+Total keystrokes: 348819
+Insert content length 229389
+Delete content length 0
+-------- Client LV map RLE --------
+number of 32 byte entries: 1404
+allocated size: 65.54 kB
+(used size: 44.93 kB)
+number of agents: 299
+-------- History RLE --------
+number of 72 byte entries: 1004
+allocated size: 73.73 kB
+(used size: 72.29 kB)
+Graph entries: 1215
+Num merges: 766
+Concurrency estimate: 6.1119175
+---- Saving normally ----
+Inserted text length (uncompressed) 229389
+Compressed 229389 bytes in the file to 107949
+FileInfo length 4473
+StartBranch length 0
+Patches length 50134
+== Total length 162584
+Regular file size 162584 bytes
+---- Saving smol mode ----
+End content length (uncompressed) 113676
+Compressed 113676 bytes in the file to 49263
+FileInfo length 4473
+StartBranch length 0
+ExperimentalEndBranch length 12
+Patches length 50120
+== Total length 103898
+Smol size 103898
+---- Saving uncompressed ----
+Inserted text length (uncompressed) 229389
+FileInfo length 4473
+StartBranch length 0
+Patches length 279524
+== Total length 284021
+Uncompressed size 284021
+---- Saving smol uncompressed ----
+End content length (uncompressed) 113676
+FileInfo length 4473
+StartBranch length 0
+ExperimentalEndBranch length 113687
+Patches length 50120
+== Total length 168308
+Uncompressed size 168308
+Resulting document size 113676 characters
+
+
+Loaded testing data from friendsforever (35446 bytes)
+-------- Operations RLE --------
+number of 64 byte entries: 3650
+allocated size: 262.14 kB
+(used size: 233.60 kB)
+ins: singles 727, fwd 2266, rev 0, count 2993
+del: singles 296, fwd 89, rev 272, count 657
+Total keystrokes: 26078
+Insert content length 23720
+Delete content length 0
+-------- Client LV map RLE --------
+number of 32 byte entries: 1463
+allocated size: 65.54 kB
+(used size: 46.82 kB)
+number of agents: 2
+-------- History RLE --------
+number of 72 byte entries: 2405
+allocated size: 294.91 kB
+(used size: 173.16 kB)
+Graph entries: 3685
+Num merges: 2258
+Concurrency estimate: 0.44865403
+---- Saving normally ----
+Inserted text length (uncompressed) 23720
+Compressed 23720 bytes in the file to 17269
+FileInfo length 6
+StartBranch length 0
+Patches length 18592
+== Total length 35894
+Regular file size 35894 bytes
+---- Saving smol mode ----
+End content length (uncompressed) 21362
+Compressed 21362 bytes in the file to 14216
+FileInfo length 6
+StartBranch length 0
+ExperimentalEndBranch length 11
+Patches length 18578
+== Total length 32839
+Smol size 32839
+---- Saving uncompressed ----
+Inserted text length (uncompressed) 23720
+FileInfo length 6
+StartBranch length 0
+Patches length 42313
+== Total length 42342
+Uncompressed size 42342
+---- Saving smol uncompressed ----
+End content length (uncompressed) 21362
+FileInfo length 6
+StartBranch length 0
+ExperimentalEndBranch length 21372
+Patches length 18578
+== Total length 39983
+Uncompressed size 39983
+Resulting document size 21362 characters
+
+
+Loaded testing data from clownschool (47263 bytes)
+-------- Operations RLE --------
+number of 64 byte entries: 4106
+allocated size: 524.29 kB
+(used size: 262.78 kB)
+ins: singles 640, fwd 2953, rev 0, count 3593
+del: singles 269, fwd 82, rev 162, count 513
+Total keystrokes: 24326
+Insert content length 22737
+Delete content length 0
+-------- Client LV map RLE --------
+number of 32 byte entries: 2515
+allocated size: 131.07 kB
+(used size: 80.48 kB)
+number of agents: 3
+-------- History RLE --------
+number of 72 byte entries: 3822
+allocated size: 294.91 kB
+(used size: 275.18 kB)
+Graph entries: 5346
+Num merges: 3628
+Concurrency estimate: 0.43521336
+---- Saving normally ----
+Inserted text length (uncompressed) 22737
+Compressed 22737 bytes in the file to 16870
+FileInfo length 41
+StartBranch length 0
+Patches length 26276
+== Total length 43214
+Regular file size 43214 bytes
+---- Saving smol mode ----
+End content length (uncompressed) 21148
+Compressed 21148 bytes in the file to 13828
+FileInfo length 41
+StartBranch length 0
+ExperimentalEndBranch length 11
+Patches length 26262
+== Total length 40170
+Smol size 40170
+---- Saving uncompressed ----
+Inserted text length (uncompressed) 22737
+FileInfo length 41
+StartBranch length 0
+Patches length 49014
+== Total length 49078
+Uncompressed size 49078
+---- Saving smol uncompressed ----
+End content length (uncompressed) 21148
+FileInfo length 41
+StartBranch length 0
+ExperimentalEndBranch length 21158
+Patches length 26262
+== Total length 47488
+Uncompressed size 47488
+Resulting document size 21148 characters
