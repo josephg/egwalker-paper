@@ -289,7 +289,6 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "jumprope",
- "ot-text",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -297,15 +296,6 @@ dependencies = [
  "smartstring",
  "str_indices",
  "trace-alloc",
-]
-
-[[package]]
-name = "ot-text"
-version = "0.1.0"
-dependencies = [
- "smallvec",
- "smartstring",
- "str_indices",
 ]
 
 [[package]]

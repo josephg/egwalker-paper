@@ -19,6 +19,7 @@ use crate::frontier::Frontier;
 
 mod cg;
 mod frontier;
+mod ot_text;
 
 // #[derive(Clone, Debug)]
 // pub struct SimpleTextOp {
