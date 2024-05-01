@@ -1105,23 +1105,25 @@ replayAll graph = replay graph (allIds graph)
 
 = Benchmark Setup <benchmark-setup>
 
-All benchmarks were run on a Ryzen 7950x CPU running Linux 6.2.0-39.
+All benchmarks were run on a Ryzen 7950x CPU running Linux 6.5.0-28 and 64GB of RAM. (Enough to prevent memory swapping in all cases).
 
-Rust code was compiled with `rustc v1.74.1` and compiled in release mode with `-C target-cpu=native`. Code is run on a single, pinned core for consistency.
+Rust code was compiled with `rustc v1.77.2` and compiled in release mode with `-C target-cpu=native`. Code is run on a single, pinned core for consistency.
 
-Javascript was run using `nodejs v21.5.0`.
+Javascript was run using `nodejs v21.7.0`.
 
-All time based measurements are based on the mean of at least 100 test iterations. All benchmark code and data is available on Github. We tested the following versions of all libraries:
+All time based measurements are based on the mean of at least 100 test iterations except OT running A2. This test was only run for 10 iterations. Error bars are not included above as the standard deviation for all benchmark results was less than 1%.
+
+All benchmark code and data is available on Github. We tested the following versions of all libraries:
 
 #table(
   columns: (auto, auto, auto),
   align: (left, left, right, right, right, right),
   [*Library*], [*Language*], [*Version / Git Hash*],
-  [Diamond Types (DT / DT-CRDT)], [Rust], [`7adf4bafeccb`],
-  [Automerge], [Rust], [v 0.5.5],
+  [Diamond Types (DT / DT-CRDT)], [Rust], [`44a65c44bf`],
+  [Automerge], [Rust], [v 0.5.9],
   [Yjs], [Javascript], [v 13.6.10],
-  [JSON-Joy], [Javascript], [`38392b30228a`],
-  [Cola], [Rust], [v 0.1.1],
+  // [JSON-Joy], [Javascript], [`38392b30228a`],
+  // [Cola], [Rust], [v 0.1.1],
 )
 
 Cola with cursor optimisation removed is available at `https://github.com/josephg/cola-nocursors/`. //#link(https://github.com/josephg/cola-nocursors/).
