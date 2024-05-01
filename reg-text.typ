@@ -735,31 +735,56 @@ When sending a subset of events over the network (e.g., a single event during re
 // TODO: anonymise the references to repos for the conference submission
 // Can use a service like https://anonymous.4open.science/
 
-In this work we have benchmarked Eg-walker's performance on 3 criteria:
+In this work we have benchmarked Eg-walker on 3 criteria:
 
-/ Merge speed: The time taken to merge a large, complex set of changes from a remote peer.
-/ Memory usage: The amount of RAM used.
-/ Storage size: The size on disk to store the document's history.
+/ Merge speed: The time taken to merge events from a remote peer.
+/ Memory usage: The amount of RAM used to open a document and merge changes.
+/ Storage size: The number of bytes needed to store or transmit the document's history.
 
-Eg-walker compares favorably on all of these metrics. In our testing, the algorithm merges changes faster than CRDTs in almost all cases. It scales well. Unlike OT, Eg-walker still performs well when there are a large amount of concurrent changes. And the resulting file sizes are smaller than all other evaluated formats.
+Generally we have found Eg-walker to be fast, small and efficient. In the worst case, Eg-walker's performance is competitive with that of well optimised CRDT libraries. However, Eg-walker is significantly faster than CRDTs for many common operations - like loading a document from disk, merging short lived branches or merging long sequences of linear events.
 
-// Eg-walker also performs better than CRDTs in one other important
+The reason for this is that CRDTs require local editing events to be immediately translated into the corresponding CRDT messages before they can be saved to disk or broadcast to other peers. Translating events into CRDT messages is fast. However, before any translation can occur, the CRDT state is reconstructed in a query optimised data structure in RAM. The size of the CRDT state is proportional to the number of events which have _ever_ modified the document, so loading this state into memory can be slow and retaining it in memory can consume a lot of RAM while the document is kept open. In one of our tests, the Automerge CRDT needed 2 minutes and 44 GB of RAM to load the state object for one approximately 500KB document.
 
-Eg-walker also has one other large compared to the CRDT implementations presented here: In all the CRDT based implementations we studied, the system has a CPU and memory overhead that is paid every time the document is loaded from disk. By contrast, when an Eg-walker document is loaded from disk, no data beyond the document's current contents need to be loaded. Eg-walker only has a CPU and memory overhead when merging remote, concurrent changes. And even in this case, all RAM used returns to baseline levels after the changes have been merged in.
+When necessary, Eg-walker also reconstructs this state. However, Eg-walker only needs to build this state object in memory when merging concurrent changes. And even then, the state is only reconstructed as far back as the most recent common version. Once merging is complete, Eg-walker can immediately discard this state object from memory.
 
-only does work when merging concurrent changes. In our measurements below we compare the cost of loading a CRDT to the worst-case performance of Eg-walker.
+In our testing we have found the _worst case_ performance for Eg-walker is similar to the _expected_ performance when using a similar CRDT library. The best case performance of Eg-walker is significantly faster than that of an equivalent CRDT.
 
- Note CRDTs typically need to keep their "CRDT state" in memory during all editing operations - so they usually retain a relatively constant amount of RAM the entire time the document is loaded. Eg-walker - like OT based algorithms - generally have no fixed overhead while the document is loaded.
+#figure(
+  text(8pt, table(
+    columns: (auto, auto, auto, auto),
+    align: (left, center, center, center),
+    stroke: (x, y) => (
+      left: if x == 1 { 0.4pt } else { none },
+      // right: none,
+      // top: if y == 0 { 0.8pt } else { none },
+      // bottom: none,
+    ),
+    table.hline(stroke: 0.8pt),
+    table.header([Work performed when \\ by], [*OT*], [*Eg-walker*], [*CRDT*]),
+    table.hline(stroke: 0.4pt),
+    [When loading], [$emptyset$],[$emptyset$],[$O(n log n)$],
+    [When merging], [$O(n^2)$],[$O(n log n)$],[$O(n log n)$],
+    table.hline(stroke: 0.8pt),
+  )),
+  placement: top,
+  caption: [
+    Expected overhead of different approaches when loading documents from disk and when merging changes. Like OT based approaches, Eg-walker has no CPU or memory overhead when loading a document for editing. Like CRDT based approaches, Eg-walker is significantly more efficient when merging concurrent changes.
+  ]
+) <work-table>
 
+== Implementations
 
-We implemented two versions of eg-walker: one in TypeScript that is optimised for simplicity and readability @reference-reg, and one in Rust (as part of the _Diamond Types_ library @dt) that is optimised for performance.
-The TypeScript implementation omits several important optimisations, including internal run-length encoding and B-trees, but its behaviour is otherwise equivalent to the Rust implementation.
-The benchmarks in this section use the Rust version.
+We implemented two versions of Eg-walker: a reference implementation optimised for simplicity and readability written in Typescript @reference-reg, and a production-ready, performance optimised implementation written in Rust @dt.
+Both implementations are algorithmically identical. However, our reference implementation omits several important optimisations, including internal run-length encoding and B-trees.
+All benchmarks in this section use our performance optimised version of Eg-walker.
+
+We have benchmarked Eg-walker against two popular CRDT libraries: Automerge @automerge and Yjs#footnote[We also tested Yrs @yrs, the Rust rewrite of Yjs by the original authors. At the time of writing it performs worse than Yjs, so we have omitted it from our results.] @yjs. However, these libraries are not as well optimised as our Eg-walker implementation. In an effort to remove the effect of implementation differences in our results, we have also implemented a performance-optimised reference CRDT library which shares many implementation details with our Eg-walker implementation. This library outperforms both Yjs and Automerge.
+
+For comparison, we have also implemented a simple OT based reference implementation. This library bulk transforms all operations in a given event graph. Transformed operations are memoized and reused during processing. This library has not been optimised as thoroughly as the other code.
+
+All code and data used in our benchmarks is published alongside this article.
 Details of the hardware and software setup of our experiments are given in @benchmark-setup.
 
-To make a fair comparison, we have also implemented our own reference CRDT library using the same optimization tricks and data structures as our Eg-walker implementation. Our benchmarks show our home-grown CRDT library outperforms the industry standard libraries of Yjs and Automerge. They have nevertheless been included for completeness.
-
-We have also implemented a simple OT library for comparison. *TODO: SAY MORE ABOUT THIS?*
 
 == Editing traces
 
@@ -806,72 +831,52 @@ There are three types:
   ]
 ) <traces-table>
 
-/ Sequential Traces: ("seq"): Keystroke-granularity history of a single user writing a document, collected using an instrumented text editor. These traces contain no concurrency. We use the LaTeX source of a journal paper @Kleppmann2017 @automerge-perf, the text of an 8,800-word blog post @crdts-go-brrr, and the source for this article.
-/ Concurrent Traces: ("conc"): Multiple users concurrently editing the same document in realtime, recorded with keystroke granularity. We added 0.5–1 second of artificial latency between the collaborating users to increase the incidence of concurrent operations.
-/ Asynchronous Traces: ("async"): We reconstruct an editing trace for a file in a Git repository, with concurrency mirroring the branching/merging of the Git commits. Since Git does not record individual keystrokes, we generate the minimal edit operations to perform each commit's diff. We use `Makefile` from the Git repository for Git itself @git-makefile, and `src/node.cc` from the Git repository for Node.js @node-src-nodecc. These are some of the most-edited files in their respective repositories, containing merges of as many as six branches.
+/ Sequential Traces: (S1, S2, S3): Keystroke-granularity history of a single user writing a document, collected using an instrumented text editor. These traces contain no concurrency. We use the LaTeX source of a journal paper @Kleppmann2017 @automerge-perf, the text of an 8,800-word blog post @crdts-go-brrr, and the source for this article.
+/ Concurrent Traces: (C1, C2): Multiple users concurrently editing the same document in realtime, recorded with keystroke granularity. We added 0.5–1 second of artificial latency between the collaborating users to increase the incidence of concurrent operations.
+/ Asynchronous Traces: (A1, A2): We reconstructed the editing trace of some files in Git repositories, with concurrency mirroring the branching/merging of the Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations to perform each commit's diff. We use `Makefile` from the Git repository for Git itself @git-makefile, and `src/node.cc` from the Git repository for Node.js @node-src-nodecc.
 
-The traces vary in size by more than an order of magnitude.
-To allow comparisons across traces, instead of reporting the runtime to replay an event graph, we report the replay throughput in units of millions of editing events per second.
+The recorded editing traces originally varied a great deal in size. We have roughly standardised the sizes of all editing traces by duplicating some of our recorded event graphs multiple times. For example, a trace containing events ${A, B, C, ...}$ would be repeated to become ${A_1, B_1, C_1, ..., A_2, B_2, C_2, ..., A_3, B_3, C_3, ...}$. Each repeated copy of the graph happens causally after all earlier repetitions, so for example ${A_1, B_1, C_1, ...} -> {A_2, ...} -> {A_3, ...}$. All traces were normalised to contain approximately 500k inserted characters. This results in documents up to about 100 pages in length, depending on the number of deleted characters and the printed font size.
 
-// TODO: is it millions of run-length encoded event sequences, or millions of individual events (as reported in @traces-table)?
 
-== Eg-walker compared to existing CRDTs
+== CPU Performance
 
-We compare the performance of eg-walker to existing CRDT algorithms along the following dimensions, which are the most important aspects for practical use:
+The slowest operation a collaborative editing system performs is merging a large set of remote editing events from another peer. All received changes need to be transformed and merged into the active document. @chart-remote shows the time taken by each tested algorithm to merge all changes in our dataset. For the CRDT algorithms, the events have been preprocessed into the appropriate CRDT message format. The time taken to do this is not included in the measurement.
 
-/ Merging remote edits: How long it takes a replica to process a batch of updates it has received from another replica, and incorporate it into its local state. //For CRDT algorithms, the remote document state consists of the set of all CRDT messages. For eg-walker, the state is the event graph.
-/ File size: How many bytes it takes to encode the state of a document to send over the network or store on disk.
-// TODO: memory use?
-
-/*
-There are several other performance differences between the systems that we aren't measuring here:
-
-- Time to process local editing events. CRDT implementations need to convert local editing events into their own internal CRDT message format. Eg-walker is much faster here, but all the algorithms we measured can process local edits many orders of magnitude faster than any user is capable of typing, so we don't consider this test particularly relevant in practice.
-- Time to merge individual changes received over the network. This is hard to measure in practice. Eg-walker will have much less stable performance: it will be faster to merge individual sequential changes, but much slower when merging long lived branches compared to CRDTs.
-- Resident memory usage during editing. CRDT implementations need to keep the CRDT state resident in memory while a user edits a document. Eg-walker does not - the equivalent CRDT state is only generated when replaying or merging remote operations. And then, only the relevant parts. However, our eg-walker implementation currently still keeps the event graph in memory anyway.
-*/
-
-We measure the performance of eg-walker compared to several existing, heavily optimised CRDT libraries: Automerge @automerge, Yjs #footnote[We also tested Yrs @yrs, the Rust rewrite of Yjs by the original authors. At the time of writing it performs worse than Yjs, so we have omitted it from our results.] @yjs, Cola @cola, and json-joy @jsonjoy. We found they vary wildly in performance: on some tests the best-performing library is about 500$times$ faster than the slowest. It is difficult to determine which differences are due to implementation style, and which are fundamental algorithmic differences.
-
-In order to better compare algorithms, not implementations, we also wrote our own optimised CRDT implementation, _dt-crdt_ @dt-crdt. It uses the same language (Rust), code style, B-tree data structures, and optimisations as our eg-walker implementation. These optimisations are documented in more detail in a blog post @crdts-go-brrr.
+We have also measured the time taken to convert local editing events (keystrokes) into the CRDT's local format. However, all the systems we measured could process millions of events per second - and as this is far in excess of human typing speed, that chart is not included here.
 
 #figure(
   text(8pt, charts.speed_remote),
   caption: [
-    The speed of eg-walker event graph replay, compared to merging the equivalent set of CRDT operations.
+    The time taken by each algorithm to merge all editing events. Each algorithm received as input the complete set of "remote events" (which differed depending on the algorithm) and output the resulting, merged document.
   ],
   kind: image,
   placement: top,
 ) <chart-remote>
 
-@chart-remote shows that in this scenario, eg-walker is very fast: on sequential traces it is around 5$times$ faster to replay the event graph than dt-crdt integrating the equivalent remote operations. In the worst case, eg-walker has about half the throughput of dt-crdt.
-In absolute terms, our slowest test case (_git-makefile_) took just 15ms to process.
-Eg-walker processes over 1M events per second in all the traces we have.
-@chart-all-remote compares the same workload on other CRDT libraries; eg-walker outperforms both Yjs and Automerge on almost all traces.
+This chart is interesting for several reasons:
+// And I'm not sure how many of these reasons to include here!
 
-// TODO: add eg-walker to this chart (with the y axis fixed to 0-3 Mevents/sec)
-#figure(
-  text(8pt, charts.speed_remote),
-  caption: [
-    The speed of merging remote operations into a replica's local state in several CRDT implementations.
-  ],
-  kind: image,
-  placement: top,
-) <chart-all-remote>
+// - Eg-walker and the OT implementation, as expected, added no overhead at all in processing the purely sequential event traces (S1, S2, S3).
+- There is more difference between different CRDT implementations than there is between Eg-walker and our reference CRDT implementation. When measuring pure performance, implementation quality seems to matter more than algorithm.
+- C1 and C2 hit some pathological case in the automerge library. We have reported this to the package maintainers.
+- As expected, our operational transform implementation performs very well when there is no concurrency. But it scales very poorly as editing traces become more complex. Merging the _A2_ trace took approximately 1 hour - which is 160 000x slower than Eg-walker.
+
+As discussed earlier, this chart is somewhat misleading. Eg-walker and CRDT approaches have a similar performance profile when merging large sets of remote changes. However, the CRDT implementations we measured must also perform this work any time a document is loaded from disk. The Eg-walker and OT approaches have no additional overhead when loading a document into a text editor beyond reading the text content itself.
+
 
 == Eg-walker performance and concurrency
 
-Eg-walker is especially fast on traces that are mostly (e.g., `node_nodecc`) or entirely sequential.
+In @chart-remote above, we see that Eg-walker is especially fast on traces that are mostly (e.g., _A1_) or entirely sequential (e.g., _S1_).
 This is because we can clear the internal state and skip all of the internal state manipulation on critical versions (@clearing).
 To quantify this effect, we compare eg-walker's performance with a version of the algorithm that has these optimisations disabled.
-@ff-memory shows the memory usage over the course of replaying one trace, and @speed-ff shows the ratio of replay throughput between the optimised and the unoptimised versions for several traces.
+@ff-memory shows the memory usage over the course of replaying one trace, and @speed-ff shows the time taken to replay all our traces with this optimisation enabled and disabled.
 
 // TODO: what is the unit ("state size") of the y axis of this chart?
 // TODO: Typst has a bug that is currently labelling this figure with the wrong number!
 #figure(
   text(8pt, charts.ff_chart),
   caption: [
-    A comparison of the eg-walker state size while processing the _friendsforever_ data set, with and without internal state clearing enabled.
+    A comparison of the eg-walker state size while processing the _raw C1_ data set, with and without internal state clearing enabled. Unlike in other tests, for this chart we use the raw (not duplicated) version of the dataset.
   ],
   kind: image,
   placement: top,
@@ -880,13 +885,13 @@ To quantify this effect, we compare eg-walker's performance with a version of th
 #figure(
   text(8pt, charts.speed_ff),
   caption: [
-    Performance of eg-walker with and without the optimisations from @clearing.
+    Time taken for Eg-walker to replay an event graph, with and without the optimisations from @clearing.
   ],
   kind: image,
   placement: top,
 ) <speed-ff>
 
-The _git-makefile_ editing trace does not contain any critical events, so performance is the same as if the optimisations are disabled, whereas the fully sequential editing traces are processed approximately 15$times$ faster with these optimisations.
+The _A2_ editing trace does not contain any critical events, so performance is the same as if the optimisations are disabled, whereas the fully sequential editing traces are processed approximately 15$times$ faster with these optimisations.
 The concurrent trace used in @ff-memory has frequently occurring critical versions, allowing the optimisation to keep the internal state small.
 
 When processing an event graph with very high concurrency (like _git-makefile_), the performance of eg-walker is highly dependent on the order in which events are traversed.
@@ -905,33 +910,60 @@ However, the topological sort itself also takes time: in the _friendsforever_ an
 ) <chart-all-local>
 */
 
+
+== RAM usage
+
+In @chart-memusage we show the memory footprint (retained heap size) of each algorithm. The memory used by Eg-walker and OT is split into peak usage (during merging) and the steady state memory usage, after all incoming changes have been merged and the intermediate state is discarded.
+
+The OT implementation used here memoizes intermediate transformed operations to improve performance, but the memoization comes at the cost of dramatically higher memory usage. At peak this implementation used 6.8GB of RAM to merge these changes.
+
+Automerge is exceptionally memory inefficient. The best test for automerge (A1) required over 270MB of RAM. The worst required 44GB. The computer we used for benchmarking had enough RAM to prevent swapping.
+
+#figure(
+  text(7pt, charts.memusage_all),
+  caption: [
+    RAM used while replaying all editing traces. The Eg-walker and OT algorithms only need additional RAM while merging concurrent changes. Once all changes are merged, only the current document text is retained.
+  ],
+  kind: image,
+  placement: top,
+) <chart-memusage>
+
+
 == Storage size
 
 Our binary encoding of event graphs (@storage) results in smaller files than the equivalent internal CRDT state persisted by Automerge or Yjs.
-To ensure a like-for-like comparison we have disabled eg-walker's built-in LZ4 and Automerge's built-in gzip compression; enabling this compression further reduces the file sizes.
+To ensure a like-for-like comparison we have disabled Eg-walker's built-in LZ4 and Automerge's built-in gzip compression. Enabling this compression further reduces the file sizes.
+
 // TODO: instead of disabling compression in Automerge and DT, maybe it would be better to report the gzipped file size for all libraries? That will not change the Automerge/DT file size much, but it will reduce the Yjs file size to make a fair comparison.
+// (seph): No, that causes problems because of the repeated event graphs. Gzip is (sometimes) clever enough to compact the repeated events - but thats very algorithm dependant.
+
 
 Automerge also stores the full editing history of a document, and @chart-dt-vs-automerge shows the resulting file sizes relative to the raw concatenated text content of all insertions.
 In all of our traces, eg-walker has a significantly smaller file size, and the graph structure adds only modest overhead to the raw text.
 
-In contrast, Yjs does not store any deleted characters, which results in a smaller file size, at the cost of not being able to reconstruct past document states.
+// TODO: Is this worth adding?
+// Note that storing the raw editing trace in this compact form removes one of the principle benefits of Eg-walker, as the event graph must be replayed in order to determine the current document text. To improve load time, the current text content can be cached and stored alongside the event graph on disk. Alternately, the transformed operation positions can also be stored in the file. In our testing, this resulted in a tiny increase in file size while improving load performance by an order of magnitude.
+
+In contrast, Yjs does not store any deleted characters. This results in a smaller file size, at the cost of not being able to reconstruct past document states.
 To make the comparison fair, @chart-dt-vs-yjs compares Yjs to a variant of our event graph encoding in which the text content of deleted characters is omitted.
 Our encoding is smaller than Yjs on all traces, and the overhead of storing the event graph is between 20% and 3$times$ the final plain text file size.
 
 // TODO: why is git-makefile not included in this and the following figure?
 #figure(
   text(8pt, charts.filesize_full),
-  caption: [Relative file size storing edit traces using eg-walker's event graph encoding and Automerge.],
+  caption: [Relative file size storing edit traces using eg-walker's event graph encoding and Automerge. The raw size shown is the concatenated length of all inserted keystrokes - which acts as a lower bound on the file size in this test.],
   kind: image,
   placement: top,
 ) <chart-dt-vs-automerge>
 
 #figure(
   text(8pt, charts.filesize_smol),
-  caption: [File size of our event graph encoding in which deleted text content has been omitted, compared to the equivalent Yjs file size.],
+  caption: [File size of our event graph encoding in which deleted text content has been omitted, compared to the equivalent Yjs file size. The raw size shown here is the size of the final, stored document. This acts as a lower bound on the file size in all cases.],
   kind: image,
   placement: top,
 ) <chart-dt-vs-yjs>
+
+
 
 
 = Related Work <related-work>
@@ -997,6 +1029,7 @@ We also believe that eg-walker can be extended to other file types such as rich 
 #counter(heading).update(0)
 #set heading(numbering: "A", supplement: "Appendix")
 
+/*
 = Generic CRDT to replay algorithm <generic-crdt-replay>
 
 In this section, we present a generic replay function which matches the behaviour of any CRDT.
@@ -1068,6 +1101,7 @@ replayAll graph = replay graph (allIds graph)
 
 // CLAIM: Using an event graph, in combination with this replay function ($q$ = *replayAll*), this algorithm will generate the same document state at all times to the equivalent CRDT.
 
+*/
 
 = Benchmark Setup <benchmark-setup>
 
@@ -1091,188 +1125,6 @@ All time based measurements are based on the mean of at least 100 test iteration
 )
 
 Cola with cursor optimisation removed is available at `https://github.com/josephg/cola-nocursors/`. //#link(https://github.com/josephg/cola-nocursors/).
-
-/*
-#import "@preview/algorithmic:0.1.0"
-#import algorithmic: algorithm
-
-#algorithm({
-  import algorithmic: *
-  Function("ResetState", args: ("state",), {
-    Assign[state][dummy data]
-  })
-
-  Function("TransformPartial", args: ($G$, $V_0$, $V_m$), {
-    Assign[$s$][(dummy data)]
-    Assign[$C$][$"greatestCommonVersion"(G)$]
-
-    For(cond: [Event $(i, e_i, P_i) in "inOrderTraversal"(G, "from:" C, "to:" V_0)$], {
-      // Cmt[As above]
-      Fn[setPrepareVersion][$s$, $P_i$]
-      Assign([$m$], FnI[prepare][$s$, $i$, $e_i$])
-      Fn[effect][$s$, $m$]
-    })
-    For(cond: [Event $(i, e_i, P_i) in "inOrderTraversal"(G, "from:" V_0, "to:" V_0 union V_m)$], {
-      If(cond: [$"isCriticalVersion"(P_i)$], {
-        Assign[$s$][(dummy data)]
-        If(cond: [$"isCriticalVersion"({i})$], {
-          State[#smallcaps("yield") $e_i$]
-          State(smallcaps("Continue"))
-        })
-      })
-
-      Fn[setPrepareVersion][$s$, $P_i$]
-      Assign([$m$], FnI[prepare][$s$, $i$, $e_i$])
-      State[#smallcaps("yield") #FnI[effect][$s$, $m$]]
-    })
-  })
-})
-*/
-
-/*
-== Example optimised version_contains_ID function <example-localid-algorithm>
-
-> Blah that section title.
-
-This is an optimised function for checking if a version contains some local ID. Ie, this function checks if $i in ceil(V)$ for some event $i$ and some version $V$.
-
-The algorithm does a bounded breadth first search within the event graph, checking events where:
-
-- The event is within $ceil(V)$
-- The local ID of the event is $>=$ the local ID of the search target.
-
-For simplicity, the algorithm given below does not take advantage of run-length encoding. In our implementation, we also run-length encode all items in the event graph. This optimisation yields another large performance gain at the cost of some implementation complexity.
-
-We have implemented a family of similar algorithms for querying the event graph, including functions to find the set difference, set union and set intersection between versions. See XXXX github.com/josephg/causal-graphs / diamond-types/src/cg/graph/tools.rs . TODO
-
-```typescript
-function versionContainsLocalId(graph: EventGraph, version: LocalID[], target: LocalId): boolean => {
-  // Max heap. The highest local ID is removed first.
-  let queue = new PriorityQueue<LocalID>()
-
-  // Any ID < target is not relevant due to the ordering constraint.
-  for (let id of version) {
-    if (id == target) return true
-    else if (id > target) queue.enq(id)
-  }
-
-  while (queue.length > 0) {
-    let id = queue.deq()
-    if (id === target) return true
-
-    // Clear any other queue items pointing to this entry.
-    while (queue.peek() == id) queue.deq()
-
-    for (let p of graph.getParents(id)) {
-      if (p === target) return true
-      else if (p > target) queue.enq(p)
-    }
-  }
-
-  return false
-}
-
-```
-
-*/
-
-/*
-== Optimised diff function using local IDs <diff>
-
-This is an optimised graph diff function. It computes the difference between the graphs $ceil(V_1)$ and $ceil(V_2)$, and returns the sets of event IDs that are only in $V_1$ and only in $V_2$.
-
-This algorithm takes advantage of local IDs to compute the set difference efficiently.
-
-For simplicity, the algorithm given here does not take advantage of run-length encoding. In our implementation, we also run-length encode all items in the event graph. This optimisation yields another large performance gain at the cost of some implementation complexity. See XXXX github.com/josephg/causal-graphs . TODO
-
-```typescript
-type LocalId = number // Local IDs are just integers.
-enum Flag { V1Only, V2Only, Shared }
-
-function diff(graph: EventGraph, v1: LocalId[], v2: LocalId[]) {
-  // Max heap. The highest local ID is removed first.
-  let queue = new PriorityQueue<(LocalId, Flag)>()
-
-  // Number of items in the queue in both transitive histories (state Shared).
-  let numShared = 0
-
-  for (let id of v1) queue.push((id, Flag.V1Only))
-  for (let id of v2) queue.push((id, Flag.V2Only))
-
-  let v1Only = [], v2Only = []
-
-  // Loop until everything is shared.
-  while (queue.size() > numShared) {
-    let (id, flag) = queue.pop()
-    if (flag === Flag.Shared) numShared--
-
-    // If the next item in the queue
-    while (!queue.isEmpty() && queue.peek().0 == id) {
-      let (_, flag2) = queue.pop() // Remove the item
-      if (flag2 === Flag.Shared) numShared--;
-      if (flag2 !== flag) flag = Flag.Shared
-    }
-
-    if (flag == Flag.V1Only) v1Only.push(id)
-    if (flag == Flag.V2Only) v2Only.push(id)
-
-    for (let p of graph.getParents(id)) queue.push((p, flag))
-    if (flag == Flag.Shared) numShared += cg.getParents(id).length
-  }
-
-  return {v1Only, v2Only}
-}
-
-```
-
-*/
-
-/*
-== The List formulation of FugueMax <list-fuguemax-code>
-
-The function below is a reimplementation of the logic of FugueMax, expressed as a list insertion. See @fugue-list above for commentary.
-
-```typescript
-function integrate(ctx: EditContext, cg: causalGraph.CausalGraph, newItem: Item, cursor: DocCursor) {
-  if (cursor.idx >= ctx.items.length || ctx.items[cursor.idx].curState !== ItemState.NotYetInserted) return
-
-  let scanning = false
-  let scanIdx = cursor.idx
-  let scanEndPos = cursor.endPos
-
-  let leftIdx = cursor.idx - 1
-  let rightIdx = newItem.rightParent === -1 ? ctx.items.length : findItemIdx(ctx, newItem.rightParent)
-
-  while (scanIdx < ctx.items.length) {
-    let other = ctx.items[scanIdx]
-
-    if (other.opId === newItem.rightParent) throw Error('invalid state')
-
-    // The index of the origin left / right for the other item.
-    let oleftIdx = other.originLeft === -1 ? -1 : findItemIdx(ctx, other.originLeft)
-    if (oleftIdx < leftIdx) break
-    else if (oleftIdx === leftIdx) {
-      let orightIdx = other.rightParent === -1 ? ctx.items.length : findItemIdx(ctx, other.rightParent)
-
-      if (orightIdx === rightIdx && causalGraph.lvCmp(cg, newItem.opId, other.opId) < 0) break
-      else scanning = orightIdx < rightIdx
-    }
-
-    scanEndPos += itemWidth(other.endState)
-    scanIdx++
-
-    if (!scanning) {
-      cursor.idx = scanIdx
-      cursor.endPos = scanEndPos
-    }
-  }
-
-  // We've found the position. Insert where the cursor points.
-  ctx.insert(newItem, cursor)
-}
-```
-*/
-
 
 // TODO: proofs.
 // "given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event" (end of Section 2)

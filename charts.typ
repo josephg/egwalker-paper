@@ -9,13 +9,17 @@
 )
 
 #let algorithms = (
-  "dt", "dtcrdt", "ot", "yjs", "automerge"
+  "dt",
+  "ot",
+  "dtcrdt",
+  "yjs",
+  "automerge"
 )
 
 #let algnames = (
-  dt: "Egwalker",
-  dtcrdt: "reference-CRDT",
+  dt: "Eg-walker",
   ot: "OT",
+  dtcrdt: "Reference CRDT",
   yjs: "Yjs",
   automerge: "Automerge"
 )
@@ -181,7 +185,7 @@
     size: (7, 4),
     // x-tick-step: 2,
     x-min: -0.02,
-    x-max: 1000,
+    x-max: 700,
     label-key: 0,
     value-key: (..range(1, 8)),
     // value-key: (..range(1, 4)),
@@ -239,10 +243,10 @@
 )
 
 #let all_mem_names = (
-  dt_steady: "Egwalker (steady state)",
-  dt_peak: "Egwalker (peak)",
-  ot_steady: "OT (steady state)",
+  dt_peak: "Eg-walker (peak)",
+  dt_steady: "Eg-walker (steady)",
   ot_peak: "OT (peak)",
+  ot_steady: "OT (steady)",
 
   dtcrdt: algnames.dtcrdt,
   yjs: algnames.yjs,
@@ -336,6 +340,7 @@
     mode: "clustered",
     // mode: "basic",
     size: (7, 4),
+    x-tick-step: 10,
     // x-tick-step: 0.5,
     // x-tick-step: 50,
     x-min: -0.1,
@@ -379,6 +384,10 @@
   dt: datasets.map(ds => dt_stats.at(ds).uncompressed_size / mb),
   automerge: datasets.map(ds => yjs_am_sizes.at(ds).automergeUncompressed / mb),
 )
+#let smol_filesizes = (
+  dt: datasets.map(ds => dt_stats.at(ds).uncompressed_smol_size / mb),
+  yjs: datasets.map(ds => yjs_am_sizes.at(ds).yjs / mb),
+)
 
 #let filesize_full = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
@@ -412,17 +421,55 @@
     // x-unit: [x],
     x-label: [File size in MB (lower is better)],
     // x-label: text(10pt, [% file size overhead compared to total inserted content length. (Smaller is better)]),
-    ("dt", "automerge").map(alg => (
-      algnames.at(alg),
-      big_filesizes.at(alg),
-    ).flatten()),
-    // (
-    //   "S1", "S2", "S3", "C1", "C2", "A1", "A2"
-    // ).map(name => (
-    //   name,
-    //   dt_stats.at(name).uncompressed_size / mb,
-    //   yjs_am_sizes.at(name).automergeUncompressed / mb,
-    // )),
+    (
+      ("(Raw size)", ..datasets.map(ds => dt_stats.at(ds).ins_content_len_utf8 / mb)),
+      ..("dt", "automerge").map(alg => (
+        algnames.at(alg),
+        big_filesizes.at(alg),
+      ).flatten())
+    ),
+  )
+})
+
+#let filesize_smol = canvas(length: 1cm, {
+  draw.set-style(barchart: barchart_style)
+  draw.set-style(barchart: ( legend: (
+    // default-position: "legend.north-east",
+    default-position: "legend.inner-north-east",
+  )))
+  chart.barchart(
+    mode: "clustered",
+    // mode: "basic",
+    size: (7, 4),
+    x-tick-step: 0.5,
+    // x-tick-step: 50,
+    x-min: -0.002,
+    x-max: 3,
+    label-key: 0,
+    // value-key: (..range(1, 6)),
+    value-key: (..range(1, 8)),
+    axis-style: "scientific",
+    bar-style: (idx) => (
+      stroke: 0.1pt + black,
+      fill: dscolors.at(datasets.at(idx))
+      // fill: (red, green, blue, yellow).at(idx),
+    ),
+    // plot-args: (
+    //   plot-style: black
+    // ),
+    labels: (
+      // [Eg-walker (full)], [Automerge]
+    ),
+    // x-unit: [x],
+    x-label: [File size in MB (lower is better)],
+    // x-label: text(10pt, [% file size overhead compared to total inserted content length. (Smaller is better)]),
+    (
+      ("(Raw size)", ..datasets.map(ds => dt_stats.at(ds).final_doc_len_utf8 / mb)),
+      ..("dt", "yjs").map(alg => (
+        algnames.at(alg),
+        smol_filesizes.at(alg),
+      ).flatten())
+    ),
   )
 })
 
@@ -475,7 +522,7 @@
   )
 })
 
-#let filesize_smol = canvas(length: 1cm, {
+#let filesize_smol2 = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   draw.set-style(barchart: ( legend: (
     // default-position: "legend.north-east",
