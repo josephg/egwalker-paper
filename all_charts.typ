@@ -7,8 +7,9 @@
 
 === ff_chart
 #charts.ff_chart
-=== speed_remote
-#charts.speed_remote
+=== speed_merge
+#charts.speed_merge
+#charts.speed_load
 === speed_ff
 #charts.speed_ff
 

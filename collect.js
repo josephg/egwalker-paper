@@ -17,6 +17,7 @@ const tests = {
     'dt/merge_norm',
     'dt/ff_on',
     'dt/ff_off',
+    'dt/opt_load',
 
     'dt/local',
     'dt/local_rle',

@@ -336,6 +336,8 @@ fn measure_memory() {
     println!("JSON written to {filename}");
 }
 
+const DATASETS: &[&str] = &["S1", "S2", "S3", "C1", "C2", "A1", "A2"];
+
 fn main() {
     #[cfg(feature = "memusage")]
     measure_memory();
@@ -351,7 +353,7 @@ fn main() {
         // for name in ["clownschool", "friendsforever", "node_nodecc", "git-makefile"] {
         // for name in ["A2"] {
         // for name in ["S1", "S2", "S3", "C1", "C2", "A1"] {
-        for name in ["S1", "S2", "S3", "C1", "C2", "A1", "A2"] {
+        for &name in DATASETS {
             let mut group = c.benchmark_group("ot");
             let test_data = load_data(name);
 
@@ -372,6 +374,8 @@ fn main() {
                     black_box(s);
                 })
             });
+
+            group.finish();
         }
 
         c.final_summary();

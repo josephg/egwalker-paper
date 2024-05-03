@@ -128,7 +128,7 @@
 )
 
 #let timings = json("results/timings.json")
-#let time_taken = (
+#let merge_times = (
   // "dt", "ot", "dtcrdt", "yjs", "automerge"
   dt: timings.dt_merge_norm,
   ot: timings.ot,
@@ -136,7 +136,38 @@
   yjs: timings.yjs_remote,
   automerge: timings.automerge_remote,
 )
+#let load_times = (
+  dt: timings.dt_opt_load,
+  ot: timings.dt_opt_load,
+  dtcrdt: merge_times.dtcrdt,
+  yjs: merge_times.yjs,
+  automerge: merge_times.automerge,
+)
 
+#let am(items) = {
+  let sum = items.sum()
+  return sum / items.len()
+}
+#let gm(items) = {
+  let prod = items.product()
+  return calc.root(prod, items.len())
+}
+
+#let map_dict(d, f) = {
+  let result = (:)
+  for (key, val) in d.pairs() {
+    result.insert(key, f(val))
+  }
+  return result
+}
+
+#let avg_opt_load_time = am(timings.dt_opt_load.values())
+
+// #let xxx = map_dict(("hi": 3), x => x + 1)
+
+// #let x = algorithms.map(alg => gm(merge_times.at(alg).values()))
+// #let x = map_dict(merge_times, t => gm(t.values()))
+#let avg_times = map_dict(merge_times, t => am(t.values()))
 
 #let speed_ff = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
@@ -177,7 +208,7 @@
   )
 })
 
-#let speed_remote = canvas(length: 1cm, {
+#let speed_merge = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   chart.barchart(
     mode: "clustered",
@@ -204,10 +235,45 @@
       // [dt-crdt], [dt]
     ),
     // x-unit: [x],
-    x-label: [Replay time taken in milliseconds (lower is better)],
+    x-label: [Merge time taken in milliseconds (lower is better)],
     algorithms.map(alg => (
       algnames.at(alg),
-      datasets.map(name => time_taken.at(alg).at(name)),
+      datasets.map(name => merge_times.at(alg).at(name)),
+    ).flatten()),
+  )
+})
+
+#let speed_load = canvas(length: 1cm, {
+  draw.set-style(barchart: barchart_style)
+  chart.barchart(
+    mode: "clustered",
+    // mode: "basic",
+    size: (7, 4),
+    // x-tick-step: 2,
+    x-min: -0.02,
+    x-max: 700,
+    label-key: 0,
+    value-key: (..range(1, 8)),
+    // value-key: (..range(1, 4)),
+    axis-style: "scientific",
+    bar-style: idx => (
+      stroke: 0.1pt + black,
+      fill: dscolors.at(datasets.at(idx))
+    ),
+    // plot-args: (
+    //   plot-style: black
+    // ),
+    labels: (
+      // [eg-walker],
+      // [dt-crdt],
+      // [automerge]
+      // [dt-crdt], [dt]
+    ),
+    // x-unit: [x],
+    x-label: [Load time in milliseconds (lower is better)],
+    algorithms.map(alg => (
+      algnames.at(alg),
+      datasets.map(name => load_times.at(alg).at(name)),
     ).flatten()),
   )
 })
@@ -230,6 +296,11 @@
   yjs: yjsmem,
   automerge: ammem,
 )
+
+#let avg_mem = map_dict(mem_data, m => (
+  steady_state: am(m.values().map(x => x.steady_state)),
+  peak: am(m.values().map(x => x.peak)),
+))
 
 #let all_mem_data = (
   dt_steady: datasets.map(ds => dtmem.at(ds).steady_state),
@@ -384,6 +455,10 @@
   dt: datasets.map(ds => dt_stats.at(ds).uncompressed_size / mb),
   automerge: datasets.map(ds => yjs_am_sizes.at(ds).automergeUncompressed / mb),
 )
+#let big_filesizes_overhead = (
+  dt: datasets.map(ds => (dt_stats.at(ds).uncompressed_size - dt_stats.at(ds).ins_content_len_utf8) / mb),
+  automerge: datasets.map(ds => (yjs_am_sizes.at(ds).automergeUncompressed - dt_stats.at(ds).ins_content_len_utf8) / mb),
+)
 #let smol_filesizes = (
   dt: datasets.map(ds => dt_stats.at(ds).uncompressed_smol_size / mb),
   yjs: datasets.map(ds => yjs_am_sizes.at(ds).yjs / mb),
@@ -425,11 +500,53 @@
       ("(Raw size)", ..datasets.map(ds => dt_stats.at(ds).ins_content_len_utf8 / mb)),
       ..("dt", "automerge").map(alg => (
         algnames.at(alg),
-        big_filesizes.at(alg),
-      ).flatten())
+        ..big_filesizes.at(alg),
+      ))
     ),
   )
 })
+
+// #let filesize_full = canvas(length: 1cm, {
+//   draw.set-style(barchart: barchart_style)
+//   draw.set-style(barchart: ( legend: (
+//     // default-position: "legend.north-east",
+//     default-position: "legend.inner-north-east",
+//   )))
+//   chart.barchart(
+//     mode: "clustered",
+//     // mode: "basic",
+//     size: (7, 4),
+//     x-tick-step: 0.5,
+//     // x-tick-step: 50,
+//     x-min: -0.004,
+//     x-max: 4,
+//     label-key: 0,
+//     // value-key: (..range(1, 6)),
+//     value-key: (..range(1, 8)),
+//     axis-style: "scientific",
+//     bar-style: (idx) => (
+//       stroke: 0.1pt + black,
+//       fill: dscolors.at(datasets.at(idx))
+//       // fill: (red, green, blue, yellow).at(idx),
+//     ),
+//     // plot-args: (
+//     //   plot-style: black
+//     // ),
+//     labels: (
+//       // [Eg-walker (full)], [Automerge]
+//     ),
+//     // x-unit: [x],
+//     x-label: [File size in MB (lower is better)],
+//     // x-label: text(10pt, [% file size overhead compared to total inserted content length. (Smaller is better)]),
+//     (
+//       ("(Raw size)", ..datasets.map(ds => dt_stats.at(ds).ins_content_len_utf8 / mb)),
+//       ..("dt", "automerge").map(alg => (
+//         algnames.at(alg),
+//         big_filesizes.at(alg),
+//       ).flatten())
+//     ),
+//   )
+// })
 
 #let filesize_smol = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
