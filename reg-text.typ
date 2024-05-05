@@ -114,19 +114,21 @@
 #heading(numbering: none, [Abstract])
 
 Collaborative text editing algorithms allow several users to concurrently modify a text file, and automatically merge concurrent edits into a consistent state.
-Existing collaboration algorithms are either slow to merge files that have diverged substantially due to offline editing (in the case of Operational Transformation/OT), or incur overheads due to giving a unique ID to every character (in the case of CRDTs).
-We introduce #algname, a collaboration algorithm for text that achieves the best of both the OT and the CRDT worlds: it avoids the overheads of CRDTs while simultaneously offering fast merges.
-Our implementation of #algname outperforms existing CRDT and OT algorithms in most editing scenarios, while also using less memory, having smaller file sizes, and supporting peer-to-peer collaboration without a central server.
-*(TODO: quantify the performance improvement?)*
+Existing algorithms fall in two categories: Operational Transformation (OT) algorithms are slow to merge files that have diverged substantially due to offline editing; CRDTs are slow to load and consume a lot of memory.
+We introduce #algname, a collaboration algorithm for text that avoids these weaknesses.
+Compared to existing CRDTs, it consumes an order of magnitude less memory in the steady state, and loading a document from disk is orders of magnitude faster.
+Compared to OT, merging long-running branches is orders of magnitude faster.
+In the worst case, the merging performance of #algname is comparable with existing CRDT algorithms.
+#algname can be used everywhere CRDTs are used, including peer-to-peer systems without a central server.
 By offering performance that is competitive with centralised algorithms, our result paves the way towards the widespread adoption of peer-to-peer collaboration software.
 
 
 = Introduction <introduction>
 
-Real-time collaborative editing has become an essential feature for many types of software, including document editors such as Google Docs, Microsoft Word, or Overleaf, and graphics software such as Figma.
+Real-time collaboration has become an essential feature for many types of software, including document editors such as Google Docs, Microsoft Word, or Overleaf, and graphics software such as Figma.
 In such software, each user's device locally maintains a copy of the shared file (e.g. in a tab of their web browser).
-A user's edits to the file are immediately applied to their own local copy, without waiting for a network round-trip, in order to ensure that the user interface is responsive regardless of network latency.
-Different users may therefore make edits concurrently, and the software must merge such concurrent edits in a way that preserves the users' intentions, and ensuring that all devices converge towards the same state.
+A user's edits are immediately applied to their own local copy, without waiting for a network round-trip, so that the user interface is responsive regardless of network latency.
+Different users may therefore make edits concurrently, and the software must merge such concurrent edits in a way that preserves the users' intentions, and ensure that all devices converge to the same state.
 
 For example, in @two-inserts, two users initially have the same document "Helo".
 User 1 inserts a second letter "l" at index 3, while concurrently user 2 inserts an exclamation mark at index 4.
@@ -158,45 +160,46 @@ Due to the concurrent insertion at an earlier index, user 1 must insert the excl
 One way of solving this problem is to use _Operational Transformation_ (OT): when user 1 receives $italic("Insert")(4, \"!\")$ that operation is transformed with regard to the concurrent insertion at index 3, which increments the index at which the exclamation mark is inserted.
 OT is an old and widely-used technique: it was introduced in 1989 @Ellis1989, and the OT algorithm Jupiter @Nichols1995 forms the basis of real-time collaboration in Google Docs @DayRichter2010.
 
-
 // Seph: I'm not sure how much people care about the theoretical complexity of OT this early in the paper. Might be better to ground it in some real world benchmarking.
 OT is simple and fast in the case of @two-inserts, where each user performed only one operation since the last version they had in common.
-In general, if user 1 performed $k$ operations and user 2 performed $m$ operations since their last common version, merging their states using OT has a cost of at least $O(k m)$, since each of the $k$ operations must be transformed with respect to each of the $m$ operations and vice versa.
-Some OT algorithms have a complexity that is quadratic or even cubic in the number of operations performed by each user @Li2006 @Roh2011RGA @Sun2020OT.
-This is acceptable for online collaboration where $k$ and $m$ are typically small, but if users may edit a document offline or if the software supports explicit branching and merging workflows @Upwelling, an algorithm with complexity $O(k m)$ can become impracticably slow.
+In general, if the users each performed $n$ operations since their last common version, merging their states using OT has a cost of at least $O(n^2)$, since each of one user's operations must be transformed with respect to all of the other user's operations.
+Some OT algorithms have a merge complexity that is cubic or even slower @Li2006 @Roh2011RGA @Sun2020OT.
+This is acceptable for online collaboration where $n$ is typically small, but if users may edit a document offline or if the software supports explicit branching and merging workflows @Upwelling, an algorithm with complexity $O(n^2)$ can become impracticably slow.
+In @benchmarking we show a real-life example document that takes one hour to merge using OT.
 
 _Conflict-free Replicated Data Types_ (CRDTs) have been proposed as an alternative to OT.
 The first CRDT for collaborative text editing appeared in 2006 @Oster2006WOOT, and over a dozen text CRDTs have been published since @crdt-papers.
-These algorithms work by giving each character a unique identifier, and using those IDs instead of integer indexes to identify the position of insertions and deletions in the document.
-This avoids having to transform operations (since IDs are not affected by concurrent operations), but storing and transmitting those IDs introduces overhead.
-// This can be slow and expensive.
-Moreover, some CRDT algorithms need to retain IDs of deleted characters (_tombstones_), which introduces further overhead.
-// The full set of IDs typically needs to be loaded into memory during editing sessions to allow edits to be converted to the CRDT's native format.
-// In our testing, we have found even industry leading CRDT algorithms (such as Automerge and Yjs)
+These algorithms work by giving each character a unique identifier, and using those IDs instead of integer indexes to identify the position of insertions and deletions.
+This avoids having to transform operations, since IDs are not affected by concurrent operations.
+Unfortunately, these IDs need to be held in memory while a document is being edited; even with careful optimisation, this metadata uses more than 10 times more memory than the document text, and makes documents much slower to load from disk.
+Some CRDT algorithms also need to retain IDs of deleted characters (_tombstones_).
 
-In this paper we propose #if anonymous { algname } else { [_Event Graph Walker_ (#algname)] }, an approach to collaborative editing that combines the strengths of OT and CRDT in a single algorithm.
-Like OT, #algname uses integer indexes to identify insertion and deletion positions, and it avoids the overheads of CRDTs at times when there is no concurrency.
-When two users concurrently perform $k$ and $m$ operations respectively, #algname can merge them at a cost of $O((k+m) log (k+m))$, which is much faster than the cost of $O(k m)$ or worse incurred by OT algorithms.
+In this paper we propose #if anonymous { algname } else { [_Event Graph Walker_ (#algname)] }, a collaborative editing algorithm that has the strengths of both OT and CRDTs but not their weaknesses.
+Like OT, #algname uses integer indexes to identify insertion and deletion positions, and transforms those indexes to merge concurrent operations.
+When two users concurrently perform $n$ operations each, #algname can merge them at a cost of $O(n log n)$, much faster than OT's cost of $O(n^2)$ or worse.
 
-To merge concurrent operations, #algname must also transform the indexes of insertions and deletions like in @two-inserts.
-Instead of transforming one operation with respect to one other operation, as in OT, #algname transforms sets of concurrent operations by first building a temporary data structure that reflects all of the operations that have occurred since the last version they had in common, and then using that structure to transform each operation.
-In fact, we use a CRDT to implement this data structure.
-However, unlike existing algorithms, we only invoke the CRDT to perform merges, and we avoid the CRDT overhead whenever operations are not concurrent (which is the common case in most editing workflows).
-Moreover, we use the CRDT only temporarily for merges; we never write CRDT data to disk and never send it over the network.
+#algname merges concurrent edits using a CRDT algorithm we designed.
+Unlike existing algorithms, we invoke the CRDT only to perform merges of concurrent operations, and we discard its state as soon as the merge is complete.
+We never write the CRDT state to disk and never send it over the network.
+While a document is being edited, we only hold the document text in memory, but no CRDT metadata.
+Most of the time, #algname therefore uses 1–2 orders of magnitude less memory than a CRDT.
+During merging, when #algname temporarily uses more memory, its peak memory use is comparable to the best known CRDT implementations.
 
-The fact that both sequential operations and large merges are fast makes #algname suitable for both real-time collaboration and offline work.
-#algname also assumes no central server, so it can be used over a peer-to-peer network.
+#algname assumes no central server, so it can be used over a peer-to-peer network.
 Although all existing CRDTs and a few OT algorithms can be used peer-to-peer, most of them have poor performance compared to the centralised OT used in production software such as Google Docs.
 In contrast, #algname's performance matches or surpasses that of centralised algorithms.
 It therefore paves the way towards the widespread adoption of peer-to-peer collaboration software, and perhaps overcoming the dominance of centralised cloud software that exists in the market today.
 
-In this paper we focus on collaborative editing of plain text files, although we believe that our approach could be generalised to other file types such as rich text, spreadsheets, graphics, presentations, CAD drawings, etc.
+Collaboration on plain text files is the first application for #algname.
+We believe that our approach can be generalised to other file types such as rich text, spreadsheets, graphics, presentations, CAD drawings, and more.
+More generally, #algname provides a framework for efficient coordination-free distributed systems, in which nodes can always make progress independently, but converge eventually @Hellerstein2010.
 
 This paper makes the following contributions:
 
-- TODO
-- We introduce the #algname algorithm.
-- In @benchmarking we evaluate the performance of #algname, comparing it to equivalent CRDT based approaches on file size, CPU time and memory usage in real world editing environments. #algname is usually faster and smaller than equivalent CRDT based approaches in our real world data sets. However, in our testing we have found modern CRDTs outperform #algname in case of extreme concurrency (for example, very complex git editing histories).
+- In @algorithm we introduce #algname, a hybrid CRDT/OT algorithm for text that is faster and has a vastly smaller memory footprint than existing CRDTs.
+- Since there is no established benchmark for collaborative text editing, we are also publishing a suite of editing traces of text files for benchmarking. They are derived from real documents and demonstrate various patterns of sequential and concurrent editing.
+- In @benchmarking we use those editing traces to evaluate the performance of our implementation of #algname, comparing it to selected CRDTs and an OT implementation. We measure CPU time to load a document, CPU time to merge edits from a remote replica, memory usage, and file size. #algname improves the state of the art by orders of magnitude in the best cases, and is only slightly slower in the worst cases.
+- We prove the correctness of #algname in @proofs.
 
 = Background
 
@@ -320,10 +323,12 @@ Regardless of whether the OT or the CRDT approach is used, a collaborative editi
 // (seph): ^-- this is a very bold statement.
 
 #if anonymous {
-  [= The #algname algorithm]
+  [= The #algname algorithm <algorithm>]
 } else {
-  [= The Event Graph Walker algorithm]
+  [= The Event Graph Walker algorithm <algorithm>]
 }
+
+// While OT transforms one operation with respect to one other operation, #algname builds a temporary data structure that reflects the concurrent edits, and uses it to operations efficiently.
 
 #algname is a collaborative text editing algorithm based on the idea of event graph replay.
 The algorithm builds on a replication layer that ensures that whenever a replica adds an event to the graph, all non-crashed replicas eventually receive it.
@@ -1056,6 +1061,7 @@ We also believe that #algname can be extended to other file types such as rich t
   #heading(numbering: none, [Acknowledgements])
 
   This work was made possible by the generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have been possible without financial support and the endless conversations we have shared about collaborative editing.
+  Thank you to Matthew Weidner and Joe Hellerstein for feedback on a draft of this paper.
 ]
 
 #show bibliography: set text(8pt)
@@ -1166,5 +1172,8 @@ All benchmark code and data is available on Github. We tested the following vers
 
 Cola with cursor optimisation removed is available at `https://github.com/josephg/cola-nocursors/`. //#link(https://github.com/josephg/cola-nocursors/).
 
-// TODO: proofs.
+= Proof of Correctness <proofs>
+
+TODO
+
 // "given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event" (end of Section 2)
