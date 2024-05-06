@@ -38,13 +38,13 @@
 )
 
 #let dscolors = (
-  S1: rgb("#4269d0"),
-  S2: rgb("#4269d0"),
-  S3: rgb("#4269d0"),
-  C1: rgb("#efb118"),
-  C2: rgb("#efb118"),
-  A1: rgb("#ff725c"),
-  A2: rgb("#ff725c"),
+  S1: rgb("#1b9e77"),
+  S2: rgb("#1b9e77"),
+  S3: rgb("#1b9e77"),
+  C1: rgb("#d95f02"),
+  C2: rgb("#d95f02"),
+  A1: rgb("#7570b3"),
+  A2: rgb("#7570b3"),
 )
 
 #let p1_ff = json("results/xf-node_nodecc-ff.json")
