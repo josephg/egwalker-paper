@@ -1,30 +1,30 @@
 {
-  "A1": {
-    "steady_state": 8781358,
-    "peak": 10103206
-  },
-  "A2": {
-    "steady_state": 5924560,
-    "peak": 6551248
-  },
-  "S3": {
-    "steady_state": 7039496,
-    "peak": 7358984
+  "C1": {
+    "steady_state": 30859748,
+    "peak": 37049676
   },
   "S2": {
-    "steady_state": 7689316,
-    "peak": 7975012
+    "steady_state": 8465292,
+    "peak": 8750988
   },
-  "C1": {
-    "steady_state": 29507252,
-    "peak": 34909996
+  "S3": {
+    "steady_state": 7972816,
+    "peak": 8292304
   },
   "C2": {
-    "steady_state": 32420014,
-    "peak": 33369262
+    "steady_state": 34035030,
+    "peak": 34984278
+  },
+  "A1": {
+    "steady_state": 10316886,
+    "peak": 11706702
+  },
+  "A2": {
+    "steady_state": 6475448,
+    "peak": 7102136
   },
   "S1": {
-    "steady_state": 11365472,
-    "peak": 14052640
+    "steady_state": 11661256,
+    "peak": 14375368
   }
 }
