@@ -110,6 +110,7 @@ const plotTimes = () => {
     },
     x: {
       label: 'Merge time taken (milliseconds) (less is better)',
+      fontSize: "20px",
       grid: true,
       domain: [baseline, 37000000],
       // type: 'linear',
@@ -117,6 +118,7 @@ const plotTimes = () => {
       type: 'log',
       axis: 'bottom',
       tickSpacing: 50,
+      // marginBottom: 40,
       // labelOffset: 40,
       // tickFormat: '1s',
       // tickSize: 4,
@@ -156,7 +158,7 @@ const plotTimes = () => {
         anchor: 'left',
         tickFormat: (d, i, _) => algnames[d],
       }),
-      Plot.ruleX([60], {stroke: '#800000', strokeOpacity: 0.5}),
+      Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5}),
       Plot.tickX(data, {fy: 'type', x: "val", y: "dataset"}),
       Plot.text(data, {
         y: 'dataset', fy: 'type',
