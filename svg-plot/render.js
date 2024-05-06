@@ -83,7 +83,7 @@ const plotTimes = () => {
     document: window.document,
     // marginLeft: 130,
     marginLeft: 85,
-    marginRight: 60,
+    // marginRight: 60,
     // marginBottom: 40,
     width: 500,
     height: 400,
@@ -105,8 +105,8 @@ const plotTimes = () => {
       // domain: data.map(d => d.dataset),
       axis: null,
       // tickFormat: 's',
-      // inset: 1,
-      
+      // inset: 0.1,
+
     },
     x: {
       label: 'Merge time taken (milliseconds) (less is better)',
@@ -116,10 +116,11 @@ const plotTimes = () => {
       // nice: true,
       type: 'log',
       axis: 'bottom',
+      tickSpacing: 50,
       // labelOffset: 40,
       // tickFormat: '1s',
       // tickSize: 4,
-      tickSpacing: 50,
+      // tickSpacing: 40,
       // strokeOpacity: 1,
       // tickFormat: (a, b, c) => `${formatMs(a)}`,
     },
@@ -127,12 +128,17 @@ const plotTimes = () => {
       scheme: "Dark2"
     },
     marks: [
+      Plot.gridX({
+        strokeWidth: 0.5,
+        strokeOpacity: 0.15,
+        tickSpacing: 45,
+      }),
       // Plot.axisY({
       //   textAnchor: 'start',
       //   fill: 'white',
       //   dx: 10,
       // }),
-      // Plot.frame(),
+      // Plot.frame({fy: 'dt'}),
       Plot.barX(data, {
         y: 'dataset',
         fy: 'type',
@@ -170,7 +176,7 @@ const plotTimes = () => {
         fill: 'white',
       }),
       // Plot.text(data, {y: 'dataset', fy: 'type', text: (d) => (d.val * 100).toFixed(1), dx: -6, lineAnchor: "bottom"}),
-      
+
       // Plot.text(data, {
       //   text: d => `${Math.floor(d.value / 1000)} ms`,
       //   y: "type",
@@ -180,7 +186,7 @@ const plotTimes = () => {
       //   fill: "white"
       // }),
       // Plot.text(data, {x: 'val', y: 'type', text: 'asdf', textAnchor: 'end', dx: 5}),
-      Plot.ruleX([baseline]),
+      Plot.ruleX([baseline], {strokeWidth: 1.5}),
       // Plot.ruleY([0]),
     ]
   })
