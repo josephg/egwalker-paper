@@ -208,7 +208,8 @@
   )
 })
 
-#let speed_merge = canvas(length: 1cm, {
+#let speed_merge = image("diagrams/test.svg")
+#let speed_merge_ = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   chart.barchart(
     mode: "clustered",

@@ -14,6 +14,18 @@
 #charts.speed_ff
 
 
+#figure(
+  image("diagrams/test.svg", width: 50%),
+  // text(8pt, charts.speed_ff),
+  caption: [
+    Time taken for alg to replay an event graph, with and without the optimisations from xxx.
+  ],
+  kind: image,
+  placement: top,
+) <speed-ff>
+
+
+
 // === all_speed_remote:
 // #charts.all_speed_remote
 
