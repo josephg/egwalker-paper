@@ -15,7 +15,7 @@ for (const d of DATASETS) {
   })
 }
 
-saveReportsSync('../paper-benchmarks/results/js.json')
+saveReportsSync('../../results/js.json')
 reportTable()
 
 // for (const d of DATASETS) {
