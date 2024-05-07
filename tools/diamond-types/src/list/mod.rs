@@ -117,9 +117,9 @@ pub struct ListOpLog {
 
     /// This contains all content ever inserted into the document, in time order (not document
     /// order). This object is indexed by the operation set.
-    pub(crate) operation_ctx: ListOperationCtx,
+    pub operation_ctx: ListOperationCtx,
     // TODO: Replace me with a compact form of this data.
-    pub(crate) operations: RleVec<KVPair<ListOpMetrics>>,
+    pub operations: RleVec<KVPair<ListOpMetrics>>,
 
     // /// This is the LocalVersion for the entire oplog. So, if you merged every change we store into
     // /// a branch, this is the version of that branch.

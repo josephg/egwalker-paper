@@ -9,13 +9,13 @@ const fs = require('fs')
 // ]
 const datasets = ["S1", "S2", "S3", "C1", "C2", "A1", "A2"]
 // const datasetsAmYjs = ['automerge-paper', 'seph-blog1', 'clownschool', 'friendsforever', 'node_nodecc', 'egwalker']
-const datasetsAmYjs = datasets
+
 const tests = {
   // 'automerge-converter': ['automerge/remote'],
   'diamond-types': [
     // 'dt/merge', // DEPRECATED.
     'dt/merge_norm',
-    'dt/ff_on',
+    // 'dt/ff_on',
     'dt/ff_off',
     'dt/opt_load',
 

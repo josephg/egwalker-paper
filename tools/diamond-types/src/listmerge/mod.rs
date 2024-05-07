@@ -20,7 +20,7 @@ use crate::ost::IndexTree;
 use crate::ost::recording_index_tree::RecordingTree;
 
 pub(crate) mod yjsspan;
-pub(crate) mod merge;
+pub mod merge;
 pub(crate) mod markers;
 mod advance_retreat;
 // pub(crate) mod txn_trace;

@@ -930,7 +930,7 @@ To quantify this effect, we compare #algname's performance with a version of the
 #figure(
   text(8pt, charts.speed_ff),
   caption: [
-    Time taken for #algname to transform all events in an event graph, with and without the optimisations from @clearing.
+    Time taken for #algname to merge all events in an event graph, with and without the optimisations from @clearing.
   ],
   kind: image,
   placement: top,

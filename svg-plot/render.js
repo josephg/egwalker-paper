@@ -649,7 +649,9 @@ const plotFF = () => {
   }
 
   const data = [
-    ...datasets.map(dataset => ({ dataset, type: 'ff_on', val: rawTimings.dt_ff_on[dataset], })),
+    ...datasets.map(dataset => ({ dataset, type: 'ff_on', val: rawTimings.dt_merge_norm[dataset], })),
+
+    //...datasets.map(dataset => ({ dataset, type: 'ff_on', val: rawTimings.dt_ff_on[dataset], })),
     ...datasets.map(dataset => ({ dataset, type: 'ff_off', val: rawTimings.dt_ff_off[dataset], })),
   ]
 
@@ -686,7 +688,7 @@ const plotFF = () => {
 
     },
     x: {
-      label: 'Time taken to transform all events, in milliseconds. (Less is better)',
+      label: 'Time taken to merge all events, in milliseconds. (Less is better)',
       fontSize: "20px",
       grid: true,
       domain: [0, 100],

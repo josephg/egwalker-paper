@@ -603,7 +603,7 @@ impl TransformedResult {
 }
 
 #[derive(Debug)]
-pub(crate) struct TransformedOpsIterRaw<'a> {
+pub struct TransformedOpsIterRaw<'a> {
     // subgraph: &'a Graph,
     aa: &'a AgentAssignment,
     op_ctx: &'a ListOperationCtx,
@@ -633,7 +633,7 @@ pub(crate) struct TransformedOpsIterRaw<'a> {
 // }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum TransformedResultRaw {
+pub enum TransformedResultRaw {
     FF(DTRange),
     Apply(KVPair<ListOpMetrics>),
     DeleteAlreadyHappened(DTRange),

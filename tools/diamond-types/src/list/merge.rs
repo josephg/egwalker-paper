@@ -21,7 +21,7 @@ impl ListOpLog {
                                 from, merging)
     }
 
-    pub(crate) fn get_xf_operations_full_raw(&self, from: FrontierRef, merging: FrontierRef) -> TransformedOpsIterRaw {
+    pub fn get_xf_operations_full_raw(&self, from: FrontierRef, merging: FrontierRef) -> TransformedOpsIterRaw {
         TransformedOpsIterRaw::new(&self.cg.graph, &self.cg.agent_assignment,
                                 &self.operation_ctx, &self.operations,
                                 from, merging)
@@ -88,45 +88,31 @@ impl ListOpLog {
         iter.concurrent_inserts_collided()
     }
 
-    pub fn dbg_iter_xf_operations_no_ff(&self) -> impl Iterator<Item=(DTRange, Option<TextOperation>)> + '_ {
+    pub fn dbg_iter_xf_operations_no_ff(&self) -> TransformedOpsIterRaw<'_> {
         let (plan, _common) = self.cg.graph.make_m1_plan(Some(&self.operations), &[], self.cg.version.as_ref(), false);
-        let iter: TransformedOpsIterX = TransformedOpsIterRaw::from_plan(&self.cg.agent_assignment,
+        TransformedOpsIterRaw::from_plan(&self.cg.agent_assignment,
                                                      &self.operation_ctx, &self.operations,
                                                      plan)
-            .into();
-
-        iter.map(|result| {
-            match result {
-                TransformedResultX::Apply(KVPair(start, op)) => {
-                    let content = op.get_content(&self.operation_ctx);
-                    let len = op.len();
-                    let text_op: TextOperation = (op, content).into();
-                    ((start..start + len).into(), Some(text_op))
-                }
-                TransformedResultX::DeleteAlreadyHappened(range) => (range, None)
-            }
-        })
-
-        // // allow_ff: false!
-        // let (plan, common) = self.cg.graph.make_m1_plan(Some(&self.operations), &[], self.cg.version.as_ref(), false);
-        // let iter = TransformedOpsIter::from_plan(&self.cg.graph, &self.cg.agent_assignment,
-        //                                              &self.operation_ctx, &self.operations,
-        //                                              plan, common);
-        //
-        // // Return the data in the same format as iter_xf_operations_from to make benchmarks fair.
-        // iter.map(|(lv, mut origin_op, xf)| {
-        //     let len = origin_op.len();
-        //     let op: Option<TextOperation> = match xf {
-        //         BaseMoved(base) => {
-        //             origin_op.loc.span = (base..base+len).into();
-        //             let content = origin_op.get_content(&self.operation_ctx);
-        //             Some((origin_op, content).into())
-        //         }
-        //         DeleteAlreadyHappened => None,
-        //     };
-        //     ((lv..lv +len).into(), op)
-        // })
     }
+    // pub fn dbg_iter_xf_operations_no_ff(&self) -> impl Iterator<Item=(DTRange, Option<TextOperation>)> + '_ {
+    //     let (plan, _common) = self.cg.graph.make_m1_plan(Some(&self.operations), &[], self.cg.version.as_ref(), false);
+    //     let iter: TransformedOpsIterX = TransformedOpsIterRaw::from_plan(&self.cg.agent_assignment,
+    //                                                  &self.operation_ctx, &self.operations,
+    //                                                  plan)
+    //         .into();
+    //
+    //     iter.map(|result| {
+    //         match result {
+    //             TransformedResultX::Apply(KVPair(start, op)) => {
+    //                 let content = op.get_content(&self.operation_ctx);
+    //                 let len = op.len();
+    //                 let text_op: TextOperation = (op, content).into();
+    //                 ((start..start + len).into(), Some(text_op))
+    //             }
+    //             TransformedResultX::DeleteAlreadyHappened(range) => (range, None)
+    //         }
+    //     })
+    // }
 
     pub fn get_ff_stats(&self) -> (usize, usize, usize) {
         let (plan, _common) = self.cg.graph.make_m1_plan(Some(&self.operations), &[], self.cg.version.as_ref(), true);

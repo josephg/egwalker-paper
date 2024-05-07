@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// Note that OperationInternal can't directly implement
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub(crate) struct ListOpMetrics {
+pub struct ListOpMetrics {
     /// The span of content which is inserted or deleted.
     ///
     /// For inserts, this describes the resulting location (span) of the new characters.
@@ -72,7 +72,7 @@ impl HasLength for ListOpMetrics {
 
 #[derive(Clone, Eq, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub(crate) struct ListOperationCtx {
+pub struct ListOperationCtx {
     pub(crate) ins_content: Vec<u8>,
     pub(crate) del_content: Vec<u8>,
 }
@@ -98,7 +98,7 @@ impl ListOperationCtx {
     }
 
     #[inline]
-    pub(crate) fn get_str(&self, kind: ListOpKind, range: DTRange) -> &str {
+    pub fn get_str(&self, kind: ListOpKind, range: DTRange) -> &str {
         unsafe { std::str::from_utf8_unchecked(&self.switch(kind)[range.start..range.end]) }
     }
 

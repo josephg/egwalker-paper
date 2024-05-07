@@ -8,10 +8,15 @@ mod idxtrace;
 
 use std::env;
 use criterion::{black_box, Criterion, BenchmarkId, Throughput};
-use jumprope::JumpRope;
+use jumprope::{JumpRope, JumpRopeBuf};
 use crdt_testdata::{load_testing_data, TestData};
+use diamond_types::DTRange;
 use diamond_types::list::{ListCRDT, ListOpLog};
 use diamond_types::list::encoding::*;
+use diamond_types::list::op_metrics::ListOpMetrics;
+use diamond_types::list::operation::{ListOpKind, TextOperation};
+use diamond_types::listmerge::merge::{reverse_str, TransformedResultRaw};
+use diamond_types::rle::KVPair;
 use crate::idxtrace::idxtrace_benchmarks;
 use crate::utils::*;
 
@@ -173,6 +178,50 @@ fn encoding_nodecc_benchmarks(c: &mut Criterion) {
 // );
 // criterion_main!(benches);
 
+#[inline(always)]
+fn apply_op_at(r: &mut JumpRopeBuf, oplog: &ListOpLog, op: ListOpMetrics) {
+    // let xf_pos = op.loc.span.start;
+    match op.kind {
+        ListOpKind::Ins => {
+            let content = oplog.operation_ctx.get_str(ListOpKind::Ins, op.content_pos.unwrap());
+            // assert!(pos <= self.content.len_chars());
+            if op.loc.fwd {
+                r.insert(op.loc.span.start, content);
+            } else {
+                // We need to insert the content in reverse order.
+                let c = reverse_str(content);
+                r.insert(op.loc.span.start, &c);
+            }
+        }
+        ListOpKind::Del => {
+            r.remove(op.loc.span.into());
+        }
+    }
+}
+
+fn doc_from_iter<I>(oplog: &ListOpLog, iter: I) -> JumpRopeBuf
+where I: Iterator<Item=TransformedResultRaw> {
+    let mut r = JumpRopeBuf::new();
+
+    for xf in iter {
+        match xf {
+            TransformedResultRaw::Apply(KVPair(_, op)) => {
+                apply_op_at(&mut r, oplog, op);
+            }
+
+            TransformedResultRaw::FF(range) => {
+                // Activate *SUPER FAST MODE*.
+                for KVPair(_, op) in oplog.operations.iter_range_ctx(range, &oplog.operation_ctx) {
+                    apply_op_at(&mut r, oplog, op);
+                }
+            }
+
+            TransformedResultRaw::DeleteAlreadyHappened(_) => {} // Discard.
+        }
+    }
+
+    r
+}
 
 fn paper_benchmarks(c: &mut Criterion) {
     // const PAPER_DATASETS: &[&str] = &["automerge-paperx3", "seph-blog1x3", "node_nodeccx1", "friendsforeverx25", "clownschoolx25", "egwalkerx1", "git-makefilex2"];
@@ -189,17 +238,17 @@ fn paper_benchmarks(c: &mut Criterion) {
             });
         });
 
-        group.bench_function(BenchmarkId::new("ff_on", name), |b| {
-            b.iter(|| {
-                oplog.iter_xf_operations()
-                    .for_each(|op| { black_box(op); });
-            })
-        });
+        // group.bench_function(BenchmarkId::new("ff_on", name), |b| {
+        //     b.iter(|| {
+        //         let result = doc_from_iter(&oplog, oplog.get_xf_operations_full_raw(&[], oplog.cg.version.as_ref()));
+        //         black_box(result);
+        //     })
+        // });
 
         group.bench_function(BenchmarkId::new("ff_off", name), |b| {
             b.iter(|| {
-                oplog.dbg_iter_xf_operations_no_ff()
-                    .for_each(|op| { black_box(op); });
+                let result = doc_from_iter(&oplog, oplog.dbg_iter_xf_operations_no_ff());
+                black_box(result);
             })
         });
 
