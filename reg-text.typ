@@ -286,11 +286,11 @@ Given some version $V$, the corresponding set of events can be reconstructed as 
 $ sans("Events")(V) = V union {e_1 | exists e_2 in V : e_1 -> e_2} $
 
 Since an event graph grows only by adding events that are concurrent to or children of existing events (we never change the parents of an existing event), there is a one-to-one correspondence between an event graph and its version.
-Hence, for all valid event graphs $G$, we have $sans("Events")(sans("Version")(G)) = G$.
+For all valid event graphs $G$, $sans("Events")(sans("Version")(G)) = G$.
 
 The set of parents of an event in the graph is the version of the document in which that operation must be interpreted.
-The version can hence also be seen as a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
-Even if the event graph is large, a version rarely consists of more than two events in practice.
+The version can hence be seen as a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
+Even if the event graph is large, in practice a version rarely consists of more than two events.
 
 == Replaying editing history
 
@@ -329,8 +329,6 @@ Regardless of whether the OT or the CRDT approach is used, a collaborative editi
   [= The Event Graph Walker algorithm <algorithm>]
 }
 
-// While OT transforms one operation with respect to one other operation, #algname builds a temporary data structure that reflects the concurrent edits, and uses it to operations efficiently.
-
 #algname is a collaborative text editing algorithm based on the idea of event graph replay.
 The algorithm builds on a replication layer that ensures that whenever a replica adds an event to the graph, all non-crashed replicas eventually receive it.
 The state of each replica consists of three parts:
@@ -343,6 +341,7 @@ The state of each replica consists of three parts:
 It first performs a topological sort, as illustrated in @topological-sort. Then each event is transformed so that the transformed insertions and deletions can be applied in topologically sorted order, starting with an empty document, to obtain the document state.
 In Git parlance, this process "rebases" a DAG of operations into a linear operation history with the same effect.
 The input of the algorithm is the event graph, and the output is this topologically sorted sequence of transformed operations.
+While OT transforms one operation with respect to one other, #algname uses the internal state to transform operations efficiently.
 
 In graphs with concurrent operations there are multiple possible sort orders. #algname guarantees that the final document state is the same, regardless which of these orders is chosen. However, the choice of sort order may affect the performance of the algorithm, as discussed in @complexity.
 
@@ -416,7 +415,7 @@ In graphs with concurrent operations there are multiple possible sort orders. #a
   caption: [An event graph (left) and one possible topologically sorted order of that graph (right).],
 ) <topological-sort>
 
-For example, the graph in @graph-example has two possible sort orders; #algname either first inserts "l" at index 3 and then the exclamation mark at index 5 (like User 1 in @two-inserts), or first inserts "!" at index 4 followed by "l" at index 3 (like User 2 in @two-inserts); the final document state is "Hello!" either way.
+For example, the graph in @graph-example has two possible sort orders; #algname either first inserts "l" at index 3 and then "!" at index 5 (like User 1 in @two-inserts), or it first inserts "!" at index 4 followed by "l" at index 3 (like User 2 in @two-inserts). The final document state is "Hello!" either way.
 
 Event graph replay easily extends to incremental updates for real-time collaboration: when a new event is added to the graph, it becomes the next element of the topologically sorted sequence.
 We can transform each new event in the same way as during replay, and apply the transformed operation to the current document state.
@@ -445,11 +444,11 @@ The event graph can remain on disk without using any space in memory or any CPU 
 The event graph is only required when handling concurrency, and even then we only have to replay the portion of the graph since the last ancestor that the concurrent operations had in common.
 
 #algname's approach contrasts with existing CRDTs, which require every replica to persist the internal state (including the unique ID for each character) and send it over the network, and which require that state to be loaded into memory in order to both generate and receive operations, even when there is no concurrency.
-This can use significant amounts of memory and can make documents slow to load.
+This uses significant amounts of memory and makes documents slow to load.
 
 OT algorithms avoid this internal state; similarly to #algname, they only need to persist the latest document state and the history of operations that are concurrent to operations that may arrive in the future.
-In both #algname and OT, the editing history/event graph can be discarded if we know that no event we may receive in the future will be concurrent with any existing event.
-However, OT algorithms have asymptotically worse performance than #algname in transforming concurrent operations (see @complexity).
+In both #algname and OT, the event graph can be discarded if we know that no event we may receive in the future will be concurrent with any existing event.
+However, OT algorithms are very slow to merge long-running branches (see @benchmarking).
 Some OT algorithms are only able to handle restricted forms of event graphs, whereas #algname handles arbitrary DAGs.
 
 == Walking the event graph <graph-walk>
@@ -459,7 +458,7 @@ In @partial-replay we show how the algorithm can be optimised to replay only a p
 
 First, we topologically sort the event graph in a way that keeps events on the same branch consecutive as much as possible: for example, in @topological-sort we first visit $e_"A1" ... e_"A4"$, then $e_"B1" ... e_"B4"$. We avoid alternating between branches, such as $e_"A1", e_"B1", e_"A2", e_"B2" ...$, even though that would also be a valid topological sort.
 For this we use a standard textbook algorithm @CLRS2009: perform a depth-first traversal starting from the oldest event, and build up the topologically sorted list in the order that events are visited.
-When a node has multiple children in the graph, we choose their order based on a heuristic so that branches with fewer events tend to appear before branches with more events in the sorted order; this can improve performance but is not essential.
+When a node has multiple children in the graph, we choose their order based on a heuristic so that branches with fewer events tend to appear before branches with more events in the sorted order; this can improve performance (see @complexity) but is not essential.
 We estimate the size of a branch by counting the number of events that happened after each event.
 
 The algorithm then processes the events one at a time in topologically sorted order, updating the internal state and outputting a transformed operation for each event.
@@ -505,18 +504,20 @@ These events can be processed as follows:
 1. Start in the empty state, and then call $sans("apply")(e_1)$, $sans("apply")(e_2)$, $sans("apply")(e_3)$, and $sans("apply")(e_4)$. This is valid because each event's parent version is the set of all events processed so far.
 2. Before we can apply $e_5$ we must rewind the prepare version to be ${e_2}$, which is the parent of $e_5$. We can do this by calling $sans("retreat")(e_4)$ and $sans("retreat")(e_3)$.
 3. Now we can call $sans("apply")(e_5)$, $sans("apply")(e_6)$, and $sans("apply")(e_7)$.
-4. The parents of $e_8$ are ${e_4, e_7}$; before we can apply $e_8$ we must therefore add $e_3$ and $e_4$ back into the prepare state again. We do this by calling $sans("advance")(e_3)$ and $sans("advance")(e_4)$.
+4. The parents of $e_8$ are ${e_4, e_7}$; before we can apply $e_8$ we must therefore add $e_3$ and $e_4$ to the prepare state again by calling $sans("advance")(e_3)$ and $sans("advance")(e_4)$.
 5. Finally, we can call $sans("apply")(e_8)$.
 
 In complex event graphs such as the one in @topological-sort the same event may have to be retreated and advanced several times, but we can process arbitrary DAGs this way.
 In general, before applying the next event $e$ in topologically sorted order, compute $G_"old" = sans("Events")(V_p)$ where $V_p$ is the current prepare version, and $G_"new" = sans("Events")(e.italic("parents"))$.
 We then call $sans("retreat")$ on each event in $G_"old" - G_"new"$ (in reverse topological sort order), and call $sans("advance")$ on each event in $G_"new" - G_"old"$ (in topological sort order) before calling $sans("apply")(e)$.
 
+/*
 The following algorithm efficiently computes the events to retreat and advance when moving the prepare version from $V_p$ to $V'_p$.
 For each event in $V_p$ and $V'_p$ we insert the index of that event in the topological sort order into a priority queue, along with a tag indicating whether the event is in the old or the new prepare version.
 We then repeatedly pop the event with the greatest index off the priority queue, and enqueue the indexes of its parents along with the same tag.
 We stop the traversal when all entries in the priority queue are common ancestors of both $V_p$ and $V'_p$.
 Any events that were traversed from only one of the versions need to be retreated or advanced respectively.
+*/
 
 == Representing prepare and effect versions <prepare-effect-versions>
 
@@ -526,9 +527,10 @@ Runs of characters with consecutive IDs and the same properties can be run-lengt
 A record is inserted into this sequence by $sans("apply")(e_i)$ for an insertion event $e_i$.
 Subsequent deletion events and $sans("retreat")$/$sans("advance")$ calls may modify properties of the record, but records in the sequence are not removed or reordered once they have been inserted.
 
-When the event graph contains concurrent insertion operations, we use an existing CRDT algorithm to ensure that all replicas place the records in this sequence in the same order, regardless of the order in which the event graph is traversed.
-Any list CRDT could be used for this purpose; the main differences between algorithms are their performance and their interleaving characteristics @fugue.
-Our implementation of #algname uses a variant of the Yjs algorithm @yjs @Nicolaescu2016YATA that we conjecture to be maximally non-interleaving; we leave a detailed analysis of this algorithm to future work, since it is not core to this paper.
+When the event graph contains concurrent insertions, we use a CRDT to ensure that all replicas place the records in this sequence in the same order, regardless of the order in which the event graph is traversed.
+For example, RGA @Roh2011RGA or YATA @Nicolaescu2016YATA could be used for this purpose.
+Our implementation of #algname uses a variant of the Yjs algorithm @yjs, itself based on YATA, that we conjecture to be maximally non-interleaving.
+We leave a detailed analysis of this algorithm to future work, since it is not core to this paper.
 
 Each record in this sequence contains:
 - the ID of the event that inserted the character;
@@ -612,8 +614,8 @@ In the prepare state, by retreating $e_4$ and $e_3$ the "H" is marked as `NotIns
   caption: [The internal #algname state after replaying all of the events in @graph-hi-hey.]
 ) <crdt-state-2>
 
-@crdt-state-2 shows the state after replaying all of the events in @graph-hi-hey: "i" is also deleted, the characters "e" and "y" are inserted immediately after the "h", $e_3$ and $e_4$ are advanced again, and finally the exclamation mark is inserted after the "y".
-The figures include the character for the sake of readability, but the algorithm actually does not need to store characters in its internal state.
+@crdt-state-2 shows the state after replaying all of the events in @graph-hi-hey: "i" is also deleted, the characters "e" and "y" are inserted immediately after the "h", $e_3$ and $e_4$ are advanced again, and finally "!" is inserted after the "y".
+The figures include the character for the sake of readability, but #algname actually does not store text content in its internal state.
 
 == Mapping indexes to character IDs
 
@@ -642,10 +644,10 @@ We also need to efficiently perform $sans("retreat")(e_i)$ and $sans("advance")(
 While advancing/retreating we cannot look up a target record by its index. Instead, we maintain a second B-tree, mapping from each event's ID to the target record. The mapping stores a value depending on the type of the event:
 
 - For delete events, we store the ID of the character deleted by the event.
-- For insert events, we store a pointer to the leaf node in the first B-tree which contains the corresponding record. When nodes in the first B-tree are split, we update the pointers in the second B-tree accordingly.
+- For insert events, we store a pointer to the leaf node in the first B-tree that contains the corresponding record. When nodes in the first B-tree are split, we update the pointers in the second B-tree accordingly.
 
-On every $sans("apply")(e)$, after updating the sequence as above, we update this mapping based on the event.
-When we subsequently perform a $sans("retreat")(e)$ or $sans("advance")(e)$, that event $e$ must have already been applied, and hence $e.italic("id")$ must appear in this mapping.
+On every $sans("apply")(e)$, after updating the sequence as above, we update this mapping.
+When we subsequently call $sans("retreat")(e)$ or $sans("advance")(e)$, that event $e$ must have already been applied, and hence $e.italic("id")$ must appear in this mapping.
 This map allows us to advance or retreat in logarithmic time.
 
 == Clearing the internal state <clearing>
@@ -670,7 +672,7 @@ These optimisations make it very fast to process documents that are mostly edite
 
 The internal state can be discarded once replay is complete, although it is also possible to retain the internal state for transforming future events.
 If a replica receives events that are concurrent with existing events in its graph, but the replica has already discarded its internal state resulting from those events, it needs to rebuild some of that state.
-It can do this by identifying the most recent critical version that happened before the new event, replaying the existing events that happened after that critical version, and finally applying the new events.
+It can do this by identifying the most recent critical version that happened before the new events, replaying the existing events that happened after that critical version, and finally applying the new events.
 Events from before that critical version are not replayed.
 Since most editing histories have critical versions from time to time, this means that usually only a small subset of the event graph is replayed.
 In the worst case, this algorithm replays the entire event graph.
@@ -685,7 +687,7 @@ This internal state can be obtained by replaying the events since $V_"crit"$, th
 
 1. We initialise a new internal state corresponding to version $V_"crit"$. Since we do not know the the document state at this version, we start with a single placeholder record representing the unknown document content.
 2. We update the internal state by replaying events from $V_"crit"$ to $V_"curr"$, but we do not output transformed operations during this stage.
-3. Finally, we replay the new event $e_"new"$ and output the transformed operation. If we received a batch of new events, we replay them in topologically sorted order.
+3. Finally, we apply the new event $e_"new"$ and output the transformed operation. If we received a batch of new events, we apply them in topologically sorted order.
 
 The placeholder record we start with in step 1 represents the range of indexes $[0, infinity]$ of the document state at $V_"crit"$ (we do not know the length of the document at that version, but we can still have a placeholder for arbitrarily many indexes).
 Placeholders are counted as the number of characters they represent in the order statistic tree construction, and they have the same length in both the prepare and the effect versions.
@@ -723,12 +725,12 @@ The worst-case complexity of the algorithm is therefore $O(n^2 log n)$, but this
 To store the event graph compactly on disk, we developed a compression technique that takes advantage of how people typically write text documents: namely, they tend to insert or delete consecutive sequences of characters, and less frequently hit backspace or move the cursor to a new location.
 #algname's event graph storage format is inspired by the Automerge CRDT library @automerge-storage @automerge-columnar, which in turn uses ideas from column-oriented databases @Abadi2013 @Stonebraker2005. We also borrow some bit-packing tricks from the Yjs CRDT library @yjs.
 
-We first topologically sort the events in the graph. Different replicas may sort the set differently, but locally to one replica we can identify an event by its index in this sorted order.
+We first topologically sort the events in the graph. Different replicas may sort the graph differently, but locally to one replica we can identify an event by its index in this sorted order.
 Then we store different properties of events in separate byte sequences called _columns_, which are then combined into one file with a simple header.
 Each column stores some different fields of the event data. The columns are:
 
 - _Event type, start position, and run length._ For example, "the first 23 events are insertions at consecutive indexes starting from index 0, the next 10 events are deletions at consecutive indexes starting from index 7," and so on. We encode this using a variable-length binary encoding of integers, which represents small numbers in one byte, larger numbers in two bytes, etc.
-- _Inserted content._ An insertion event contains exactly one character (a Unicode scalar value), and a deletion does not. We simply concatenate the UTF-8 encoding of the characters for insertion events in the same order as they appear in the first column, and then LZ4-compress this string.
+- _Inserted content._ An insertion event contains exactly one character (a Unicode scalar value), and a deletion does not. We concatenate the UTF-8 encoding of the characters for insertion events in the same order as they appear in the first column, and LZ4-compress.
 - _Parents._ By default we assume that every event has exactly one parent, namely its predecessor in the topological sort. Any events for which this is not true are listed explicitly, for example: "the first event has zero parents; the 153rd event has two parents, namely events numbers 31 and 152;" and so on.
 - _Event IDs._ Each event is uniquely identified by a pair of a replica ID and a per-replica sequence number. This column stores runs of event IDs, for example: "the first 1085 events are from replica $A$, starting with sequence number 0; the next 595 events are from replica $B$, starting with sequence number 0;" and so on.
 
@@ -746,11 +748,11 @@ When sending a subset of events over the network (e.g., a single event during re
 // TODO: anonymise the references to repos for the conference submission
 // Can use a service like https://anonymous.4open.science/
 
-In this work we compare #algname to various CRDT implementations and an OT implementation on 3 criteria:
+We compare #algname to two popular CRDT implementations and an OT implementation along three dimensions:
 
-/ Speed: The time taken to load a document and merge a set of changes from a remote peer.
-/ Memory usage: The amount of RAM used to load a document and merge changes.
-/ Storage size: The number of bytes needed to store or transmit the document's history.
+/ Speed: The CPU time to load a document into memory, and to merge a set of updates from a remote replica.
+/ Memory usage: The RAM used while a document is loaded and while merging remote updates.
+/ Storage size: The number of bytes needed to persistently store a document or replicate it over the network.
 
 We have found #algname to perform well on all of these measures. #algname merges complex editing traces at a similar speed as the equivalently constructed CRDT implementation. Peak memory usage (when merging complex changes) is higher than that of an equivalent CRDT, but after merging is complete, any memory used can be once again freed. And our binary encoding of the event graph takes up less space on disk.
 
@@ -763,7 +765,7 @@ When concurrent events are merged together, #algname constructs a new CRDT state
 As a result, #algname allows documents to be loaded from disk and edited much faster than CRDTs allow, and with less resident memory usage. When changes are merged, the CRDT state is only reconstructed back to the common branching point, so merging sequential changes, or recent concurrent changes is consistently fast. The slowest operation #algname encounters is when it merges large, long lived branches together. When this happens, memory usage temporarily spikes as events are loaded from disk, and transformed via a temporary CRDT state object.
 
 // TODO: Move this further down I reckon.
-// CRDTs have extra overhead when a document is loaded because CRDTs require local editing events to be translated into the corresponding CRDT messages before they can be saved to disk or broadcast to remote peers. In order to translate editing events into CRDT messages, a local replica needs to query the current CRDT state object. In the systems we looked at, each time a document is opened, the CRDT state must be unpacked into a query-optimised data structure in RAM before any edits can take place. This introduces noticeable latency at startup time, and
+// CRDTs have extra overhead when a document is loaded because CRDTs require local editing events to be translated into the corresponding CRDT messages before they can be saved to disk or broadcast to remote replicas. In order to translate editing events into CRDT messages, a local replica needs to query the current CRDT state object. In the systems we looked at, each time a document is opened, the CRDT state must be unpacked into a query-optimised data structure in RAM before any edits can take place. This introduces noticeable latency at startup time, and
 
 // When necessary, #algname also reconstructs this state. However, #algname only needs to build this state object in memory when merging concurrent changes. And even then, the state is only reconstructed as far back as the most recent common version. Once merging is complete, #algname can immediately discard this state object from memory.
 
@@ -881,9 +883,9 @@ The recorded editing traces originally varied a great deal in size. We have roug
 
 // We have measured the time taken to merge our editing traces into a local, empty document. Once all events were loaded, the document was saved and loaded back.
 
-The slowest operation a collaborative editing system performs is merging a large set of remote editing events from another peer. All received changes need to be transformed and merged into the active document. @chart-remote shows the time taken by each tested algorithm to merge all changes in our dataset into an empty document. For the CRDT implementations, all events were preprocessed into the appropriate CRDT message format. The time taken to do this is not included in our measurements.
+The slowest operation a collaborative editing system performs is merging a large set of remote editing events from another replica. All received changes need to be transformed and merged into the active document. @chart-remote shows the time taken by each tested algorithm to merge all changes in our dataset into an empty document. For the CRDT implementations, all events were preprocessed into the appropriate CRDT message format. The time taken to do this is not included in our measurements.
 
-Once all events were received from a remote peer, the resulting local state was saved to disk and then loaded back into memory. The CRDT implementations execute the same commands to construct a local CRDT object from remote events and from events stored on disk. OT and #algname based systems are able to simply load the resulting text content directly from disk. When using one of these approaches, historical events are only loaded from disk when concurrent branches are merged together.
+Once all events were received from a remote replica, the resulting local state was saved to disk and then loaded back into memory. The CRDT implementations execute the same commands to construct a local CRDT object from remote events and from events stored on disk. OT and #algname based systems are able to simply load the resulting text content directly from disk. When using one of these approaches, historical events are only loaded from disk when concurrent branches are merged together.
 
 For completeness, we also measured the time taken to process local editing events. However, all of the systems we tested can process events many orders of magnitude much faster than any human's typing speed. We have not shown this data as at that speed, the differences between systems are irrelevant.
 
