@@ -169,7 +169,9 @@
 // #let x = map_dict(merge_times, t => gm(t.values()))
 #let avg_times = map_dict(merge_times, t => am(t.values()))
 
-#let speed_ff = canvas(length: 1cm, {
+
+#let speed_ff = image("diagrams/ff.svg")
+#let speed_ff_ = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   chart.barchart(
     mode: "clustered",
@@ -208,7 +210,7 @@
   )
 })
 
-#let speed_merge = image("diagrams/test.svg")
+#let speed_merge = image("diagrams/timings.svg")
 #let speed_merge_ = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   chart.barchart(
@@ -244,7 +246,7 @@
   )
 })
 
-#let speed_load = canvas(length: 1cm, {
+#let speed_load_ = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   chart.barchart(
     mode: "clustered",
@@ -402,7 +404,8 @@
 })
 
 
-#let memusage_all = canvas(length: 1cm, {
+#let memusage_all = image("diagrams/memusage.svg")
+#let memusage_all_ = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   draw.set-style(barchart: ( legend: (
     // default-position: "legend.north-east",
@@ -465,7 +468,8 @@
   yjs: datasets.map(ds => yjs_am_sizes.at(ds).yjs / mb),
 )
 
-#let filesize_full = canvas(length: 1cm, {
+#let filesize_full = image("diagrams/filesize_full.svg")
+#let filesize_full_ = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   draw.set-style(barchart: ( legend: (
     // default-position: "legend.north-east",
@@ -549,7 +553,8 @@
 //   )
 // })
 
-#let filesize_smol = canvas(length: 1cm, {
+#let filesize_smol = image("diagrams/filesize_smol.svg")
+#let filesize_smol_ = canvas(length: 1cm, {
   draw.set-style(barchart: barchart_style)
   draw.set-style(barchart: ( legend: (
     // default-position: "legend.north-east",

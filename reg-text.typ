@@ -889,10 +889,10 @@ For completeness, we also measured the time taken to process local editing event
 #figure(
   text(8pt, [
     #charts.speed_merge
-    #charts.speed_load
+    // #charts.speed_load
   ]),
   caption: [
-    The time taken by each algorithm to merge all editing events, then reload the editing context from disk. Each algorithm received as input the complete set of "remote events" (which differed depending on the algorithm) and output the resulting, merged document.
+    The time taken by each algorithm to merge all editing events and reload the resulting document from disk. Each algorithm received as input the complete set of "remote events" (which differed depending on the algorithm) and output the resulting, merged document. The CRDT implementations (Ref CRDT, Automerge and Yjs) take the same amount of time to merge changes as they do to subsequently load the document from disk. The red line in this chart shows 1 frame \@ 60hz.
   ],
   kind: image,
   placement: top,
@@ -919,16 +919,18 @@ To quantify this effect, we compare #algname's performance with a version of the
 #figure(
   text(8pt, charts.ff_chart),
   caption: [
-    A comparison of the #algname state size while processing the _raw C1_ data set, with and without internal state clearing enabled. Unlike in other tests, for this chart we use the raw (not duplicated) version of the dataset.
+    A comparison of the #algname state size while processing the _raw C1_ data set, with and without internal state clearing enabled. This chart uses the raw (not duplicated) version of the dataset.
   ],
   kind: image,
   placement: top,
 ) <ff-memory>
 
+// TODO: This chart does not include time spent *applying* the transformed changes, so its slightly faster
+// than the merge times we list.
 #figure(
   text(8pt, charts.speed_ff),
   caption: [
-    Time taken for #algname to replay an event graph, with and without the optimisations from @clearing.
+    Time taken for #algname to transform all events in an event graph, with and without the optimisations from @clearing.
   ],
   kind: image,
   placement: top,
@@ -994,14 +996,14 @@ Our encoding is smaller than Yjs on all traces, and the overhead of storing the 
 // TODO: why is git-makefile not included in this and the following figure?
 #figure(
   text(8pt, charts.filesize_full),
-  caption: [Relative file size storing edit traces using #algname's event graph encoding and Automerge. The raw size shown is the concatenated length of all inserted keystrokes - which acts as a lower bound on the file size in this test.],
+  caption: [Relative file size storing edit traces using #algname's event graph encoding and Automerge. The lightly shaded region in each bar shows the concatenated length of all inserted text - which is a lower bound on the file size in this test.],
   kind: image,
   placement: top,
 ) <chart-dt-vs-automerge>
 
 #figure(
   text(8pt, charts.filesize_smol),
-  caption: [File size of our event graph encoding in which deleted text content has been omitted, compared to the equivalent Yjs file size. The raw size shown here is the size of the final, stored document. This acts as a lower bound on the file size in all cases.],
+  caption: [File size of our event graph encoding in which deleted text content has been omitted, compared to the equivalent Yjs file size. The lightly shaded region is the size of the resulting document, which acts as a lower bound on the file size.],
   kind: image,
   placement: top,
 ) <chart-dt-vs-yjs>

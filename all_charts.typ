@@ -9,13 +9,14 @@
 #charts.ff_chart
 === speed_merge
 #charts.speed_merge
-#charts.speed_load
+#charts.speed_merge_
+#charts.speed_load_
 === speed_ff
 #charts.speed_ff
 
 
 #figure(
-  image("diagrams/test.svg", width: 50%),
+  image("diagrams/timings.svg", width: 50%),
   // text(8pt, charts.speed_ff),
   caption: [
     Time taken for alg to replay an event graph, with and without the optimisations from xxx.
