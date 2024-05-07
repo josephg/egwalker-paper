@@ -204,7 +204,7 @@
       ).flatten(),
       (
         "Optimization on",
-        datasets.map(name => timings.dt_ff_on.at(name)),
+        datasets.map(name => timings.dt_merge_norm.at(name)),
       ).flatten(),
     ),
   )
