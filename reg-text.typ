@@ -171,7 +171,8 @@ _Conflict-free Replicated Data Types_ (CRDTs) have been proposed as an alternati
 The first CRDT for collaborative text editing appeared in 2006 @Oster2006WOOT, and over a dozen text CRDTs have been published since @crdt-papers.
 These algorithms work by giving each character a unique identifier, and using those IDs instead of integer indexes to identify the position of insertions and deletions.
 This avoids having to transform operations, since IDs are not affected by concurrent operations.
-Unfortunately, these IDs need to be held in memory while a document is being edited; even with careful optimisation, this metadata uses more than 10 times more memory than the document text, and makes documents much slower to load from disk.
+Unfortunately, these IDs need to be held in memory while a document is being edited.
+Even with careful optimisation, this metadata uses more than 10 times as much memory as the document text, and makes documents much slower to load from disk.
 Some CRDT algorithms also need to retain IDs of deleted characters (_tombstones_).
 
 In this paper we propose #if anonymous { algname } else { [_Event Graph Walker_ (#algname)] }, a collaborative editing algorithm that has the strengths of both OT and CRDTs but not their weaknesses.
@@ -199,7 +200,7 @@ This paper makes the following contributions:
 - In @algorithm we introduce #algname, a hybrid CRDT/OT algorithm for text that is faster and has a vastly smaller memory footprint than existing CRDTs.
 - Since there is no established benchmark for collaborative text editing, we are also publishing a suite of editing traces of text files for benchmarking. They are derived from real documents and demonstrate various patterns of sequential and concurrent editing.
 - In @benchmarking we use those editing traces to evaluate the performance of our implementation of #algname, comparing it to selected CRDTs and an OT implementation. We measure CPU time to load a document, CPU time to merge edits from a remote replica, memory usage, and file size. #algname improves the state of the art by orders of magnitude in the best cases, and is only slightly slower in the worst cases.
-- We prove the correctness of #algname in @proofs.
+- We prove the correctness of #algname in @proofs. // TODO!
 
 = Background
 
