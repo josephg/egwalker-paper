@@ -493,8 +493,8 @@ fn main() {
     // for file in &["automerge-paperx3", "seph-blog1x3", "node_nodeccx1", "friendsforeverx25", "clownschoolx25", "egwalkerx1"] {
     for file in &["S1", "S2", "S3", "C1", "C2", "A1", "A2"] {
         println!("\n\n----\n{file}");
-        run_automerge(&format!("../../../diamond-types/paper_benchmark_data/{}", file));
-        run_yrs(&format!("../../../diamond-types/paper_benchmark_data/{}", file));
+        run_automerge(&format!("../../datasets/{}", file));
+        run_yrs(&format!("../../datasets/{}", file));
     }
 
     // run_automerge("automerge-paper");
