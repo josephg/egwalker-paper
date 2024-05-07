@@ -13,25 +13,25 @@ const datasetsAmYjs = datasets
 const tests = {
   // 'automerge-converter': ['automerge/remote'],
   'diamond-types': [
-    'dt/merge', // DEPRECATED.
+    // 'dt/merge', // DEPRECATED.
     'dt/merge_norm',
     'dt/ff_on',
     'dt/ff_off',
     'dt/opt_load',
 
-    'dt/local',
-    'dt/local_rle',
+    // 'dt/local',
+    // 'dt/local_rle',
     'dt-crdt/process_remote_edits', // from run_on_old
-    'dt-crdt/local',
+    // 'dt-crdt/local',
   ],
-  'reg-paper/tools/paper-benchmarks': [
+  'paper-benchmarks': [
     'automerge/local',
     'automerge/remote',
     'cola/local',
     'cola-nocursor/local',
     // 'yrs/local',
   ],
-  'reg-paper/tools/ot-bench': [
+  'ot-bench': [
     'ot',
   ],
 }
@@ -45,7 +45,7 @@ function emitSpeeds() {
       for (const d of datasets) {
         try {
           // let project = test == 'automerge/remote' ? 'automerge-converter' : 'diamond-types'
-          const data = JSON.parse(fs.readFileSync(`../${project}/target/criterion/${test}/${d}/base/estimates.json`, 'utf8'))
+          const data = JSON.parse(fs.readFileSync(`tools/${project}/target/criterion/${test}/${d}/base/estimates.json`, 'utf8'))
 
           console.log('t', test, 'd', d, data.mean.point_estimate)
 

@@ -15,7 +15,7 @@ smartstring = { version = "1.0.1", features = ["serde"] }
 str_indices = "0.4.3"
 criterion = { version = "0.5.1", features = [] }
 rustc-hash = "1.1.0"
-trace-alloc = { path = "../../../diamond-types/crates/trace-alloc", optional = true }
+trace-alloc = { path = "../diamond-types/crates/trace-alloc", optional = true }
 
 [features]
 memusage = ["trace-alloc", "trace-alloc/memusage"]

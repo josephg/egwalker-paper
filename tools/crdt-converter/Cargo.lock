@@ -60,21 +60,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "automerge-converter"
-version = "0.1.0"
-dependencies = [
- "automerge",
- "criterion",
- "diamond-types-crdt",
- "rand",
- "serde",
- "serde_json",
- "smallvec",
- "smartstring",
- "yrs",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -211,6 +196,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b540bd8bc810d3885c6ea91e2018302f68baba2129ab3e88f32389ee9370880d"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "crdt-converter"
+version = "0.1.0"
+dependencies = [
+ "automerge",
+ "criterion",
+ "diamond-types-crdt",
+ "rand",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "smartstring",
+ "yrs",
 ]
 
 [[package]]
