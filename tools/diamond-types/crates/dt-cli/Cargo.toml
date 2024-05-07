@@ -1,0 +1,31 @@
+[package]
+name = "dt-cli"
+version = "0.2.0"
+edition = "2021"
+description = "CLI for interacting with diamond-types data"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "dt"
+path = "src/main.rs"
+
+[dependencies]
+diamond-types = { path = "../..", features = ["serde", "dot_export", "merge_conflict_checks", "gen_test_data"] }
+clap = { version = "4.2.4", features = ["derive"] }
+similar = "2.1.0"
+rand = "0.8.5"
+serde = "1.0.136"
+serde_json = "1.0.79"
+anyhow = "1.0.71"
+smallvec = "1.10.0"
+smartstring = "1.0.1"
+chrono = { version = "0.4.24", default-features = false, features = ["alloc", "std", "serde"] }
+rle = { path = "../rle" }
+
+git2 = { version = "0.17.1", optional = true }
+indicatif = { version = "0.17.3", optional = true }
+
+[features]
+default = ["git"]
+git = ["dep:git2", "dep:indicatif"]
