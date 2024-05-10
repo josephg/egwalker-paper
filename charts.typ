@@ -72,9 +72,26 @@
     y-tick-step: 500,
     x-label: "Events processed (in thousands)",
     y-label: [Eg-walker state size],
+    // style: idx => (
+    //   stroke: 0.1pt + black,
+    //   // fill: dscolors.at(datasets.at(idx)),
+    // ),
     {
-      plot.add(scale_data("results/xf-friendsforever-noff.json", 0.001), label: [without clearing])
-      plot.add(scale_data("results/xf-friendsforever-ff.json", 0.001), label: [with clearing])
+      plot.add(
+        scale_data("results/xf-friendsforever-noff.json", 0.001),
+        label: [without clearing],
+        style: (stroke: rgb("#d95f02"))
+      )
+      plot.add(
+        scale_data("results/xf-friendsforever-ff.json", 0.001),
+        label: [with clearing],
+        style: (stroke: rgb("#1b9e77"))
+      )
+      // plot.annotate({
+      //   draw.grid((0,0), (25, 3500))
+      //   // draw.rect((0, 0), (25, 1000), fill: rgb(255,0,0,50))
+      //   // draw.content((0,3000), [asdf])
+      // })
     }
   )
 })
