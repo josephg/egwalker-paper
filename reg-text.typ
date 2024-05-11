@@ -989,15 +989,21 @@ The traces represent the editing history of the following documents:
 / Concurrent Traces: Trace C1 is two users in the same document, writing a reflection on an episode of a TV series they have just watched. C2 is two users collaboratively reflecting on going to clown school together. We recorded these real-time collaborations with keystroke granularity, and we added 1~sec (C1) or 0.5~sec (C2) artificial latency between the collaborating users to increase the incidence of concurrent operations.
 / Asynchronous Traces: We reconstructed the editing trace of some files in Git repositories. The event graph mirrors the branching/merging of Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations necessary to perform each commit's diff. Trace A1 is `src/node.cc` from the Git repository for Node.js @node-src-nodecc, and A2 is `Makefile` from the Git repository for Git itself @git-makefile.
 
-#let stats_for(name, type) = {
+#let stats_for(name, type, num_authors: none) = {
   let data = json("results/dataset_stats.json").at(name)
+
+  // let a = num_authors
+  if num_authors == none {
+    num_authors = data.num_agents
+  }
+
   (
     name,
     type,
     str(calc.round(data.total_keystrokes / 1000)),
     str(calc.round(data.concurrency_estimate, digits: 2)),
     str(data.graph_rle_size),
-    str(data.num_agents)
+    str(num_authors)
   )
 }
 
@@ -1007,21 +1013,21 @@ The traces represent the editing history of the following documents:
     align: (center, center, right, right, right, right),
     stroke: none,
     table.hline(stroke: 0.8pt),
-    table.header([*Name*], [*Type*], [*Events (k)*], [*Avg. Conc.*], [*Runs*], [*Replicas*]),
+    table.header([*Name*], [*Type*], [*Events (k)*], [*Avg. Conc.*], [*Runs*], [*Authors*]),
     table.hline(stroke: 0.4pt),
 
-    ..stats_for("S1", "seq"),
+    ..stats_for("S1", "seq", num_authors: 2),
     ..stats_for("S2", "seq"),
-    ..stats_for("S3", "seq"),
+    ..stats_for("S3", "seq", num_authors: 2),
     ..stats_for("C1", "conc"),
-    ..stats_for("C2", "conc"),
+    ..stats_for("C2", "conc", num_authors: 2),
     ..stats_for("A1", "async"),
     ..stats_for("A2", "async"),
     table.hline(stroke: 0.8pt),
   )),
   placement: top,
   caption: [
-    The text editing traces used in our evaluation. _Events_: total number of editing events, in thousands. Each inserted or deleted character counts as one event. _Average concurrency_: mean number of concurrent branches per event in the trace. _Runs_: number of sequential runs (linear event sequences without branching/merging). _Replicas_: number of users who added at least one event.
+    The text editing traces used in our evaluation. _Events_: total number of editing events, in thousands. Each inserted or deleted character counts as one event. _Average concurrency_: mean number of concurrent branches per event in the trace. _Runs_: number of sequential runs (linear event sequences without branching/merging). _Authors_: number of users who added at least one event.
   ]
 ) <traces-table>
 
