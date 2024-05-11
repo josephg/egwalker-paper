@@ -145,3 +145,9 @@ node-src-nodecc:
   type: web
   title: "Node.js source code: src/node.cc"
   url: https://github.com/nodejs/node/blob/main/src/node.cc
+
+sharedb:
+  type: web
+  title: ShareDB
+  author: ["Gentle, Joseph"]
+  url: https://github.com/share/sharedb
