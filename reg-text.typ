@@ -15,11 +15,18 @@
   algname = "Feathertail"
 }
 
+#let draft = true
+#let background = none
+#if draft {
+  background = rotate(64deg, text(120pt, fill: rgb("DFDBD4"))[*DRAFT*])
+}
+
 #set page(
   paper: "a4",
   numbering: "1",
   // 178 × 229 mm text block on an A4 page (210 × 297 mm)
   margin: (x: (210 - 178) / 2 * 1mm, y: (297 - 229) / 2 * 1mm),
+  background: background
 )
 
 // 10pt text with 12pt leading
@@ -85,6 +92,12 @@
   base_level: 0,
   fill: rgb("#e8e8f8")
 )
+
+#if draft {
+  align(center, text(16pt)[
+    Draft #datetime.today().display()
+  ])
+}
 
 #if anonymous {
   align(center, text(20pt)[*Fast and memory-efficient collaborative text editing*])
