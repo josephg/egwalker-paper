@@ -1,30 +1,30 @@
 {
   "S1": {
-    "steady_state": 17308720,
-    "peak": 17308720
+    "steady_state": 17452872,
+    "peak": 17452872
   },
   "S2": {
-    "steady_state": 14022632,
-    "peak": 14022632
+    "steady_state": 13997336,
+    "peak": 13997336
   },
   "S3": {
-    "steady_state": 27981488,
-    "peak": 27981488
+    "steady_state": 29147992,
+    "peak": 29147992
   },
   "C1": {
-    "steady_state": 41619128,
-    "peak": 41619128
+    "steady_state": 42158456,
+    "peak": 42158456
   },
   "C2": {
-    "steady_state": 97659832,
-    "peak": 97659832
+    "steady_state": 99158960,
+    "peak": 99158960
   },
   "A1": {
-    "steady_state": 28580056,
-    "peak": 28580056
+    "steady_state": 28867456,
+    "peak": 28867456
   },
   "A2": {
-    "steady_state": 24862296,
-    "peak": 24862296
+    "steady_state": 23541576,
+    "peak": 23541576
   }
 }
