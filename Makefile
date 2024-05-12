@@ -1,15 +1,9 @@
 .phony: all
-
-all: $(ALL_JSON) $(DIAGRAMS)
+all: reg-text.pdf
+# all: $(ALL_JSON) $(DIAGRAMS)
 
 DT_TOOL=tools/diamond-types/target/release/dt
 CONV_TOOL=tools/crdt-converter/target/release/crdt-converter
-
-$(DT_TOOL):
-	cd tools/diamond-types && cargo build --release -p dt-cli
-
-$(CONV_TOOL):
-	cd tools/crdt-converter && cargo build --release
 
 DATASET = S1 S2 S3 C1 C2 A1 A2
 
@@ -59,6 +53,12 @@ ALL_RESULTS = \
 
 DIAGRAMS = diagrams/timings.svg diagrams/memusage.svg diagrams/filesize_full.svg diagrams/filesize_smol.svg diagrams/ff.svg
 
+
+$(DT_TOOL):
+	cd tools/diamond-types && cargo build --release -p dt-cli
+
+$(CONV_TOOL):
+	cd tools/crdt-converter && cargo build --release
 
 # These all get duplicated different numbers of times, so they're written out in full.
 datasets/S1.dt: datasets/raw/automerge-paper.dt $(DT_TOOL)
@@ -131,9 +131,9 @@ tools/ot-bench/target/criterion/ot/%/estimates.json: $(ALL_JSON)
 results/timings.json results/yjs_am_sizes.json &: results/js.json $(ALL_YJS) $(ALL_AM) $(ALL_BENCHES)
 	node collect.js
 
-
 $(DIAGRAMS) &: svg-plot/node_modules $(ALL_RESULTS)
 	cd svg-plot && node render.js
 
+# This is the master target.
 reg-text.pdf: reg-text.typ charts.typ $(DIAGRAMS) $(ALL_RESULTS)
 	typst compile reg-text.typ
