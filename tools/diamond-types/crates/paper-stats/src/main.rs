@@ -7,8 +7,7 @@
 // Run with:
 // $ cargo run --release --features memusage --example stats
 
-use std::collections::HashMap;
-// use std::fs::File;
+use std::collections::BTreeMap;
 
 #[cfg(feature = "memusage")]
 use humansize::{DECIMAL, format_size};
@@ -21,6 +20,8 @@ use diamond_types::list::encoding::EncodeOptions;
 use diamond_types::list::oplog::ListOpLogStats;
 #[cfg(feature = "memusage")]
 use trace_alloc::*;
+
+// use std::fs::File;
 
 const DATASETS: &[&str] = & ["S1", "S2", "S3", "C1", "C2", "A1", "A2"];
 
@@ -162,7 +163,7 @@ struct MemUsage {
 // $ cargo run -p paper-stats --features memusage --release
 #[cfg(feature = "memusage")]
 fn measure_memory() {
-    let mut usage = HashMap::new();
+    let mut usage = BTreeMap::new();
 
     for &name in DATASETS {
         print!("{name}...");
@@ -199,7 +200,7 @@ struct Stats {
 }
 
 fn get_stats() {
-    let mut all_stats = HashMap::new();
+    let mut all_stats = BTreeMap::new();
 
     for name in DATASETS {
         let bytes = std::fs::read(format!("../../datasets/{name}.dt")).unwrap();

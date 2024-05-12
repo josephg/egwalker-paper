@@ -1,4 +1,8 @@
 {
+  "A1": {
+    "steady_state": 10316886,
+    "peak": 11706702
+  },
   "A2": {
     "steady_state": 6475448,
     "peak": 7102136
@@ -7,24 +11,20 @@
     "steady_state": 30859748,
     "peak": 37049676
   },
-  "S2": {
-    "steady_state": 8465292,
-    "peak": 8750988
-  },
   "C2": {
     "steady_state": 34035030,
     "peak": 34984278
   },
-  "A1": {
-    "steady_state": 10316886,
-    "peak": 11706702
+  "S1": {
+    "steady_state": 11661256,
+    "peak": 14375368
+  },
+  "S2": {
+    "steady_state": 8465292,
+    "peak": 8750988
   },
   "S3": {
     "steady_state": 10331668,
     "peak": 11050168
-  },
-  "S1": {
-    "steady_state": 11661256,
-    "peak": 14375368
   }
 }

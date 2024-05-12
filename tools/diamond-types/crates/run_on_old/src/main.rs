@@ -1,5 +1,4 @@
-#[cfg(feature = "memusage")]
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use criterion::{BenchmarkId, black_box, Criterion};
 #[cfg(feature = "memusage")]
@@ -224,7 +223,7 @@ struct MemUsage {
 // $ cargo run -p run_on_old --release --features memusage
 #[cfg(feature = "memusage")]
 fn measure_memory() {
-    let mut usage = HashMap::new();
+    let mut usage = BTreeMap::new();
 
     for &name in DATASETS {
         print!("{name}...");

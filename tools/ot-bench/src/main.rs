@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{BufReader, Write};
 use std::ops::Range;
@@ -300,7 +300,7 @@ fn measure_memory() {
         serde_json::from_slice(&old_data).map_err(std::io::Error::from)
     }).unwrap_or_else(|err| {
         eprintln!("Warning: Could not read old data from {filename}: {:?}", err);
-        HashMap::new()
+        BTreeMap::new()
     });
 
     // dbg!(&usage);

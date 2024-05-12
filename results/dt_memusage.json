@@ -1,15 +1,23 @@
 {
-  "C2": {
-    "steady_state": 1003656,
-    "peak": 79488984
+  "A1": {
+    "steady_state": 72912,
+    "peak": 7664558
+  },
+  "A2": {
+    "steady_state": 431520,
+    "peak": 8014744
   },
   "C1": {
     "steady_state": 1014072,
     "peak": 68530752
   },
-  "A1": {
-    "steady_state": 72912,
-    "peak": 7664558
+  "C2": {
+    "steady_state": 1003656,
+    "peak": 79488984
+  },
+  "S1": {
+    "steady_state": 597432,
+    "peak": 4715252
   },
   "S2": {
     "steady_state": 323640,
@@ -18,13 +26,5 @@
   "S3": {
     "steady_state": 164424,
     "peak": 14817158
-  },
-  "A2": {
-    "steady_state": 431520,
-    "peak": 8014744
-  },
-  "S1": {
-    "steady_state": 597432,
-    "peak": 4715252
   }
 }
