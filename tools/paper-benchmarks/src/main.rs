@@ -1,25 +1,19 @@
 #![allow(unused)]
 
-use std::collections::HashMap;
-use std::ops::Range;
+use std::collections::BTreeMap;
 
-use automerge::{AutoCommit, Automerge, ObjType, ReadDoc};
+use automerge::{AutoCommit, ReadDoc};
 use automerge::transaction::Transactable;
-use crdt_testdata::{load_testing_data, TestData, TestPatch};
+use crdt_testdata::{load_testing_data, TestData};
 #[cfg(feature = "bench")]
-use criterion::{Bencher, BenchmarkId, black_box, Criterion, Throughput};
-use diamond_types::AgentId;
-use diamond_types::list::encoding::ENCODE_FULL;
+use criterion::Criterion;
 use diamond_types::list::ListOpLog;
-use diamond_types_crdt::list::ListCRDT as DTCRDT;
-use jumprope::{JumpRope, JumpRopeBuf};
 use serde::Serialize;
-use trace_alloc::{get_thread_memory_usage, measure_memusage};
-use yrs::{Text, TextRef, Transact};
+use trace_alloc::measure_memusage;
+use yrs::{Text, Transact};
+
 #[cfg(feature = "bench")]
-use crate::convert1::{bench_automerge_remote, convert_main};
-#[cfg(feature = "bench")]
-use crate::ff_bench::bench_ff;
+use crate::convert1::bench_automerge_remote;
 
 mod benchmarks;
 mod ff_bench;
@@ -54,7 +48,7 @@ struct MemUsage {
 // $ cargo run --features memusage --release
 #[cfg(feature = "memusage")]
 fn measure_memory() {
-    let mut usage = HashMap::new();
+    let mut usage = BTreeMap::new();
 
     for &name in DATASETS {
         print!("{name}...");
