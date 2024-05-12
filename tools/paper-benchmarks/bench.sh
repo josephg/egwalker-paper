@@ -7,7 +7,7 @@ set -e
 
 start_time=$(date +%s)   # Capture start time in seconds
 
-cargo build --profile bench
+cargo build --profile bench --features bench
 
 end_time=$(date +%s)     # Capture end time in seconds
 

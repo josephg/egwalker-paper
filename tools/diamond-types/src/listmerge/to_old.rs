@@ -1,6 +1,7 @@
 use rle::{HasLength, MergableSpan, merge_items, MergeableIterator, SplitableSpan, SplitableSpanHelpers};
 use crate::{DTRange, SmartString, LV, Frontier};
 use crate::causalgraph::agent_assignment::remote_ids::RemoteVersionSpan;
+use crate::dtrange::is_underwater;
 use crate::list::ListOpLog;
 use crate::list::operation::ListOpKind;
 use crate::listmerge::M2Tracker;
@@ -189,6 +190,7 @@ impl ListOpLog {
                     }
                 }
                 OldCRDTOpInternal::Del { start_v, target } => {
+                    assert!(!is_underwater(target.span.start));
                     OldCRDTOp::Del { start_v, target }
                 }
             }

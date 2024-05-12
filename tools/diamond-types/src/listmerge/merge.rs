@@ -13,7 +13,7 @@ use rle::intersect::rle_intersect_rev;
 use crate::listmerge::{DocRangeIndex, Index, M2Tracker};
 use crate::listmerge::yjsspan::{INSERTED, NOT_INSERTED_YET, CRDTSpan};
 use crate::list::operation::{ListOpKind, TextOperation};
-use crate::dtrange::{DTRange, UNDERWATER_START};
+use crate::dtrange::{DTRange, is_underwater, UNDERWATER_START};
 use crate::rle::{KVPair, RleSpanHelpers, RleVec};
 use crate::{AgentId, CausalGraph, Frontier, LV};
 use crate::causalgraph::agent_assignment::AgentAssignment;
@@ -531,6 +531,7 @@ impl M2Tracker {
                 let lv_start = op_pair.0;
 
                 #[cfg(feature = "ops_to_old")] {
+                    assert!(!is_underwater(target.start));
                     self.dbg_ops.push_rle(OldCRDTOpInternal::Del {
                         start_v: lv_start,
                         target: RangeRev {
@@ -900,6 +901,48 @@ impl<'a> TransformedOpsIter<'a> {
         // Importantly, we're passing allow_ff: false to make sure we get the actual output!
         let (plan, common) = subgraph.make_m1_plan(Some(ops), from_frontier, merge_frontier, false);
         let mut iter = Self::from_plan(subgraph, aa, op_ctx, ops, plan, common);
+
+        // dbg!(iter.tracker.range_tree.content_len() - CRDTSpan::new_underwater().len());
+
+        // let mut into = JumpRopeBuf::new();
+        //
+        // let mut last_len = 0;
+        // let mut last_lv = 0..0;
+        //
+        // while let Some((_lv, origin_op, xf)) = iter.next() {
+        //     match (origin_op.kind, xf) {
+        //         (ListOpKind::Ins, BaseMoved(pos)) => {
+        //             debug_assert!(origin_op.content_pos.is_some()); // Ok if this is false - we'll just fill with junk.
+        //             let content = origin_op.get_content(&op_ctx).unwrap();
+        //             // println!("Insert '{}' at {} (len {})", content, pos, origin_op.len());
+        //             assert!(pos <= into.len_chars());
+        //             if origin_op.loc.fwd {
+        //                 into.insert(pos, content);
+        //             } else {
+        //                 // We need to insert the content in reverse order.
+        //                 let c = reverse_str(content);
+        //                 into.insert(pos, &c);
+        //             }
+        //             // println!("-> doc len {}", into.len_chars());
+        //         }
+        //
+        //         (_, DeleteAlreadyHappened) => {}, // Discard.
+        //
+        //         (ListOpKind::Del, BaseMoved(del_start)) => {
+        //             let del_end = del_start + origin_op.len();
+        //             // println!("Delete {}..{} (len {}) doc len {}", del_start, del_end, origin_op.len(), into.len_chars());
+        //             // println!("Delete {}..{} (len {}) '{}'", del_start, del_end, origin_op.len(), to.content.slice_chars(del_start..del_end).collect::<String>());
+        //             debug_assert!(into.len_chars() >= del_end);
+        //             into.remove(del_start..del_end);
+        //         }
+        //     }
+        //
+        //     let l1 = iter.tracker.range_tree.content_len() - CRDTSpan::new_underwater().len();
+        //     let l2 = into.len_chars();
+        //     assert_eq!(l1, l2);
+        //     last_len = l1;
+        //     last_lv = _lv.._lv + origin_op.len();
+        // }
         while let Some(_) = iter.next() {} // Consume all actions.
         iter.tracker.dbg_ops
     }
