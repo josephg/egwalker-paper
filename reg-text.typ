@@ -9,13 +9,16 @@
 #import "charts.typ"
 #show: thmrules
 
+// Might be worth pulling these two fields in from a config file instead
 #let anonymous = true
+#let draft = true
+
+
 #let algname = "Eg-walker"
 #if anonymous {
   algname = "Feathertail"
 }
 
-#let draft = true
 #let background = none
 #if draft {
   background = rotate(64deg, text(120pt, fill: rgb("DFDBD4"))[*DRAFT*])
