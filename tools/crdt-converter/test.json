@@ -1,0 +1,1 @@
+{"kind":"concurrent","endContent":"appppple\n","numAgents":2,"txns":[{"parents":[],"numChildren":1,"agent":0,"time":"1970-01-01T00:00:00Z","patches":[[0,0,"apple\n"]],"_dtSpan":[0,6]},{"parents":[0],"numChildren":0,"agent":1,"time":"1970-01-01T00:00:00Z","patches":[[3,0,"ppp"]],"_dtSpan":[6,9]}]}

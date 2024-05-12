@@ -1,10 +1,13 @@
 #![allow(unused_imports)]
 
+use argh::FromArgs;
 use std::collections::HashMap;
 use std::error::Error;
+use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::BufReader;
 use std::ops::Range;
+use std::path::{Path, PathBuf};
 use automerge::{ActorId, AutoCommit, Automerge, ObjType, ReadDoc};
 use automerge::transaction::Transactable;
 use criterion::{BenchmarkId, black_box, Criterion};
@@ -200,7 +203,7 @@ impl TextCRDT for DTCRDT {
     }
 }
 
-fn load_history(filename: &str) -> EditHistory {
+fn load_history<P: AsRef<Path>>(filename: P) -> EditHistory {
     let file = BufReader::new(File::open(filename).unwrap());
     serde_json::from_reader(file).unwrap()
 }
@@ -430,42 +433,52 @@ fn bench_main() {
     c.final_summary();
 }
 
-fn run_automerge(filename: &str) {
-    println!("Processing {filename}... to automerge");
-    let history = load_history(&format!("{filename}.json"));
+fn run_automerge(filename: &Path) {
+    println!("Processing {}... to automerge", filename.to_string_lossy());
+    // let history = load_history(&format!("{filename}.json"));
+    let history = load_history(filename);
     let (mut doc, text_id) = process::<AutomergeCRDT>(&history);
 
     // println!("done!");
     let result = doc.text(text_id.clone()).unwrap();
+    black_box(result);
     // println!("result: '{result}'");
     let saved = doc.save();
     println!("automerge document saves to {} bytes", saved.len());
 
-    let out_filename = format!("{filename}.am");
+    // let out_filename = format!("{filename}.am");
+    let out_filename = filename.with_extension("am");
     std::fs::write(&out_filename, saved).unwrap();
-    println!("Saved to {out_filename}");
-
+    println!("Saved to {}", out_filename.to_string_lossy());
 
     let saved_nocompress = doc.save_nocompress();
     println!("automerge uncompressed document size to {} bytes", saved_nocompress.len());
 
-    let out_filename = format!("{filename}-uncompressed.am");
+    // This is horrible.
+    let mut out_filename = filename.to_path_buf();
+    out_filename.set_extension("");
+    let mut out_filename: OsString = out_filename.into();
+    out_filename.push("-uncompressed");
+    let mut out_filename: PathBuf = out_filename.into();
+    out_filename.set_extension("am");
+    // let out_filename = format!("{filename}-uncompressed.am");
     std::fs::write(&out_filename, saved_nocompress).unwrap();
-    println!("Saved uncompressed data to {out_filename}");
+    println!("Saved uncompressed data to {}", out_filename.to_string_lossy());
 
     // assert_eq!(result, history.end_content);
 }
 
-fn run_dt(filename: &str) {
-    let history = load_history(&format!("{filename}.json"));
+fn run_dt(filename: &Path) {
+    // let history = load_history(&format!("{filename}.json"));
+    let history = load_history(filename);
     let (doc, _) = process::<DTCRDT>(&history);
 
     assert_eq!(doc.to_string(), history.end_content);
 }
 
-fn run_yrs(filename: &str) {
-    println!("Processing {filename} to Yrs...");
-    let history = load_history(&format!("{filename}.json"));
+fn run_yrs(filename: &Path) {
+    println!("Processing {} to Yrs...", filename.to_string_lossy());
+    let history = load_history(filename);
     let (doc, text_ref) = process::<YrsCRDT>(&history);
 
     let content = text_ref.get_string(&doc.transact());
@@ -477,9 +490,25 @@ fn run_yrs(filename: &str) {
     }
     // assert_eq!(content, history.end_content, "content does not match");
 
-    let out_filename = format!("{filename}.yjs");
+    // let out_filename = format!("{filename}.yjs");
+    let out_filename = filename.with_extension("yjs");
     std::fs::write(&out_filename, doc.transact().encode_state_as_update_v2(&StateVector::default())).unwrap();
-    println!("Saved to {out_filename}");
+    println!("Saved to {}", out_filename.to_string_lossy());
+}
+
+/// Convert json editing traces to automerge and yjs
+#[derive(Debug, FromArgs)]
+struct Cfg {
+    /// convert to yjs
+    #[argh(switch, short='y')]
+    yjs: bool,
+    /// convert to automerge
+    #[argh(switch, short='a')]
+    automerge: bool,
+
+    /// input filename
+    #[argh(positional)]
+    input: PathBuf,
 }
 
 fn main() {
@@ -491,10 +520,20 @@ fn main() {
 
     // "git-makefilex3",
     // for file in &["automerge-paperx3", "seph-blog1x3", "node_nodeccx1", "friendsforeverx25", "clownschoolx25", "egwalkerx1"] {
-    for file in &["S1", "S2", "S3", "C1", "C2", "A1", "A2"] {
-        println!("\n\n----\n{file}");
-        run_automerge(&format!("../../datasets/{}", file));
-        run_yrs(&format!("../../datasets/{}", file));
+
+
+    // for file in &["S1", "S2", "S3", "C1", "C2", "A1", "A2"] {
+    //     println!("\n\n----\n{file}");
+    //     run_automerge(&format!("../../datasets/{}", file));
+    //     run_yrs(&format!("../../datasets/{}", file));
+    // }
+
+    let cfg: Cfg = argh::from_env();
+    if cfg.yjs {
+        run_yrs(&cfg.input);
+    }
+    if cfg.automerge {
+        run_automerge(&cfg.input);
     }
 
     // run_automerge("automerge-paper");
