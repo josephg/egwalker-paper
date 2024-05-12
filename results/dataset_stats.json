@@ -1,12 +1,12 @@
 {
-  "S3": {
-    "file_size": 355551,
-    "smol_size": 184685,
-    "uncompressed_size": 632602,
-    "uncompressed_smol_size": 268178,
+  "S2": {
+    "file_size": 471421,
+    "smol_size": 149637,
+    "uncompressed_size": 752613,
+    "uncompressed_smol_size": 285429,
     "op_stats": {
       "entry_byte_size": 64,
-      "len": 54397,
+      "len": 60162,
       "capacity": 65536
     },
     "graph_stats": {
@@ -19,109 +19,16 @@
       "len": 1,
       "capacity": 4
     },
-    "num_insert_keystrokes": 529540,
-    "num_delete_keystrokes": 364414,
-    "total_keystrokes": 893954,
-    "ins_content_len_utf8": 529552,
-    "final_doc_len_chars": 165126,
-    "final_doc_len_utf8": 165128,
+    "num_insert_keystrokes": 637467,
+    "num_delete_keystrokes": 467160,
+    "total_keystrokes": 1104627,
+    "ins_content_len_utf8": 637491,
+    "final_doc_len_chars": 170307,
+    "final_doc_len_utf8": 170307,
     "concurrency_estimate": 0.0,
     "graph_rle_size": 1,
     "num_agents": 1,
-    "final_document_size": 165126
-  },
-  "S1": {
-    "file_size": 316413,
-    "smol_size": 194402,
-    "uncompressed_size": 610585,
-    "uncompressed_smol_size": 378196,
-    "op_stats": {
-      "entry_byte_size": 64,
-      "len": 32193,
-      "capacity": 32768
-    },
-    "graph_stats": {
-      "entry_byte_size": 72,
-      "len": 1,
-      "capacity": 4
-    },
-    "aa_stats": {
-      "entry_byte_size": 32,
-      "len": 1,
-      "capacity": 4
-    },
-    "num_insert_keystrokes": 546945,
-    "num_delete_keystrokes": 232389,
-    "total_keystrokes": 779334,
-    "ins_content_len_utf8": 546945,
-    "final_doc_len_chars": 314556,
-    "final_doc_len_utf8": 314556,
-    "concurrency_estimate": 0.0,
-    "graph_rle_size": 1,
-    "num_agents": 1,
-    "final_document_size": 314556
-  },
-  "C2": {
-    "file_size": 676591,
-    "smol_size": 672340,
-    "uncompressed_size": 1224941,
-    "uncompressed_smol_size": 1185216,
-    "op_stats": {
-      "entry_byte_size": 64,
-      "len": 102650,
-      "capacity": 131072
-    },
-    "graph_stats": {
-      "entry_byte_size": 72,
-      "len": 95526,
-      "capacity": 131072
-    },
-    "aa_stats": {
-      "entry_byte_size": 32,
-      "len": 62851,
-      "capacity": 65536
-    },
-    "num_insert_keystrokes": 568425,
-    "num_delete_keystrokes": 39725,
-    "total_keystrokes": 608150,
-    "ins_content_len_utf8": 568425,
-    "final_doc_len_chars": 528700,
-    "final_doc_len_utf8": 528700,
-    "concurrency_estimate": 0.43521336,
-    "graph_rle_size": 133626,
-    "num_agents": 3,
-    "final_document_size": 528700
-  },
-  "A1": {
-    "file_size": 334914,
-    "smol_size": 131031,
-    "uncompressed_size": 601765,
-    "uncompressed_smol_size": 151140,
-    "op_stats": {
-      "entry_byte_size": 64,
-      "len": 53622,
-      "capacity": 65536
-    },
-    "graph_stats": {
-      "entry_byte_size": 72,
-      "len": 91,
-      "capacity": 128
-    },
-    "aa_stats": {
-      "entry_byte_size": 32,
-      "len": 924,
-      "capacity": 1024
-    },
-    "num_insert_keystrokes": 488767,
-    "num_delete_keystrokes": 458570,
-    "total_keystrokes": 947337,
-    "ins_content_len_utf8": 488767,
-    "final_doc_len_chars": 38142,
-    "final_doc_len_utf8": 38142,
-    "concurrency_estimate": 0.098713554,
-    "graph_rle_size": 101,
-    "num_agents": 194,
-    "final_document_size": 38142
+    "final_document_size": 170307
   },
   "C1": {
     "file_size": 466960,
@@ -154,6 +61,99 @@
     "num_agents": 2,
     "final_document_size": 534050
   },
+  "S1": {
+    "file_size": 316413,
+    "smol_size": 194402,
+    "uncompressed_size": 610585,
+    "uncompressed_smol_size": 378196,
+    "op_stats": {
+      "entry_byte_size": 64,
+      "len": 32193,
+      "capacity": 32768
+    },
+    "graph_stats": {
+      "entry_byte_size": 72,
+      "len": 1,
+      "capacity": 4
+    },
+    "aa_stats": {
+      "entry_byte_size": 32,
+      "len": 1,
+      "capacity": 4
+    },
+    "num_insert_keystrokes": 546945,
+    "num_delete_keystrokes": 232389,
+    "total_keystrokes": 779334,
+    "ins_content_len_utf8": 546945,
+    "final_doc_len_chars": 314556,
+    "final_doc_len_utf8": 314556,
+    "concurrency_estimate": 0.0,
+    "graph_rle_size": 1,
+    "num_agents": 1,
+    "final_document_size": 314556
+  },
+  "S3": {
+    "file_size": 682717,
+    "smol_size": 178153,
+    "uncompressed_size": 1286536,
+    "uncompressed_smol_size": 220652,
+    "op_stats": {
+      "entry_byte_size": 64,
+      "len": 70080,
+      "capacity": 131072
+    },
+    "graph_stats": {
+      "entry_byte_size": 72,
+      "len": 1,
+      "capacity": 4
+    },
+    "aa_stats": {
+      "entry_byte_size": 32,
+      "len": 1,
+      "capacity": 4
+    },
+    "num_insert_keystrokes": 1151946,
+    "num_delete_keystrokes": 1065556,
+    "total_keystrokes": 2217502,
+    "ins_content_len_utf8": 1152326,
+    "final_doc_len_chars": 86390,
+    "final_doc_len_utf8": 86442,
+    "concurrency_estimate": 0.0,
+    "graph_rle_size": 1,
+    "num_agents": 1,
+    "final_document_size": 86390
+  },
+  "A1": {
+    "file_size": 334914,
+    "smol_size": 131031,
+    "uncompressed_size": 601765,
+    "uncompressed_smol_size": 151140,
+    "op_stats": {
+      "entry_byte_size": 64,
+      "len": 53622,
+      "capacity": 65536
+    },
+    "graph_stats": {
+      "entry_byte_size": 72,
+      "len": 91,
+      "capacity": 128
+    },
+    "aa_stats": {
+      "entry_byte_size": 32,
+      "len": 924,
+      "capacity": 1024
+    },
+    "num_insert_keystrokes": 488767,
+    "num_delete_keystrokes": 458570,
+    "total_keystrokes": 947337,
+    "ins_content_len_utf8": 488767,
+    "final_doc_len_chars": 38142,
+    "final_doc_len_utf8": 38142,
+    "concurrency_estimate": 0.098713554,
+    "graph_rle_size": 101,
+    "num_agents": 194,
+    "final_document_size": 38142
+  },
   "A2": {
     "file_size": 318046,
     "smol_size": 200401,
@@ -185,35 +185,35 @@
     "num_agents": 299,
     "final_document_size": 227352
   },
-  "S2": {
-    "file_size": 471421,
-    "smol_size": 149637,
-    "uncompressed_size": 752613,
-    "uncompressed_smol_size": 285429,
+  "C2": {
+    "file_size": 676591,
+    "smol_size": 672340,
+    "uncompressed_size": 1224941,
+    "uncompressed_smol_size": 1185216,
     "op_stats": {
       "entry_byte_size": 64,
-      "len": 60162,
-      "capacity": 65536
+      "len": 102650,
+      "capacity": 131072
     },
     "graph_stats": {
       "entry_byte_size": 72,
-      "len": 1,
-      "capacity": 4
+      "len": 95526,
+      "capacity": 131072
     },
     "aa_stats": {
       "entry_byte_size": 32,
-      "len": 1,
-      "capacity": 4
+      "len": 62851,
+      "capacity": 65536
     },
-    "num_insert_keystrokes": 637467,
-    "num_delete_keystrokes": 467160,
-    "total_keystrokes": 1104627,
-    "ins_content_len_utf8": 637491,
-    "final_doc_len_chars": 170307,
-    "final_doc_len_utf8": 170307,
-    "concurrency_estimate": 0.0,
-    "graph_rle_size": 1,
-    "num_agents": 1,
-    "final_document_size": 170307
+    "num_insert_keystrokes": 568425,
+    "num_delete_keystrokes": 39725,
+    "total_keystrokes": 608150,
+    "ins_content_len_utf8": 568425,
+    "final_doc_len_chars": 528700,
+    "final_doc_len_utf8": 528700,
+    "concurrency_estimate": 0.43521336,
+    "graph_rle_size": 133626,
+    "num_agents": 3,
+    "final_document_size": 528700
   }
 }
