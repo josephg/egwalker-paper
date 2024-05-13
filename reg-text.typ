@@ -914,7 +914,7 @@ In all of our traces, #algname has a significantly smaller overhead.
 // TODO: Is this worth adding?
 // Note that storing the raw editing trace in this compact form removes one of the principle benefits of #algname, as the event graph must be replayed in order to determine the current document text. To improve load time, the current text content can be cached and stored alongside the event graph on disk. Alternately, the transformed operation positions can also be stored in the file. In our testing, this resulted in a tiny increase in file size while improving load performance by an order of magnitude.
 
-In contrast, Yjs only stores the text of the resulting, merged document. This results in a smaller file size, and in the case of #algname, much faster loading times. However, the resulting system cannot reconstruct earlier document states.
+In contrast, Yjs only stores the text of the resulting, merged document. This results in a smaller file size, and in the case of #algname, much faster loading times. However, the resulting systems cannot reconstruct earlier document states.
 @chart-dt-vs-yjs compares Yjs to the equivalent event graph encoding in which we only store the resulting document text and operation metadata.
 Our encoding is smaller than Yjs on all traces. The overhead of storing the event graph is between 20% and 3$times$ the final plain text file size.
 // Using this scheme, #algname can still merge editing events and load the document text directly from disk.
