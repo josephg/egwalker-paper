@@ -83,6 +83,15 @@ const roundAuto = n => {
 
 const mean = list => (list.reduce((a, b) => a + b) / list.length)
 
+const meanFor = (type, data) => (
+  {
+    type,
+    val: mean(datasets.map(name => (
+      typeof data === 'function' ? data(name) : data[name]
+    ))),
+  }
+)
+
 const plotTimes = () => {
   const algnames = {
     dt: [egwalkerName],
@@ -113,9 +122,6 @@ const plotTimes = () => {
 
   const baseline = 1.2
 
-  const meanFor = (type, timings) => (
-    { type, val: mean(datasets.map(name => timings[name])) }
-  )
   const means = [
     meanFor('dtmerge', rawTimings.dt_merge_norm),
     meanFor('dtload', rawTimings.dt_opt_load),
@@ -346,16 +352,27 @@ const plotMemusage = () => {
     ...datasets.map(dataset => ({ dataset, type: 'otsteady', val: otmem[dataset].steady_state, })),
 
     // Steady and peak are basically the same for the CRDT data sets
-    // ...datasets.map(dataset => ({ dataset, type: 'dtcrdtsteady', val: dtcrdtmem[dataset].steady_state, })),
     ...datasets.map(dataset => ({ dataset, type: 'dtcrdt', val: dtcrdtmem[dataset].peak, })),
     ...datasets.map(dataset => ({ dataset, type: 'yjs', val: yjsmem[dataset].peak, })),
     ...datasets.map(dataset => ({ dataset, type: 'automerge', val: ammem[dataset].peak, })),
+    // ...datasets.map(dataset => ({ dataset, type: 'dtcrdtsteady', val: dtcrdtmem[dataset].steady_state, })),
 
     // ...datasets.map(dataset => ({ dataset, type: 'otmerge', val: rawTimings.ot[dataset], })),
     // ...datasets.map(dataset => ({ dataset, type: 'dtcrdt', val: rawTimings['dt-crdt_process_remote_edits'][dataset], })),
     // ...datasets.map(dataset => ({ dataset, type: 'automerge', val: rawTimings.automerge_remote[dataset], })),
     // ...datasets.map(dataset => ({ dataset, type: 'yjs', val: rawTimings.yjs_remote[dataset], })),
   ]
+
+  const means = [
+    meanFor('dtpeak', dataset => dtmem[dataset].peak),
+    meanFor('dtsteady', dataset => dtmem[dataset].steady_state),
+    meanFor('otpeak', dataset => otmem[dataset].peak),
+    meanFor('otsteady', dataset => otmem[dataset].steady_state),
+    meanFor('dtcrdt', dataset => dtcrdtmem[dataset].peak),
+    meanFor('yjs', dataset => yjsmem[dataset].peak),
+    meanFor('automerge', dataset => ammem[dataset].peak),
+  ] //.filter(m => m.val > baseline)
+
 
   // console.log(data)
 
@@ -369,7 +386,7 @@ const plotMemusage = () => {
     // marginRight: 60,
     // marginBottom: 40,
     width: 500,
-    height: 500,
+    height: 530,
     style: {
       background: 'white',
       // 'background-color': 'green',
@@ -385,6 +402,9 @@ const plotMemusage = () => {
     //   tickFormat: (d, i, _) => algnames[d],
     //   // axis: 'left',
     // },
+    fy: {
+      paddingInner: 0.15,
+    },
     y: {
       // label: 'Algorithm',
       // label: null,
@@ -440,6 +460,15 @@ const plotMemusage = () => {
       //   fill: 'green',
       //   opacity: 0.1,
       // }),
+
+      Plot.ruleX(means.filter(m => m.val > baseline), {
+        x: d => Math.max(d.val, baseline),
+        fy: 'type',
+        stroke: 'black',
+        opacity: 0.4,
+        strokeWidth: 1,
+        inset: 2,
+      }),
       Plot.barX(data, {
         y: 'dataset',
         fy: 'type',
@@ -495,6 +524,20 @@ const plotMemusage = () => {
         fill: 'black',
         dx: 6,
       }),
+
+      Plot.textX(means, {
+        x: d => Math.max(d.val, baseline),
+        fy: 'type',
+        text: d => `x̄ = ${formatBytes(d.val)}`,
+        fontWeight: 700,
+        fontSize: 9,
+        opacity: 0.6,
+
+        frameAnchor: 'top',
+        dy: -8,
+        // textAnchor: 'bottom',
+      }),
+
       // Plot.text(data, {
       //   y: 'dataset', fy: 'type',
       //   x: baseline,
@@ -838,6 +881,11 @@ const plotFF = () => {
     ...datasets.map(dataset => ({ dataset, type: 'ff_off', val: rawTimings.dt_ff_off[dataset], })),
   ]
 
+  const means = [
+    meanFor('ff_on', rawTimings.dt_merge_norm),
+    meanFor('ff_off', rawTimings.dt_ff_off),
+  ] //.filter(m => m.val > baseline)
+
   // console.log(data)
 
   return Plot.plot({
@@ -914,6 +962,15 @@ const plotFF = () => {
       //   fill: 'green',
       //   opacity: 0.1,
       // }),
+
+      // Plot.ruleX(means, {
+      //   x: 'val',
+      //   fy: 'type',
+      //   stroke: 'black',
+      //   opacity: 0.4,
+      //   strokeWidth: 1,
+      //   inset: 2,
+      // }),
       Plot.barX(data, {
         y: 'dataset',
         fy: 'type',
@@ -945,6 +1002,20 @@ const plotFF = () => {
         fill: 'black',
         dx: 6,
       }),
+
+      // Plot.textX(means, {
+      //   x: 'val',
+      //   fy: 'type',
+      //   text: d => `x̄ = ${formatMs(d.val)}`,
+      //   fontWeight: 700,
+      //   fontSize: 9,
+      //   opacity: 0.6,
+
+      //   frameAnchor: 'top',
+      //   dy: -8,
+      //   // textAnchor: 'bottom',
+      // }),
+
       // Plot.text(data, {
       //   y: 'dataset', fy: 'type',
       //   x: 0,
