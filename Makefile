@@ -97,13 +97,6 @@ datasets/%.am datasets/%-uncompressed.am &: datasets/%.json $(CONV_TOOL)
 	$(CONV_TOOL) -a $<
 
 
-# # Blanket rule for benchmarking. This must be specialised below - since it depends on $< being
-# # set to the benchmarking program.
-# target/criterion/%/base/estimates.json:
-# 	@echo "Sleeping for 5 seconds to cool down CPU..."
-# 	@sleep 5
-# 	taskset 0x1 nice -10 $< --bench $*
-
 
 # ***** Benchmarking and memory usage profiling
 

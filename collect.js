@@ -10,52 +10,44 @@ const fs = require('fs')
 const datasets = ["S1", "S2", "S3", "C1", "C2", "A1", "A2"]
 // const datasetsAmYjs = ['automerge-paper', 'seph-blog1', 'clownschool', 'friendsforever', 'node_nodecc', 'egwalker']
 
-const tests = {
-  // 'automerge-converter': ['automerge/remote'],
-  'diamond-types': [
-    // 'dt/merge', // DEPRECATED.
-    'dt/merge_norm',
-    // 'dt/ff_on',
-    'dt/ff_off',
-    'dt/opt_load',
+const tests = [
+  // 'dt/merge', // DEPRECATED.
+  'dt/merge_norm',
+  // 'dt/ff_on',
+  'dt/ff_off',
+  'dt/opt_load',
 
-    // 'dt/local',
-    // 'dt/local_rle',
-    'dt-crdt/process_remote_edits', // from run_on_old
-    // 'dt-crdt/local',
-  ],
-  'paper-benchmarks': [
-    'automerge/local',
-    'automerge/remote',
-    'cola/local',
-    'cola-nocursor/local',
-    // 'yrs/local',
-  ],
-  'ot-bench': [
-    'ot',
-  ],
-}
+  // 'dt/local',
+  // 'dt/local_rle',
+  'dt-crdt/process_remote_edits', // from run_on_old
+  // 'dt-crdt/local',
+
+  'automerge/local',
+  'automerge/remote',
+  'cola/local',
+  'cola-nocursor/local',
+
+  'ot',
+]
 
 function emitSpeeds() {
   const speeds = {}
 
-  for (const project in tests) {
-    for (const test of tests[project]) {
-      let s = speeds[test.replace(/\//g, '_')] = {}
-      for (const d of datasets) {
-        try {
-          // let project = test == 'automerge/remote' ? 'automerge-converter' : 'diamond-types'
-          const data = JSON.parse(fs.readFileSync(`tools/${project}/target/criterion/${test}/${d}/base/estimates.json`, 'utf8'))
+  for (const test of tests) {
+    let s = speeds[test.replace(/\//g, '_')] = {}
+    for (const d of datasets) {
+      try {
+        // let project = test == 'automerge/remote' ? 'automerge-converter' : 'diamond-types'
+        const data = JSON.parse(fs.readFileSync(`target/criterion/${test}/${d}/base/estimates.json`, 'utf8'))
 
-          console.log('t', test, 'd', d, data.mean.point_estimate)
+        console.log('t', test, 'd', d, data.mean.point_estimate)
 
-          // speeds[`${test.replace(/\//g, '_')}_${d}`] = data.mean.point_estimate
-          s[d] = data.mean.point_estimate / 1e6
-        } catch (e) {
-          if (e.code == 'ENOENT') {
-            console.warn('Warning: No data for', test, d)
-          } else throw e
-        }
+        // speeds[`${test.replace(/\//g, '_')}_${d}`] = data.mean.point_estimate
+        s[d] = data.mean.point_estimate / 1e6
+      } catch (e) {
+        if (e.code == 'ENOENT') {
+          console.warn('Warning: No data for', test, d)
+        } else throw e
       }
     }
   }
