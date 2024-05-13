@@ -749,10 +749,12 @@ Each column stores some different fields of the event data. The columns are:
 - _Inserted content._ An insertion event contains exactly one character (a Unicode scalar value), and a deletion does not. We concatenate the UTF-8 encoding of the characters for insertion events in the same order as they appear in the first column, and LZ4-compress.
 - _Parents._ By default we assume that every event has exactly one parent, namely its predecessor in the topological sort. Any events for which this is not true are listed explicitly, for example: "the first event has zero parents; the 153rd event has two parents, namely events numbers 31 and 152;" and so on.
 - _Event IDs._ Each event is uniquely identified by a pair of a replica ID and a per-replica sequence number. This column stores runs of event IDs, for example: "the first 1085 events are from replica $A$, starting with sequence number 0; the next 595 events are from replica $B$, starting with sequence number 0;" and so on.
-- _Cached transform positions (optional)._ We can optionally store the transformed positions of each event. This allows the document state to be recomputed much faster in many cases. And because of the similarity between transformed positions and original positions, this data adds a very small amount of file overhead in practice.
+// - _Cached transform positions (optional)._ We can optionally store the transformed positions of each event. This allows the document state to be recomputed much faster in many cases. And because of the similarity between transformed positions and original positions, this data adds a very small amount of file overhead in practice.
 
 // TODO: the next two paragraphs could be omitted if we're short of space
 We use several further tricks to reduce file size. For example, we run-length-encode deletions in reverse direction (due to holding down backspace). We express operation indexes relative to the end of the previous event, so that the number fits in fewer bytes. We deduplicate replica IDs, and so on.
+
+Peers can optionally also store a copy of the document's content, after all changes have been merged. This allows documents to be loaded directly from disk, without any additional overhead. (The event graph is only needed when merging concurrent changes).
 
 We send the same data format over the network when replicating the entire event graph.
 When sending a subset of events over the network (e.g., a single event during real-time collaboration), references to parent events outside of that subset need to be encoded using the $(italic("replicaID"), italic("seqNo"))$ event IDs, but otherwise a similar encoding can be used.
@@ -773,7 +775,7 @@ We compare #algname with two popular CRDT libraries: Automerge v0.5.9 @automerge
 We only test their collaborative text datatypes, and not the other features they support.
 However, the performance of these libraries varies widely.
 In an effort to distinguish between implementation differences and algorithmic differences, we have also implemented our own performance-optimised reference CRDT library.
-This library shares most of its code with our Rust #algname implementation, enabling (as much as possible) a like-to-like comparison between the traditional CRDT approach and #algname.
+This library shares most of its code with our Rust #algname implementation, enabling a more like-to-like comparison between the traditional CRDT approach and #algname.
 Our reference CRDT outperforms both Yjs and Automerge.
 
 We have also implemented a simple OT library using the TTF algorithm @Oster2006TTF.
@@ -782,9 +784,8 @@ We have also implemented a simple OT library using the TTF algorithm @Oster2006T
 
 We compare these implementations along 3 dimensions:
 #footnote[Experimental setup: We ran the benchmarks on a Ryzen 7950x CPU running Linux 6.5.0-28 and 64GB of RAM.
-We compiled Rust code with rustc v1.77.2 in release mode with `-C target-cpu=native`.
-We ran on a single, pinned core to avoid interference from context switches.
-For JavaScript (Yjs) we used Node.js v21.7.0.
+We compiled Rust code with rustc v1.78.0 in release mode with `-C target-cpu=native`. Rust code was pinned to a single CPU core to improve run-to-run stability. // (The reason is that different cores of the same CPU are clocked differently due to thermal reasons. Using a single core improves run-to-run stability).
+For JavaScript (Yjs) we used Node.js v21.7.0. // Javascript wasn't pinned to a single core. Nodejs uses additional cores to run the V8 optimizer.
 All reported time measurements are the mean of at least 100 test iterations (except for the case where OT takes an hour to merge trace A2, which we ran 10 times).
 The standard deviation for all benchmark results was less than 1%, hence we do not show error bars.]
 
@@ -813,6 +814,7 @@ See @traces-appendix for details.
 
 == Time taken to load and merge changes
 
+// TODO(seph): Long sentence. Revise.
 The slowest operations in many collaborative editors are merging a large set of edits from a remote replica into the local replica state, and loading a document from disk so that it can be displayed and edited.
 To simulate a worst-case merge, we start with an empty document and then merge an entire editing trace into it.
 In the case of #algname this means replaying the full trace.
@@ -820,8 +822,11 @@ In the case of #algname this means replaying the full trace.
 // For the CRDT implementations, all events were preprocessed into the appropriate CRDT message format. The time taken to do this is not included in our measurements.
 
 After completing this merge, we saved the resulting local replica state to disk and measured the CPU time to load it back into memory.
-In the CRDT implementations we tested, loading a document is equivalent to merging the remote events and takes the same time, so we do not show CRDT loading times separately in @chart-remote.
-OT and #algname load documents hundreds of times faster because they only need to load the final document state from disk in order to edit a document; they can defer the loading and replay of historical events until a merge is required.
+In the CRDT implementations we tested, loading a document from disk is equivalent to merging the remote events, so we do not show CRDT loading times separately in @chart-remote.
+OT and #algname can load documents hundreds of times faster by caching the final document state on disk, and reloading the document text directly.
+These algorithms only need to reload historical events when merging concurrent changes or to reconstruct old document versions.
+However, this comes at the cost of consuming additional space.
+// TODO(seph): This sentence is awkward. We talk about CRDTs, then OT+egwalker, then CRDTs again? Clean me!
 Existing CRDTs cannot defer this work as they require the CRDT state to be in memory to allow a user to make local edits.
 
 // For completeness, we also measured the time taken to process local editing events. However, all of the systems we tested can process events many orders of magnitude much faster than any human's typing speed. We have not shown this data as at that speed, the differences between systems are irrelevant.
@@ -860,8 +865,9 @@ We see that the optimisation is effective for S1, S2, S3, and A1, whereas for C1
 Automerge's merge times on traces C1 and C2 are outliers. This appears to be a bug, which we have reported.
 
 When merging an event graph with very high concurrency (like A2), the performance of #algname is highly dependent on the order in which events are traversed.
-A poorly chosen traversal order can make this trace as much as 8$times$ slower to merge, and our topological sort algorithm (@graph-walk) tries to avoid such pathological cases.
-However, the topological sort itself also takes time: in the C1 and C2 traces, about 40% of the runtime is the topological sort, as there are thousands of tiny branch and merge points due to the fine-grained concurrency.
+A poorly chosen traversal order can make this trace as much as 8$times$ slower to merge. Our topological sort algorithm (@graph-walk) tries to avoid such pathological cases.
+// (Seph) This is no longer true - I optimised it.
+// However, the topological sort itself also takes time: in the C1 and C2 traces, about 40% of the runtime is the topological sort, as there are thousands of tiny branch and merge points due to the fine-grained concurrency.
 
 == RAM usage
 
@@ -873,6 +879,8 @@ For the CRDTs the difference between peak and steady-state memory use is small.
 However, the steady-state memory use of #algname is 1--2 orders of magnitude lower than the best CRDT.
 This is a significant result, since the steady state is what matters during normal operation while a document is being edited.
 Note also that peak memory usage would be lower when replaying a subset of an event graph, which is likely to be the common case.
+
+// (seph): The peak memory usage could be reduced a lot if I first divide up the graph into chunks by the critical versions. Right now, the implementation makes a "merge plan" for the whole thing (which is stored in memory) then processes the entire plan. The plan itself uses up a lot of memory. A better approach would chunk it in sections separated by critical versions. That would dramatically reduce peak memory usage!
 
 Yjs has slightly higher memory use than our reference CRDT, and Automerge significantly higher.
 Automerge's very high memory use on C1 and C2 is probably a bug.
@@ -897,20 +905,25 @@ This memory use could be reduced at the cost of increased merge times.
 Our binary encoding of event graphs (@storage) results in smaller files than the equivalent internal CRDT state persisted by Automerge or Yjs.
 To ensure a like-for-like comparison we have disabled #algname's built-in LZ4 and Automerge's built-in gzip compression. Enabling this compression further reduces the file sizes.
 
-Automerge stores the full editing history of a document, and @chart-dt-vs-automerge shows the resulting file sizes relative to the raw concatenated text content of all insertions.
-In all of our traces, #algname has a significantly smaller file size.
-Storing the graph adds only modest overhead to the raw text.
+// TODO: I wonder if it would be worth adding zlib compression (matching automerge)? It would be a small change.
+
+Automerge stores the full editing history of a document, and @chart-dt-vs-automerge shows the resulting file sizes relative to the raw concatenated text content of all insertions, with and without a cached copy of the final document text.
+In all of our traces, #algname has a significantly smaller overhead.
+
 
 // TODO: Is this worth adding?
 // Note that storing the raw editing trace in this compact form removes one of the principle benefits of #algname, as the event graph must be replayed in order to determine the current document text. To improve load time, the current text content can be cached and stored alongside the event graph on disk. Alternately, the transformed operation positions can also be stored in the file. In our testing, this resulted in a tiny increase in file size while improving load performance by an order of magnitude.
 
-In contrast, Yjs does not store any deleted characters. This results in a smaller file size, at the cost of not being able to reconstruct past document states.
-To make the comparison fair, @chart-dt-vs-yjs compares Yjs to a variant of our event graph encoding in which the text content of deleted characters is omitted.
-Our encoding is smaller than Yjs on all traces, and the overhead of storing the event graph is between 20% and 3$times$ the final plain text file size.
+In contrast, Yjs only stores the text of the resulting, merged document. This results in a smaller file size, and in the case of #algname, much faster loading times. However, the resulting system cannot reconstruct earlier document states.
+@chart-dt-vs-yjs compares Yjs to the equivalent event graph encoding in which we only store the resulting document text and operation metadata.
+Our encoding is smaller than Yjs on all traces. The overhead of storing the event graph is between 20% and 3$times$ the final plain text file size.
+// Using this scheme, #algname can still merge editing events and load the document text directly from disk.
 
 #figure(
   text(8pt, charts.filesize_full),
-  caption: [File size storing edit traces using #algname's event graph encoding and Automerge. The lightly shaded region in each bar shows the concatenated length of all inserted text, which is a lower bound on the file size.],
+  caption: [
+    File size storing edit traces using #algname's event graph encoding (with and without final document caching) compared to Automerge. The lightly shaded region in each bar shows the concatenated length of all stored text. This acts as lower bound on the file size.
+  ],
   kind: image,
   placement: top,
 ) <chart-dt-vs-automerge>
