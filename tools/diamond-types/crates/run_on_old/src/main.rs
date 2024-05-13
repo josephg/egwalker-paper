@@ -1,6 +1,10 @@
+#[cfg(feature = "memusage")]
 use std::collections::BTreeMap;
+use std::hint::black_box;
+use std::path::PathBuf;
 
-use criterion::{BenchmarkId, black_box, Criterion};
+#[cfg(feature = "bench")]
+use criterion::{BenchmarkId, Criterion};
 #[cfg(feature = "memusage")]
 use serde::Serialize;
 use smallvec::{smallvec, SmallVec};
@@ -172,11 +176,18 @@ pub fn get_txns_from_oplog(oplog: &ListOpLog) -> Vec<RemoteTxn> {
     result
 }
 
-// const DATASETS: &[&str] = &["automerge-paper", "seph-blog1", "friendsforever", "clownschool", "node_nodecc", "git-makefile", "egwalker"];
-// const DATASETS: &[&str] = &["automerge-paperx3", "seph-blog1x3", "node_nodeccx1", "friendsforeverx25", "clownschoolx25", "egwalkerx1", "git-makefilex2"];
 const DATASETS: &[&str] = &["S1", "S2", "S3", "C1", "C2", "A1", "A2"];
 // const DATASETS: &[&str] = &["S3"];
 
+fn stem() -> &'static str {
+    if PathBuf::from("datasets").exists() { "." } else { "../.." }
+}
+
+fn filename_for(trace: &str) -> String {
+    format!("{}/datasets/{trace}.dt", stem())
+}
+
+#[cfg(feature = "bench")]
 fn bench_process(c: &mut Criterion) {
     // let name = "benchmark_data/node_nodecc.dt";
     // let name = "benchmark_data/friendsforever.dt";
@@ -184,7 +195,7 @@ fn bench_process(c: &mut Criterion) {
     // let name = "benchmark_data/data.dt";
 
     for &name in DATASETS {
-        let txns = get_txns_from_file(&format!("../../datasets/{}.dt", name));
+        let txns = get_txns_from_file(&filename_for(name));
         // let txns = get_txns_from_file(&format!("benchmark_data/{}.dt", name));
 
         let mut group = c.benchmark_group("dt-crdt");
@@ -227,7 +238,7 @@ fn measure_memory() {
 
     for &name in DATASETS {
         print!("{name}...");
-        let txns = get_txns_from_file(&format!("../../datasets/{name}.dt"));
+        let txns = get_txns_from_file(&filename_for(name));
 
         let (peak, steady_state, _) = measure_memusage(|| {
             let mut old_oplog = diamond_types_crdt::list::ListCRDT::new();
@@ -246,8 +257,8 @@ fn measure_memory() {
 
     let json_out = serde_json::to_vec_pretty(&usage).unwrap();
     // let filename = "../../results/ot_memusage.json";
-    let filename = "../../results/dtcrdt_memusage.json";
-    std::fs::write(filename, json_out).unwrap();
+    let filename = format!("{}/results/dtcrdt_memusage.json", stem());
+    std::fs::write(&filename, json_out).unwrap();
     println!("JSON written to {filename}");
 }
 

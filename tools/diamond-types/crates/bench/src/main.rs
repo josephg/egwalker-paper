@@ -1,24 +1,26 @@
 #![allow(dead_code)]
 
+use std::env;
+use std::path::PathBuf;
+
+use criterion::{BenchmarkId, black_box, Criterion, Throughput};
+use jumprope::{JumpRope, JumpRopeBuf};
+
+use crdt_testdata::{load_testing_data, TestData};
+use diamond_types::list::{ListCRDT, ListOpLog};
+use diamond_types::list::encoding::*;
+use diamond_types::list::op_metrics::ListOpMetrics;
+use diamond_types::list::operation::ListOpKind;
+use diamond_types::listmerge::merge::{reverse_str, TransformedResultRaw};
+use diamond_types::rle::KVPair;
+
+use crate::utils::*;
+
 // This benchmark interacts with the automerge-perf data set from here:
 // https://github.com/automerge/automerge-perf/
 // mod testdata;
 mod utils;
 mod idxtrace;
-
-use std::env;
-use criterion::{black_box, Criterion, BenchmarkId, Throughput};
-use jumprope::{JumpRope, JumpRopeBuf};
-use crdt_testdata::{load_testing_data, TestData};
-use diamond_types::DTRange;
-use diamond_types::list::{ListCRDT, ListOpLog};
-use diamond_types::list::encoding::*;
-use diamond_types::list::op_metrics::ListOpMetrics;
-use diamond_types::list::operation::{ListOpKind, TextOperation};
-use diamond_types::listmerge::merge::{reverse_str, TransformedResultRaw};
-use diamond_types::rle::KVPair;
-use crate::idxtrace::idxtrace_benchmarks;
-use crate::utils::*;
 
 fn testing_data(name: &str) -> TestData {
     let filename = format!("benchmark_data/{}.json.gz", name);
@@ -223,11 +225,19 @@ where I: Iterator<Item=TransformedResultRaw> {
     r
 }
 
+fn stem() -> &'static str {
+    if PathBuf::from("datasets").exists() { "." } else { "../.." }
+}
+
+fn filename_for(trace: &str) -> String {
+    format!("{}/datasets/{trace}.dt", stem())
+}
+
 fn paper_benchmarks(c: &mut Criterion) {
     // const PAPER_DATASETS: &[&str] = &["automerge-paperx3", "seph-blog1x3", "node_nodeccx1", "friendsforeverx25", "clownschoolx25", "egwalkerx1", "git-makefilex2"];
     for name in PAPER_DATASETS {
         let mut group = c.benchmark_group("dt");
-        let bytes = std::fs::read(format!("../../datasets/{name}.dt")).unwrap();
+        let bytes = std::fs::read(&filename_for(name)).unwrap();
         let oplog = ListOpLog::load_from(&bytes).unwrap();
         group.throughput(Throughput::Elements(oplog.len() as _));
 
@@ -260,7 +270,7 @@ fn opt_load_time_benchmark(c: &mut Criterion) {
     for &name in PAPER_DATASETS {
         let mut group = c.benchmark_group("dt");
 
-        let bytes = std::fs::read(format!("../../datasets/{name}.dt")).unwrap();
+        let bytes = std::fs::read(&filename_for(name)).unwrap();
         let oplog = ListOpLog::load_from(&bytes).unwrap();
         let doc_content = oplog.checkout_tip().content().to_string();
 

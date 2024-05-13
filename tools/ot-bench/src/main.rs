@@ -1,10 +1,15 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
+#[cfg(feature = "bench")]
+use std::hint::black_box;
 use std::io::{BufReader, Write};
 use std::ops::Range;
+use std::path::PathBuf;
+#[cfg(feature = "bench")]
 use std::time::Duration;
 
-use criterion::{black_box, Criterion};
+#[cfg(feature = "bench")]
+use criterion::Criterion;
 use jumprope::{JumpRope, JumpRopeBuf};
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
@@ -251,12 +256,6 @@ impl OperationData {
     }
 }
 
-fn load_data(filename: &str) -> OperationData {
-    let file = BufReader::new(File::open(format!("../../datasets/{}.json", filename)).unwrap());
-    let trace: TraceExportData = serde_json::from_reader(file).unwrap();
-
-    trace.into()
-}
 
 // fn main() {
 //     let data = load_data("git-makefilex2");
@@ -282,6 +281,21 @@ fn load_data(filename: &str) -> OperationData {
 //     // }
 // }
 
+fn stem() -> &'static str {
+    if PathBuf::from("datasets").exists() { "." } else { "../.." }
+}
+
+fn filename_for(trace: &str) -> String {
+    format!("{}/datasets/{trace}.json", stem())
+}
+
+fn load_data(trace: &str) -> OperationData {
+    let file = BufReader::new(File::open(&filename_for(trace)).unwrap());
+    let trace: TraceExportData = serde_json::from_reader(file).unwrap();
+
+    trace.into()
+}
+
 #[cfg(feature = "memusage")]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct MemUsage {
@@ -294,9 +308,9 @@ struct MemUsage {
 // $ cargo run --release --features memusage
 #[cfg(feature = "memusage")]
 fn measure_memory() {
-    let filename = "../../results/ot_memusage.json";
+    let filename = format!("{}/results/ot_memusage.json", stem());
 
-    let mut usage = std::fs::read(filename).and_then(|old_data| {
+    let mut usage = std::fs::read(&filename).and_then(|old_data| {
         serde_json::from_slice(&old_data).map_err(std::io::Error::from)
     }).unwrap_or_else(|err| {
         eprintln!("Warning: Could not read old data from {filename}: {:?}", err);
@@ -332,7 +346,7 @@ fn measure_memory() {
     }
 
     let json_out = serde_json::to_vec_pretty(&usage).unwrap();
-    std::fs::write(filename, json_out).unwrap();
+    std::fs::write(&filename, json_out).unwrap();
     println!("JSON written to {filename}");
 }
 

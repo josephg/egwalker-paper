@@ -26,10 +26,14 @@ smartstring = { version = "1.0.1", features = ["serde"] }
 memusage = ["trace-alloc/memusage"]
 bench = ["dep:criterion"]
 
-[profile.bench]
-inherits = "release"
+[profile.release]
 codegen-units = 1
 lto = true
 opt-level = 3
 #rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
 #rustflags = ["-C target-cpu=native"]
+
+
+# This lets me compile a memusage target to a different directory.
+[profile.memusage]
+inherits = "release"

@@ -19,6 +19,7 @@ use smallvec::SmallVec;
 use smartstring::alias::String as SmartString;
 use yrs::{GetString, OffsetKind, Options, ReadTxn, StateVector, Text, TextRef, Transact, Update};
 use yrs::updates::decoder::Decode;
+use crate::am_filename_for;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -281,7 +282,7 @@ pub fn bench_automerge_remote(c: &mut Criterion) {
         let mut group = c.benchmark_group("automerge");
 
         // let name = "friendsforever";
-        let filename = format!("../../datasets/{name}.am");
+        let filename = am_filename_for(name);
         let bytes = std::fs::read(&filename);
         match bytes {
             Ok(bytes) => {

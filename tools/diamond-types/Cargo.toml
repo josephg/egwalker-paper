@@ -111,3 +111,7 @@ codegen-units = 1
 inherits = "release"
 debug = true
 #opt-level = 0
+
+# This lets me compile a memusage target to a different directory.
+[profile.memusage]
+inherits = "release"

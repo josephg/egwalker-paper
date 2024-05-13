@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use automerge::{AutoCommit, ReadDoc};
 use automerge::transaction::Transactable;
@@ -45,6 +46,14 @@ struct MemUsage {
     peak: usize,
 }
 
+fn stem() -> &'static str {
+    if PathBuf::from("datasets").exists() { "." } else { "../.." }
+}
+
+pub fn am_filename_for(trace: &str) -> String {
+    format!("{}/datasets/{trace}.am", stem())
+}
+
 // $ cargo run --features memusage --release
 #[cfg(feature = "memusage")]
 fn measure_memory() {
@@ -52,7 +61,7 @@ fn measure_memory() {
 
     for &name in DATASETS {
         print!("{name}...");
-        let filename = format!("../../datasets/{name}.am");
+        let filename = am_filename_for(name);
         let bytes = std::fs::read(&filename).unwrap();
 
         // The steady state is a jumprope object containing the document content.
@@ -68,8 +77,8 @@ fn measure_memory() {
     }
 
     let json_out = serde_json::to_vec_pretty(&usage).unwrap();
-    let filename = "../../results/automerge_memusage.json";
-    std::fs::write(filename, json_out).unwrap();
+    let filename = format!("{}/results/automerge_memusage.json", stem());
+    std::fs::write(&filename, json_out).unwrap();
     println!("JSON written to {filename}");
 }
 

@@ -8,6 +8,7 @@
 // $ cargo run --release --features memusage --example stats
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 #[cfg(feature = "memusage")]
 use humansize::{DECIMAL, format_size};
@@ -151,6 +152,14 @@ fn print_stats_for_oplog(_name: &str, oplog: &ListOpLog) {
 }
 
 
+fn stem() -> &'static str {
+    if PathBuf::from("datasets").exists() { "." } else { "../.." }
+}
+
+fn filename_for(trace: &str) -> String {
+    format!("{}/datasets/{trace}.dt", stem())
+}
+
 
 #[cfg(feature = "memusage")]
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -167,7 +176,7 @@ fn measure_memory() {
 
     for &name in DATASETS {
         print!("{name}...");
-        let bytes = std::fs::read(format!("../../datasets/{name}.dt")).unwrap();
+        let bytes = std::fs::read(&filename_for(name)).unwrap();
 
         // The steady state is a jumprope object containing the document content.
         let (peak, steady_state, _) = measure_memusage(|| {
@@ -183,8 +192,8 @@ fn measure_memory() {
     }
 
     let json_out = serde_json::to_vec_pretty(&usage).unwrap();
-    let filename = "../../results/dt_memusage.json";
-    std::fs::write(filename, json_out).unwrap();
+    let filename = format!("{}/results/dt_memusage.json", stem());
+    std::fs::write(&filename, json_out).unwrap();
     println!("JSON written to {filename}");
 }
 
@@ -203,7 +212,7 @@ fn get_stats() {
     let mut all_stats = BTreeMap::new();
 
     for name in DATASETS {
-        let bytes = std::fs::read(format!("../../datasets/{name}.dt")).unwrap();
+        let bytes = std::fs::read(&filename_for(name)).unwrap();
         let oplog = ListOpLog::load_from(&bytes).unwrap();
 
         let inner_stats = oplog.get_stats();
@@ -261,8 +270,8 @@ fn get_stats() {
     }
 
     let json_out = serde_json::to_vec_pretty(&all_stats).unwrap();
-    let filename = "../../results/dataset_stats.json";
-    std::fs::write(filename, json_out).unwrap();
+    let filename = format!("{}/results/dataset_stats.json", stem());
+    std::fs::write(&filename, json_out).unwrap();
     println!("Stats table written to {filename}");
 }
 

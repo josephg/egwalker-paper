@@ -10,9 +10,9 @@ diamond-types = {path = "../..", features = ["ops_to_old"]}
 diamond-types-crdt = {path = "../diamond-types-crdt"}
 smallvec = "1.9.0"
 rle = {path = "../rle"}
-criterion = { version = "0.5.1", features = ["html_reports"] }
+criterion = { version = "0.5.1", features = ["html_reports"], optional = true }
 trace-alloc = { path = "../trace-alloc", optional = true }
-serde = { version = "1.0.136", optional = true }
+serde = { version = "1.0.136", features = ["derive"], optional = true }
 serde_json = { version = "1.0.79", optional = true }
 
 [dev-dependencies]
@@ -23,4 +23,4 @@ brotli-decompressor = "2.5.0"
 
 [features]
 memusage = ["trace-alloc", "trace-alloc/memusage", "dep:serde", "dep:serde_json"]
-bench = []
+bench = ["dep:criterion"]

@@ -1,6 +1,8 @@
-.phony: all
+.phony: all cargo_magic
 all: reg-text.pdf
 # all: $(ALL_JSON) $(DIAGRAMS)
+
+cargo_magic:
 
 DT_TOOL=tools/diamond-types/target/release/dt
 CONV_TOOL=tools/crdt-converter/target/release/crdt-converter
@@ -14,23 +16,25 @@ ALL_AM = $(patsubst %,datasets/%.am,$(DATASET))
 
 
 DT_BENCHES = \
-	$(patsubst %,tools/diamond-types/target/criterion/dt/merge_norm/%/base/estimates.json,$(DATASET)) \
-	$(patsubst %,tools/diamond-types/target/criterion/dt/ff_off/%/base/estimates.json,$(DATASET)) \
-	$(patsubst %,tools/diamond-types/target/criterion/dt/opt_load/%/base/estimates.json,$(DATASET)) \
+	$(patsubst %,target/criterion/dt/merge_norm/%/base/estimates.json,$(DATASET)) \
+	$(patsubst %,target/criterion/dt/ff_off/%/base/estimates.json,$(DATASET)) \
+	$(patsubst %,target/criterion/dt/opt_load/%/base/estimates.json,$(DATASET)) \
 
 DT_CRDT_BENCHES = \
-	$(patsubst %,tools/diamond-types/target/criterion/dt-crdt/process_remote_edits/%/base/estimates.json,$(DATASET))
+	$(patsubst %,target/criterion/dt-crdt/process_remote_edits/%/base/estimates.json,$(DATASET))
 
 AM_BENCHES = \
-	$(patsubst %,tools/paper-benchmarks/target/criterion/automerge/remote/%/base/estimates.json,$(DATASET))
+	$(patsubst %,target/criterion/automerge/remote/%/base/estimates.json,$(DATASET))
 
 OT_BENCHES = \
-	$(patsubst %,tools/ot-bench/target/criterion/ot/%/base/estimates.json,$(DATASET))
+	$(patsubst %,target/criterion/ot/%/base/estimates.json,$(DATASET))
 
 ALL_BENCHES = $(DT_BENCHES) $(DT_CRDT_BENCHES) $(AM_BENCHES) $(OT_BENCHES)
 
+# Benchmarks must be run 1 at a time.
+.NOTPARALLEL: $(ALL_BENCHES)
+
 ALL_RESULTS = \
-	results/timings.json \
 	results/automerge_memusage.json \
 	results/dtcrdt_memusage.json \
 	results/dt_memusage.json \
@@ -40,6 +44,7 @@ ALL_RESULTS = \
 	results/dataset_stats.json \
 	results/xf-friendsforever-ff.json \
 	results/xf-friendsforever-noff.json \
+	results/timings.json \
 
 # These result files aren't used directly.
 # results/js.json \
@@ -53,6 +58,7 @@ ALL_RESULTS = \
 
 DIAGRAMS = diagrams/timings.svg diagrams/memusage.svg diagrams/filesize_full.svg diagrams/filesize_smol.svg diagrams/ff.svg
 
+# ***** Creating datasets
 
 $(DT_TOOL):
 	cd tools/diamond-types && cargo build --release -p dt-cli
@@ -91,17 +97,96 @@ datasets/%.am datasets/%-uncompressed.am &: datasets/%.json $(CONV_TOOL)
 	$(CONV_TOOL) -a $<
 
 
-results/dt_memusage.json results/dataset_stats.json &: $(ALL_DT) tools/diamond-types/crates/paper-stats/src/main.rs
-	cd tools/diamond-types && cargo run --release -p paper-stats --features memusage
+# # Blanket rule for benchmarking. This must be specialised below - since it depends on $< being
+# # set to the benchmarking program.
+# target/criterion/%/base/estimates.json:
+# 	@echo "Sleeping for 5 seconds to cool down CPU..."
+# 	@sleep 5
+# 	taskset 0x1 nice -10 $< --bench $*
 
-results/dtcrdt_memusage.json: $(ALL_DT) tools/diamond-types/crates/run_on_old/src/main.rs
-	cd tools/diamond-types && cargo run --release -p run_on_old --features memusage
 
-results/automerge_memusage.json: $(ALL_AM)
-	cd tools/paper-benchmarks && cargo run --features memusage --release
+# ***** Benchmarking and memory usage profiling
 
-results/ot_memusage.json: $(ALL_JSON) tools/ot-bench/src/main.rs
-	cd tools/ot-bench && cargo run --features memusage --release
+# Dataset stats + memory usage for DT
+PAPER_STATS_TOOL = tools/diamond-types/target/release/paper-stats
+
+$(PAPER_STATS_TOOL): cargo_magic
+	cd tools/diamond-types && cargo build --release -p paper-stats --features memusage
+
+results/dt_memusage.json results/dataset_stats.json &: $(PAPER_STATS_TOOL) $(ALL_DT)
+	$<
+
+# Benchmarking for DT
+DT_BENCH_TOOL = tools/diamond-types/target/release/bench
+$(DT_BENCH_TOOL): cargo_magic
+	cd tools/diamond-types && cargo build --release -p bench
+
+target/criterion/dt/%/base/estimates.json: $(DT_BENCH_TOOL) $(ALL_DT)
+	@echo "Sleeping for 5 seconds to cool down CPU..."
+	@sleep 5
+	taskset 0x1 nice -10 $< --bench $*
+
+
+# Memory usage for dt-crdt
+DTCRDT_MEMUSAGE_TOOL = tools/diamond-types/target/memusage/run_on_old
+
+$(DTCRDT_MEMUSAGE_TOOL): cargo_magic
+	cd tools/diamond-types && cargo build --profile memusage -p run_on_old --features memusage
+results/dtcrdt_memusage.json: $(DTCRDT_MEMUSAGE_TOOL) $(ALL_DT)
+	$<
+
+# Benchmarking for dt-crdt
+DTCRDT_BENCH_TOOL = tools/diamond-types/target/release/run_on_old
+
+$(DTCRDT_BENCH_TOOL): cargo_magic
+	cd tools/diamond-types && cargo build --release -p run_on_old --features bench
+
+target/criterion/dt-crdt/%/base/estimates.json: $(DTCRDT_BENCH_TOOL) $(ALL_DT)
+	@echo "Sleeping for 5 seconds to cool down CPU..."
+	@sleep 5
+	taskset 0x1 nice -10 $< --bench $*
+
+
+# Memory usage for automerge
+AM_MEMUSAGE_TOOL = tools/paper-benchmarks/target/memusage/paper-benchmarks
+$(AM_MEMUSAGE_TOOL): cargo_magic
+	cd tools/paper-benchmarks && cargo build --profile memusage --features memusage
+
+results/automerge_memusage.json: $(AM_MEMUSAGE_TOOL) $(ALL_AM)
+	$<
+
+# Benchmarks for automerge
+PAPER_BENCH_TOOL = tools/paper-benchmarks/target/release/paper-benchmarks
+$(PAPER_BENCH_TOOL): cargo_magic
+	cd tools/paper-benchmarks && cargo build --release --features bench
+
+target/criterion/automerge/%/base/estimates.json: $(PAPER_BENCH_TOOL) $(ALL_AM)
+	@echo "Sleeping for 5 seconds to cool down CPU..."
+	@sleep 5
+	taskset 0x1 nice -10 $< --bench $*
+
+
+# Memory usage for OT
+OT_MEMUSAGE_TOOL = tools/ot-bench/target/memusage/ot-bench
+$(OT_MEMUSAGE_TOOL): cargo_magic
+	cd tools/ot-bench && cargo build --profile memusage --features memusage
+
+results/ot_memusage.json: $(OT_MEMUSAGE_TOOL) $(ALL_JSON)
+	$<
+
+# Benchmarks for OT
+OT_BENCH_TOOL = tools/ot-bench/target/release/ot-bench
+$(OT_BENCH_TOOL): cargo_magic
+	cd tools/ot-bench && cargo build --release --features bench
+
+target/criterion/ot/%/estimates.json: $(OT_BENCH_TOOL) $(ALL_AM)
+	@echo "Sleeping for 5 seconds to cool down CPU..."
+	@sleep 5
+	taskset 0x1 nice -10 $< --bench $*
+
+
+
+# YJS
 
 %/node_modules: %/package.json
 	@echo "Installing Node.js dependencies in $*..."
@@ -114,19 +199,18 @@ results/yjs_memusage.json: tools/bench-yjs/node_modules $(ALL_YJS)
 results/js.json: $(ALL_YJS)
 	cd tools/bench-yjs && node bench-remote.js
 
-tools/diamond-types/target/criterion/dt/%/base/estimates.json: $(ALL_DT)
-	cd tools/diamond-types && ./bench.sh $*
+# tools/diamond-types/target/criterion/dt/%/base/estimates.json: $(ALL_DT)
+# 	cd tools/diamond-types && ./bench.sh $*
 
-tools/diamond-types/target/criterion/dt-crdt/%/base/estimates.json: $(ALL_DT)
-	cd tools/diamond-types && ./bench-runonold.sh $*
+# tools/diamond-types/target/criterion/dt-crdt/%/base/estimates.json: $(ALL_DT)
+# 	cd tools/diamond-types && ./bench-runonold.sh $*
 
-tools/paper-benchmarks/target/criterion/automerge/%/base/estimates.json: $(ALL_AM)
-	cd tools/paper-benchmarks && ./bench.sh $*
+# tools/paper-benchmarks/target/criterion/automerge/%/base/estimates.json: $(ALL_AM)
+# 	cd tools/paper-benchmarks && ./bench.sh $*
 
-tools/ot-bench/target/criterion/ot/%/estimates.json: $(ALL_JSON)
-	cd tools/ot-bench && ./bench.sh $*
+# tools/ot-bench/target/criterion/ot/%/estimates.json: $(ALL_JSON)
+# 	cd tools/ot-bench && ./bench.sh $*
 
-.NOTPARALLEL: $(ALL_BENCHES)
 
 results/timings.json results/yjs_am_sizes.json &: results/js.json $(ALL_YJS) $(ALL_AM) $(ALL_BENCHES)
 	node collect.js

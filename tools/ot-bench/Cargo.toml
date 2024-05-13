@@ -13,15 +13,19 @@ smallvec = { version = "1.13.1", features = ["serde"]}
 smartstring = { version = "1.0.1", features = ["serde"] }
 #ot-text = { path = "../../../textot.rs" }
 str_indices = "0.4.3"
-criterion = { version = "0.5.1", features = [] }
+criterion = { version = "0.5.1", features = [], optional = true }
 rustc-hash = "1.1.0"
 trace-alloc = { path = "../diamond-types/crates/trace-alloc", optional = true }
 
 [features]
 memusage = ["trace-alloc", "trace-alloc/memusage"]
-bench = []
+bench = ["dep:criterion"]
 
 [profile.release]
 #debug = true
 lto = true
 codegen-units = 1
+
+# This lets me compile a memusage target to a different directory.
+[profile.memusage]
+inherits = "release"
