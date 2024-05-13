@@ -80,18 +80,19 @@ const roundAuto = n => {
   return roundN(n, digits)
 }
 
+const mean = list => (list.reduce((a, b) => a + b) / list.length)
 
 const plotTimes = () => {
   const algnames = {
     dt: egwalkerName,
 
     dtmerge: `${egwalkerName}\n(merge)`,
-    dtload: `${egwalkerName}\n(load)`,
+    dtload: `${egwalkerName}\n(cached load)`,
 
     ot: 'OT',
 
     otmerge: "OT\n(merge)",
-    otload: "OT\n(load)",
+    otload: "OT\n(cached load)",
 
     dtcrdt: "Ref CRDT",
     yjs: "Yjs",
@@ -109,24 +110,41 @@ const plotTimes = () => {
     ...datasets.map(name => ({ dataset: name, type: 'yjs', val: rawTimings.yjs_remote[name], })),
   ]
 
+  const baseline = 1.2
+
+  const meanFor = (type, timings) => (
+    { type, val: mean(datasets.map(name => timings[name])) }
+  )
+  const means = [
+    meanFor('dtmerge', rawTimings.dt_merge_norm),
+    meanFor('dtload', rawTimings.dt_opt_load),
+    meanFor('otmerge', rawTimings.ot),
+    meanFor('otload', rawTimings.dt_opt_load),
+    meanFor('dtcrdt', rawTimings['dt-crdt_process_remote_edits']),
+    meanFor('automerge', rawTimings.automerge_remote),
+    meanFor('yjs', rawTimings.yjs_remote),
+  ] //.filter(m => m.val > baseline)
+
   // console.log(data)
 
-  const baseline = 1.2
 
   return Plot.plot({
     figure: false,
     document: window.document,
     // marginLeft: 130,
-    marginLeft: 110,
+    marginLeft: 120,
     // marginRight: 60,
     // marginBottom: 40,
     width: 500,
-    height: 500,
+    height: 580,
     style: {
       background: 'white',
       // 'background-color': 'green',
       // "font-size": "14px",
       'font-family': 'Helvetica Neue, Helvetica, Arial, sans-serif',
+    },
+    fy: {
+      paddingInner: 0.18,
     },
     // fy: {
     //   // tickRotate: '-90',
@@ -141,7 +159,9 @@ const plotTimes = () => {
       axis: null,
       // tickFormat: 's',
       // inset: 0.1,
-
+      // inset: 1.5,
+      // insetTop: 2,
+      marginLeft: 0,
     },
     x: {
       label: 'Time taken (in milliseconds) to merge and reload changes. Log scale. (Less is better)',
@@ -176,7 +196,8 @@ const plotTimes = () => {
         // dx: 10,
         // ticks: null,
         label: null,
-        fontSize: 8
+        fontSize: 8,
+        // inset: 5,
       }),
       // Plot.frame({
       //   fy: 'dt',
@@ -202,8 +223,9 @@ const plotTimes = () => {
         dx: -17,
         tickFormat: (d, i, _) => algnames[d],
         lineHeight: 1.2,
+        // marginTop: 10,
       }),
-      Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5}),
+      Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5, inset: 2}),
       Plot.tickX(data, {fy: 'type', x: d => Math.max(d.val, baseline), y: "dataset"}),
       Plot.text(data, {
         y: 'dataset', fy: 'type',
@@ -215,6 +237,27 @@ const plotTimes = () => {
         fill: 'black',
         dx: 6,
       }),
+
+      Plot.ruleX(means.filter(m => m.val > baseline), {
+        x: d => Math.max(d.val, baseline),
+        fy: 'type',
+        stroke: 'black',
+        opacity: 0.3,
+        strokeWidth: 2,
+        inset: 2,
+      }),
+      Plot.textX(means, {
+        x: d => Math.max(d.val, baseline),
+        fy: 'type',
+        text: d => `x̄ = ${formatMs(d.val)}`,
+        fontWeight: 700,
+        fontSize: 9,
+
+        frameAnchor: 'top',
+        dy: -8,
+        // textAnchor: 'bottom',
+      }),
+
       // Plot.text(data, {
       //   y: 'dataset', fy: 'type',
       //   x: baseline,
@@ -302,6 +345,9 @@ const plotMemusage = () => {
       // "font-size": "14px",
       'font-family': 'Helvetica Neue, Helvetica, Arial, sans-serif',
     },
+    // facet: {
+    //   margin: 10,
+    // },
     // fy: {
     //   // tickRotate: '-90',
     //   label: null,
@@ -325,6 +371,7 @@ const plotMemusage = () => {
       // type: 'linear',
       // nice: true,
       type: 'log',
+      // base: Math.pow(1024, 1/3),
       axis: 'bottom',
       // tickSpacing: 50,
       // marginBottom: 40,
@@ -424,9 +471,10 @@ const plotMemusage = () => {
 const yjs_am_sizes = loadJson("../results/yjs_am_sizes.json")
 const dt_stats = loadJson("../results/dataset_stats.json")
 
-const plotSize = (data, max) => {
+const plotSize = (data, totals, max) => {
   const algnames = {
     dt: `${egwalkerName}`,
+    dtplus: `${egwalkerName}\n+ cached\nfinal state`,
     yjs: "Yjs",
     automerge: "Automerge"
   }
@@ -509,7 +557,11 @@ const plotSize = (data, max) => {
         // x1: baseline,
         x: 'val',
         fill: d => dstype[d.dataset],
-        fillOpacity: d => d.t == 'overhead' ? 1 : 0.6,
+        fillOpacity: d => ({
+          lowerbound: 0.6,
+          cache: 0.3,
+          overhead: 1,
+        })[d.t],
         // fill: d => d.t == 'overhead' ? dstype[d.dataset] : 'red',
         // fill: d => d.t == 'overhead' ? 'blue' : 'red',
         // sort: null,
@@ -523,14 +575,15 @@ const plotSize = (data, max) => {
         dx: -17,
         tickFormat: (d, i, _) => algnames[d],
         lineHeight: 1.2,
+        // fontWeight: 600,
       }),
-      // Plot.tickX(data, {fy: 'type', x: 'aggregate', y: "dataset"}),
-      Plot.tickX(data.filter(d => d.t == 'overhead'), {fy: 'type', x: 'aggregate', y: "dataset"}),
-      Plot.text(data.filter(d => d.t == 'overhead'), {
+      // Plot.tickX(data.filter(d => d.t == 'overhead'), {fy: 'type', x: 'aggregate', y: "dataset"}),
+      Plot.tickX(totals, {fy: 'type', x: 'val', y: "dataset"}),
+      Plot.text(totals, {
         y: 'dataset', fy: 'type',
-        x: 'aggregate',
+        x: 'val',
         // text: d => d.val < baseline ? '<1ms' : `${formatMs(d.val)}`,
-        text: d => `${formatBytes(d.aggregate)}`,
+        text: d => `${formatBytes(d.val)}`,
         fontSize: 9,
         textAnchor: 'start',
         fill: 'black',
@@ -567,12 +620,31 @@ const plotSize = (data, max) => {
 }
 
 const plotSizeBig = () => {
+  const totals = [
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'dt',
+      val: dt_stats[dataset].uncompressed_size,
+    })),
+
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'dtplus',
+      val: dt_stats[dataset].uncompressed_size + dt_stats[dataset].final_doc_len_utf8,
+    })),
+
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'automerge',
+      val: yjs_am_sizes[dataset].automergeUncompressed,
+    })),
+  ]
+
   const data = [
     ...datasets.map(dataset => ({
       dataset,
       type: 'dt',
       val: dt_stats[dataset].ins_content_len_utf8,
-      aggregate: dt_stats[dataset].ins_content_len_utf8,
       t: 'lowerbound'
     })),
     ...datasets.map(dataset => ({
@@ -580,14 +652,31 @@ const plotSizeBig = () => {
       type: 'dt',
       val: dt_stats[dataset].uncompressed_size - dt_stats[dataset].ins_content_len_utf8,
       t: 'overhead',
-      aggregate: dt_stats[dataset].uncompressed_size
+    })),
+
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'dtplus',
+      val: dt_stats[dataset].ins_content_len_utf8,
+      t: 'lowerbound'
+    })),
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'dtplus',
+      val: dt_stats[dataset].uncompressed_size - dt_stats[dataset].ins_content_len_utf8,
+      t: 'overhead',
+    })),
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'dtplus',
+      val: dt_stats[dataset].final_doc_len_utf8,
+      t: 'cache',
     })),
 
     ...datasets.map(dataset => ({
       dataset,
       type: 'automerge',
       val: dt_stats[dataset].ins_content_len_utf8,
-      aggregate: dt_stats[dataset].ins_content_len_utf8,
       t: 'lowerbound'
     })),
     ...datasets.map(dataset => ({
@@ -595,12 +684,11 @@ const plotSizeBig = () => {
       type: 'automerge',
       val: yjs_am_sizes[dataset].automergeUncompressed - dt_stats[dataset].ins_content_len_utf8,
       t: 'overhead',
-      aggregate: yjs_am_sizes[dataset].automergeUncompressed
     })),
   ]
 
   // console.log(data)
-  return plotSize(data, 4.3e6)
+  return plotSize(data, totals, 4.3e6)
 }
 
 const plotSizeSmol = () => {
@@ -609,7 +697,6 @@ const plotSizeSmol = () => {
       dataset,
       type: 'dt',
       val: dt_stats[dataset].final_doc_len_utf8,
-      aggregate: dt_stats[dataset].final_doc_len_utf8,
       t: 'lowerbound'
     })),
     ...datasets.map(dataset => ({
@@ -617,14 +704,12 @@ const plotSizeSmol = () => {
       type: 'dt',
       val: dt_stats[dataset].uncompressed_smol_size - dt_stats[dataset].final_doc_len_utf8,
       t: 'overhead',
-      aggregate: dt_stats[dataset].uncompressed_smol_size
     })),
 
     ...datasets.map(dataset => ({
       dataset,
       type: 'yjs',
       val: dt_stats[dataset].final_doc_len_utf8,
-      aggregate: dt_stats[dataset].final_doc_len_utf8,
       t: 'lowerbound'
     })),
     ...datasets.map(dataset => ({
@@ -632,12 +717,26 @@ const plotSizeSmol = () => {
       type: 'yjs',
       val: yjs_am_sizes[dataset].yjs - dt_stats[dataset].final_doc_len_utf8,
       t: 'overhead',
-      aggregate: yjs_am_sizes[dataset].yjs
     })),
   ]
 
+  const totals = [
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'dt',
+      val: dt_stats[dataset].uncompressed_smol_size,
+    })),
+
+    ...datasets.map(dataset => ({
+      dataset,
+      type: 'yjs',
+      val: yjs_am_sizes[dataset].yjs,
+    })),
+  ]
+
+
   // console.log(data)
-  return plotSize(data, 3e6)
+  return plotSize(data, totals, 3e6)
 }
 
 
