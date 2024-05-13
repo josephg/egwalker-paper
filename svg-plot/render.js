@@ -6,6 +6,7 @@ import {JSDOM} from "jsdom";
 const {window} = new JSDOM("")
 
 const anonymous = true
+// const anonymous = false
 const egwalkerName = anonymous ? 'Feathertail' : 'Eg-walker'
 
 const savePlot = (plot, filename) => {
@@ -84,19 +85,19 @@ const mean = list => (list.reduce((a, b) => a + b) / list.length)
 
 const plotTimes = () => {
   const algnames = {
-    dt: egwalkerName,
+    dt: [egwalkerName],
 
-    dtmerge: `${egwalkerName}\n(merge)`,
-    dtload: `${egwalkerName}\n(cached load)`,
+    dtmerge: [`${egwalkerName}`, "(merge)"],
+    dtload: [`${egwalkerName}`, "(cached load)"],
 
-    ot: 'OT',
+    ot: ['OT'],
 
-    otmerge: "OT\n(merge)",
-    otload: "OT\n(cached load)",
+    otmerge: ["OT", "(merge)"],
+    otload: ["OT", "(cached load)"],
 
-    dtcrdt: "Ref CRDT",
-    yjs: "Yjs",
-    automerge: "Automerge"
+    dtcrdt: ["Ref CRDT"],
+    yjs: ["Yjs"],
+    automerge: ["Automerge"],
   }
 
 
@@ -197,6 +198,9 @@ const plotTimes = () => {
         // ticks: null,
         label: null,
         fontSize: 8,
+
+        opacity: 0.4,
+        fontWeight: 700,
         // inset: 5,
       }),
       // Plot.frame({
@@ -205,6 +209,17 @@ const plotTimes = () => {
       //   fill: 'green',
       //   opacity: 0.1,
       // }),
+
+
+      Plot.ruleX(means.filter(m => m.val > baseline), {
+        x: d => Math.max(d.val, baseline),
+        fy: 'type',
+        stroke: 'black',
+        opacity: 0.4,
+        strokeWidth: 1,
+        inset: 2,
+      }),
+      Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5, inset: -7}),
       Plot.barX(data, {
         y: 'dataset',
         fy: 'type',
@@ -216,16 +231,39 @@ const plotTimes = () => {
         sort: {y: null, color: null, fy: {type: "x"}},
         // sort: d => ord.indexOf(d.dataset)
       }),
-      Plot.axisFy({
+      // Plot.axisFy({
+      //   fontSize: '15px',
+      //   label: null,
+      //   anchor: 'left',
+      //   dx: -17,
+      //   tickFormat: (d, i, _) => algnames[d],
+      //   lineHeight: 1.2,
+      //   // marginTop: 10,
+      // }),
+      Plot.axisFy({ // title
         fontSize: '15px',
         label: null,
         anchor: 'left',
+        // dx: -52,
         dx: -17,
-        tickFormat: (d, i, _) => algnames[d],
-        lineHeight: 1.2,
-        // marginTop: 10,
+        dy: 2,
+        tickFormat: (d) => algnames[d][0],
+        // textAnchor: 'middle',
+        lineAnchor: 'bottom',
       }),
-      Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5, inset: 2}),
+      Plot.axisFy({ // subtitle
+        fontSize: 12,
+        label: null,
+        anchor: 'left',
+        // dx: -52,
+        dx: -17,
+        dy: 7,
+        lineAnchor: 'top',
+        tickFormat: (d) => algnames[d][1],
+        // textAnchor: 'middle',
+        opacity: 0.7,
+        lineHeight: 1.1,
+      }),
       Plot.tickX(data, {fy: 'type', x: d => Math.max(d.val, baseline), y: "dataset"}),
       Plot.text(data, {
         y: 'dataset', fy: 'type',
@@ -238,20 +276,13 @@ const plotTimes = () => {
         dx: 6,
       }),
 
-      Plot.ruleX(means.filter(m => m.val > baseline), {
-        x: d => Math.max(d.val, baseline),
-        fy: 'type',
-        stroke: 'black',
-        opacity: 0.3,
-        strokeWidth: 2,
-        inset: 2,
-      }),
       Plot.textX(means, {
         x: d => Math.max(d.val, baseline),
         fy: 'type',
         text: d => `x̄ = ${formatMs(d.val)}`,
         fontWeight: 700,
         fontSize: 9,
+        opacity: 0.6,
 
         frameAnchor: 'top',
         dy: -8,
@@ -291,15 +322,15 @@ const plotTimes = () => {
 
 const plotMemusage = () => {
   const algnames = {
-    dtsteady: `${egwalkerName}\n(steady)`,
-    dtpeak: `${egwalkerName}\n(peak)`,
+    dtsteady: [`${egwalkerName}`, '(steady)'],
+    dtpeak: [`${egwalkerName}`, '(peak)'],
 
-    otsteady: "OT\n(steady)",
-    otpeak: "OT\n(peak)",
+    otsteady: ["OT", "(steady)"],
+    otpeak: ["OT", "(peak)"],
 
-    dtcrdt: "Ref CRDT",
-    yjs: "Yjs",
-    automerge: "Automerge"
+    dtcrdt: ["Ref CRDT", ''],
+    yjs: ["Yjs", ''],
+    automerge: ["Automerge", ''],
   }
 
   const dtmem = loadJson("../results/dt_memusage.json")
@@ -398,7 +429,10 @@ const plotMemusage = () => {
         // dx: 10,
         // ticks: null,
         label: null,
-        fontSize: 8
+        fontSize: 8,
+
+        opacity: 0.4,
+        fontWeight: 700,
       }),
       // Plot.frame({
       //   fy: 'dt',
@@ -417,13 +451,37 @@ const plotMemusage = () => {
         sort: {y: null, color: null, fy: {type: "x"}},
         // sort: d => ord.indexOf(d.dataset)
       }),
-      Plot.axisFy({
+      // Plot.axisFy({
+      //   fontSize: '15px',
+      //   label: null,
+      //   anchor: 'left',
+      //   dx: -17,
+      //   tickFormat: (d, i, _) => algnames[d],
+      //   lineHeight: 1.2,
+      // }),
+      Plot.axisFy({ // title
         fontSize: '15px',
         label: null,
         anchor: 'left',
+        // dx: -52,
         dx: -17,
-        tickFormat: (d, i, _) => algnames[d],
-        lineHeight: 1.2,
+        dy: 2,
+        tickFormat: (d) => algnames[d][0],
+        // textAnchor: 'middle',
+        lineAnchor: 'bottom',
+      }),
+      Plot.axisFy({ // subtitle
+        fontSize: 12,
+        label: null,
+        anchor: 'left',
+        // dx: -52,
+        dx: -17,
+        dy: 7,
+        lineAnchor: 'top',
+        tickFormat: (d) => algnames[d][1],
+        // textAnchor: 'middle',
+        opacity: 0.7,
+        lineHeight: 1.1,
       }),
       Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5}),
       Plot.tickX(data, {fy: 'type', x: d => Math.max(d.val, baseline), y: "dataset"}),
@@ -471,13 +529,7 @@ const plotMemusage = () => {
 const yjs_am_sizes = loadJson("../results/yjs_am_sizes.json")
 const dt_stats = loadJson("../results/dataset_stats.json")
 
-const plotSize = (data, totals, max) => {
-  const algnames = {
-    dt: `${egwalkerName}`,
-    dtplus: `${egwalkerName}\n+ cached\nfinal state`,
-    yjs: "Yjs",
-    automerge: "Automerge"
-  }
+const plotSize = (algnames, data, totals, max, opts = {}) => {
 
   return Plot.plot({
     figure: false,
@@ -488,6 +540,7 @@ const plotSize = (data, totals, max) => {
     // marginBottom: 40,
     width: 500,
     height: 300,
+    ...opts,
     style: {
       background: 'white',
       // 'background-color': 'green',
@@ -543,7 +596,10 @@ const plotSize = (data, totals, max) => {
         // dx: 10,
         // ticks: null,
         label: null,
-        fontSize: 8
+        fontSize: 8,
+
+        opacity: 0.4,
+        fontWeight: 700,
       }),
       // Plot.frame({
       //   fy: 'dt',
@@ -558,8 +614,8 @@ const plotSize = (data, totals, max) => {
         x: 'val',
         fill: d => dstype[d.dataset],
         fillOpacity: d => ({
-          lowerbound: 0.6,
-          cache: 0.3,
+          lowerbound: 0.5,
+          cache: 0.5,
           overhead: 1,
         })[d.t],
         // fill: d => d.t == 'overhead' ? dstype[d.dataset] : 'red',
@@ -568,14 +624,28 @@ const plotSize = (data, totals, max) => {
         sort: {y: null, color: null, fy: {type: "x"}},
         // sort: d => ord.indexOf(d.dataset)
       }),
-      Plot.axisFy({
+      Plot.axisFy({ // title
         fontSize: '15px',
         label: null,
         anchor: 'left',
-        dx: -17,
-        tickFormat: (d, i, _) => algnames[d],
-        lineHeight: 1.2,
-        // fontWeight: 600,
+        dx: -52,
+        // dx: -17,
+        dy: -0,
+        tickFormat: (d) => algnames[d][0],
+        textAnchor: 'middle',
+        lineAnchor: 'bottom',
+      }),
+      Plot.axisFy({ // subtitle
+        fontSize: 12,
+        label: null,
+        anchor: 'left',
+        dx: -52,
+        dy: 6,
+        lineAnchor: 'top',
+        tickFormat: (d) => algnames[d][1],
+        textAnchor: 'middle',
+        opacity: 0.7,
+        lineHeight: 1.1,
       }),
       // Plot.tickX(data.filter(d => d.t == 'overhead'), {fy: 'type', x: 'aggregate', y: "dataset"}),
       Plot.tickX(totals, {fy: 'type', x: 'val', y: "dataset"}),
@@ -620,6 +690,12 @@ const plotSize = (data, totals, max) => {
 }
 
 const plotSizeBig = () => {
+  const algnames = {
+    dt: [`${egwalkerName}`],
+    dtplus: [`${egwalkerName}`, '+ cached\nfinal doc'],
+    automerge: ["Automerge"],
+  }
+
   const totals = [
     ...datasets.map(dataset => ({
       dataset,
@@ -663,14 +739,14 @@ const plotSizeBig = () => {
     ...datasets.map(dataset => ({
       dataset,
       type: 'dtplus',
-      val: dt_stats[dataset].uncompressed_size - dt_stats[dataset].ins_content_len_utf8,
-      t: 'overhead',
+      val: dt_stats[dataset].final_doc_len_utf8,
+      t: 'cache',
     })),
     ...datasets.map(dataset => ({
       dataset,
       type: 'dtplus',
-      val: dt_stats[dataset].final_doc_len_utf8,
-      t: 'cache',
+      val: dt_stats[dataset].uncompressed_size - dt_stats[dataset].ins_content_len_utf8,
+      t: 'overhead',
     })),
 
     ...datasets.map(dataset => ({
@@ -688,10 +764,15 @@ const plotSizeBig = () => {
   ]
 
   // console.log(data)
-  return plotSize(data, totals, 4.3e6)
+  return plotSize(algnames, data, totals, 4.3e6)
 }
 
 const plotSizeSmol = () => {
+  const algnames = {
+    dt: [`${egwalkerName}`, 'final doc text\nonly'],
+    yjs: ["Yjs"],
+  }
+
   const data = [
     ...datasets.map(dataset => ({
       dataset,
@@ -736,7 +817,10 @@ const plotSizeSmol = () => {
 
 
   // console.log(data)
-  return plotSize(data, totals, 3e6)
+  return plotSize(algnames, data, totals, 3e6, {
+    marginLeft: 120,
+    height: 230,
+  })
 }
 
 
@@ -764,7 +848,7 @@ const plotFF = () => {
     // marginRight: 60,
     // marginBottom: 40,
     width: 500,
-    height: 220,
+    height: 200,
     style: {
       background: 'white',
       // 'background-color': 'green',
@@ -790,7 +874,7 @@ const plotFF = () => {
       label: 'Time taken to merge all events, in milliseconds. (Less is better)',
       fontSize: "20px",
       grid: true,
-      domain: [0, 100],
+      domain: [0, 105],
       // type: 'linear',
       // nice: true,
       // type: 'log',
@@ -819,7 +903,10 @@ const plotFF = () => {
         // dx: 10,
         // ticks: null,
         label: null,
-        fontSize: 8
+        fontSize: 8,
+
+        opacity: 0.4,
+        fontWeight: 700,
       }),
       // Plot.frame({
       //   fy: 'dt',
