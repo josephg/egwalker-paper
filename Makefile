@@ -67,33 +67,33 @@ $(CONV_TOOL):
 	cd tools/crdt-converter && cargo build --release
 
 # These all get duplicated different numbers of times, so they're written out in full.
-datasets/S1.dt: datasets/raw/automerge-paper.dt $(DT_TOOL)
+datasets/S1.dt: datasets/raw/automerge-paper.dt | $(DT_TOOL)
 	$(DT_TOOL) bench-duplicate $< -o $@ -n3 -f
-datasets/S2.dt: datasets/raw/seph-blog1.dt $(DT_TOOL)
+datasets/S2.dt: datasets/raw/seph-blog1.dt | $(DT_TOOL)
 	$(DT_TOOL) bench-duplicate $< -o $@ -n3 -f
-datasets/S3.dt: datasets/raw/egwalker.dt $(DT_TOOL)
+datasets/S3.dt: datasets/raw/egwalker.dt | $(DT_TOOL)
 	$(DT_TOOL) bench-duplicate $< -o $@ -n1 -f
 
-datasets/C1.dt: datasets/raw/friendsforever.dt $(DT_TOOL)
+datasets/C1.dt: datasets/raw/friendsforever.dt | $(DT_TOOL)
 	$(DT_TOOL) bench-duplicate $< -o $@ -n25 -f
-datasets/C2.dt: datasets/raw/clownschool.dt $(DT_TOOL)
+datasets/C2.dt: datasets/raw/clownschool.dt | $(DT_TOOL)
 	$(DT_TOOL) bench-duplicate $< -o $@ -n25 -f
 
-datasets/A1.dt: datasets/raw/node_nodecc.dt $(DT_TOOL)
+datasets/A1.dt: datasets/raw/node_nodecc.dt | $(DT_TOOL)
 	$(DT_TOOL) bench-duplicate $< -o $@ -n1 -f
-datasets/A2.dt: datasets/raw/git-makefile.dt $(DT_TOOL)
+datasets/A2.dt: datasets/raw/git-makefile.dt | $(DT_TOOL)
 	$(DT_TOOL) bench-duplicate $< -o $@ -n2 -f
 
 # Export dt file -> JSON
-datasets/%.json: datasets/%.dt $(DT_TOOL)
+datasets/%.json: datasets/%.dt | $(DT_TOOL)
 	$(DT_TOOL) export-trace $< -o $@
 
 # Convert JSON file to yjs
-datasets/%.yjs: datasets/%.json $(CONV_TOOL)
+datasets/%.yjs: datasets/%.json | $(CONV_TOOL)
 	$(CONV_TOOL) -y $<
 
 # Convert JSON file to automerge
-datasets/%.am datasets/%-uncompressed.am &: datasets/%.json $(CONV_TOOL)
+datasets/%.am datasets/%-uncompressed.am &: datasets/%.json | $(CONV_TOOL)
 	$(CONV_TOOL) -a $<
 
 
