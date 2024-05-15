@@ -20,23 +20,6 @@ mod benchmarks;
 mod ff_bench;
 mod convert1;
 
-fn print_xf_sizes(name: &str, samples: usize) {
-    let contents = std::fs::read(format!("benchmark_data/{name}.dt")).unwrap();
-    println!("\n\nLoaded testing data from {} ({} bytes)", name, contents.len());
-
-    let oplog = ListOpLog::load_from(&contents).unwrap();
-
-    let sizes = oplog.get_size_stats_during_xf(samples, true);
-    std::fs::write(format!("results/xf-{name}-ff.json"), serde_json::to_string(&sizes).unwrap());
-
-    let sizes = oplog.get_size_stats_during_xf(samples, false);
-    std::fs::write(format!("results/xf-{name}-noff.json"), serde_json::to_string(&sizes).unwrap());
-
-    println!("Wrote xf-{name}-ff.json / xf-{name}-noff.json with {} entries", sizes.len());
-
-    dbg!(oplog.get_ff_stats());
-}
-
 const DATASETS: &[&str] = &["S1", "S2", "S3", "C1", "C2", "A1", "A2"];
 
 #[cfg(feature = "memusage")]
@@ -83,10 +66,10 @@ fn measure_memory() {
 }
 
 fn main() {
-//     // print_xf_sizes("friendsforever", 100);
-//     // print_xf_sizes("clownschool", 100);
-//     // print_xf_sizes("node_nodecc", 200);
-//     // print_xf_sizes("git-makefile", 200);
+    // print_xf_sizes("friendsforever", 100);
+    // print_xf_sizes("clownschool", 100);
+    // print_xf_sizes("node_nodecc", 200);
+    // print_xf_sizes("git-makefile", 200);
 //
 //     // benchmarks::print_filesize();
 //     // if cfg!(feature = "memusage") {

@@ -275,6 +275,25 @@ fn get_stats() {
     println!("Stats table written to {filename}");
 }
 
+
+fn print_xf_sizes(name: &str, samples: usize) {
+    let stem = stem();
+    let contents = std::fs::read(format!("{stem}/datasets/raw/{name}.dt")).unwrap();
+    println!("\n\nLoaded testing data from {} ({} bytes)", name, contents.len());
+
+    let oplog = ListOpLog::load_from(&contents).unwrap();
+
+    let sizes = oplog.get_size_stats_during_xf(samples, true);
+    std::fs::write(format!("{stem}/results/xf-{name}-ff.json"), serde_json::to_string(&sizes).unwrap()).unwrap();
+
+    let sizes = oplog.get_size_stats_during_xf(samples, false);
+    std::fs::write(format!("{stem}/results/xf-{name}-noff.json"), serde_json::to_string(&sizes).unwrap()).unwrap();
+
+    println!("Wrote xf-{name}-ff.json / xf-{name}-noff.json with {} entries", sizes.len());
+
+    dbg!(oplog.get_ff_stats());
+}
+
 fn main() {
     #[cfg(not(feature = "memusage"))]
     eprintln!("NOTE: Memory usage reporting disabled. Run with --release --features memusage");
@@ -286,6 +305,11 @@ fn main() {
     measure_memory();
 
     get_stats();
+
+    print_xf_sizes("friendsforever", 100);
+    print_xf_sizes("clownschool", 100);
+    print_xf_sizes("node_nodecc", 200);
+    print_xf_sizes("git-makefile", 200);
 
     // // const PAPER_DATASETS: &[&str] = &["C1"];
     // for name in &["S1", "S2", "S3", "C1", "C2", "A1", "A2"] {
