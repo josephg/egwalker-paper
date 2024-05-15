@@ -1,6 +1,14 @@
-.phony: all cargo_magic
+.phony: all cargo_magic clean
 all: reg-text.pdf
 # all: $(ALL_JSON) $(DIAGRAMS)
+
+clean:
+	rm -f results/*
+	rm -rf target/criterion
+	cd tools/diamond-types && cargo clean
+	cd tools/crdt-converter && cargo clean
+	cd tools/ot-bench && cargo clean
+	cd tools/paper-benchmarks && cargo clean
 
 cargo_magic:
 
