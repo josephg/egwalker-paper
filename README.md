@@ -6,6 +6,7 @@ A rough breakdown of the stuff contained here:
 
 - `tools/`: A series of implementations of various code used for data conversion and benchmarking. In particular:
   - `tools/diamond-types`: Snapshot of [diamond types](https://github.com/josephg/diamond-types), which contains our optimised implementation of the algorithm. This mirror of the codebase includes hooks for benchmarking that we use to generate the datasets in this paper. Diamond types also contains CLI tools needed to extract traces from a git repository, and query and extract raw data from .dt data files.
+  - `tools/diamond-types/crates/paper-stats`: Child crate which analyses some internal stats of DT, used in the paper.
   - `tools/bench-yjs`: Memory and CPU time benchmark for yjs
   - `tools/crdt-converter`: Converter tool to convert editing traces (in .json format) to yjs and automerge formats. (Conversion uses the Yrs fork of yjs)
   - `tools/ot-bench`: Reference implementation of operational transform, and benchmark thereof. This implementation uses memoization to avoid excessive transform calls - which improves performance at a cost of memory usage.
@@ -19,6 +20,34 @@ The paper itself is generated as follows:
 
 - `svg-plot`: This tool generates charts in SVG format in the `diagrams/` folder from JSON data in `results/`
 - `reg-text.typ`: [Typst](https://typst.app/) source for the paper itself.
+
+
+## Running the benchmarks yourself
+
+This repository contains everything you need to fully reproduce our results.
+
+To get started, you'll need a recent version of nodejs and rust installed on your system. We used node v21 and rust 1.78. You will also need at least 44GB of RAM to run the automerge C2 benchmark. This process has only been tested on linux.
+
+Then run:
+
+```
+$ make clean
+$ make
+```
+
+It takes about 24 hours to run all of the benchmarks. Almost all of this time is taken up by:
+
+- automerge/C1 (3hrs for 100 samples)
+- automerge/C2 (11.5hrs for 100 samples)
+- OT/A2 (10 hours for 10 samples).
+
+The results we used to generate the paper are stored as a set of JSON files in `results/`. `make clean` will remove all current benchmark results.
+
+On MacOS, you may need to install gnumake and then invoke the makefile with `gmake` instead. YMMV.
+
+The makefile also contains the commands to re-convert the datasets in datasets/raw to JSON, Yjs and Automerge formats. This conversion has already been done (and the results are checked in to this repository). But if you want to regenerate them for any reason, you can delete datasets/* and run `make` again.
+
+---
 
 The paper text is copyright of the authors. All rights reserved unless otherwise indicated.
 
