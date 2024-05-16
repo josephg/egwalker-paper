@@ -1095,14 +1095,65 @@ For the sake of this proof, we define $sans("replay")$ to instead return a seque
 This allows us to distinguish between different occurrences of the same character.
 The text of the document can be recovered by simply ignoring the $italic("id")$ of each pair and concatenating the characters.
 
+#lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Insert")(i, c_i)$ and $b.italic("op") = italic("Insert")(j, c_j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-ins-ins>
+// TODO: technically the internal states will not be the same since the prepare states differ. But the next retreat/advance to a specific version should fix that up.
+#proof[
+  To replay $a$ followed by $b$, we first retreat/advance so that the prepare state corresponds to $a.italic("parents")$, then apply $a$, then retreat $a$, then retreat/advance so that the prepare state corresponds to $b.italic("parents")$, then apply $b$.
+  Applying $a$ inserts a record into the internal state, and after retreating $a$ this record has $s_p = mono("NotInsertedYet")$ and $s_e = mono("Ins")$.
+  When $b$ is applied, the presence of the record inserted by $a$ is the only difference between the internal state when applying $b$ after $a$ compared to applying $b$ without applying $a$ first (all other records are set to the same state by the retreat/advance process). // TODO: do we need a lemma for that?
+  When determining the insertion position in the internal state for $b$'s record based on $b$'s index $j$, the record inserted by $a$ does not count since it has $s_p = mono("NotInsertedYet")$.
+  Therefore, $b$'s record is inserted into the internal state at the same position relative to its neighbours, regardless of whether $a$ has been applied previously.
+  By similar argument the same holds for $a$'s record.
+
+  As explained in @prepare-effect-versions, the internal state uses a CRDT algorithm to place the records in the internal state in a consistent order, regardless of the order in which the events are applied.
+  The details of that algorithm go beyond the scope of this paper.
+  The key property of that algorithm is that the final sequence of internal state records is the same, regardless of whether we apply first $a$ and then $b$, or vice versa.
+
+  Now we consider the document state.
+  WLOG assume that the record inserted by $a$ appears at an earlier position in the internal state than the record inserted by $b$ (regardless of the order of applying $a$ and $b$).
+  Let $i'$ be the transformed index of $a.italic("op")$ when $a$ is applied first, and let $j'$ be the transformed index of $b.italic("op")$ when $b$ is applied first.
+
+  Say we replay $a$ before $b$.
+  When computing the transformed index for $b$, the internal state record for $a$ has $s_p = mono("NotInsertedYet")$, and hence it is not counted when mapping $b.italic("op")$'s index $j$ to $b$'s internal state record.
+  However, $a$'s record _is_ counted when mapping $b$'s internal state record back to an index, since $a$'s record has $s_e = mono("Ins")$ and it appears before $b$'s record.
+  Therefore the transformed index for $b.italic("op")$ is $j' + 1$ when applied after $a$.
+  On the other hand, if we replay $b$ before $a$, the record for $b$ appears after the record for $a$ in the internal state, so the transformed index for $a$ is $i'$, unaffected by $b$.
+  Thus, we have the situation as shown in @two-inserts, and the effect of the two insertions $a$ and $b$ on the document state is the same regardless of their order.
+]
+
+#lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Insert")(i, c)$ and $b.italic("op") = italic("Delete")(j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-ins-del>
+#proof[
+  Since $a$ and $b$ are concurrent, the character being deleted by $b$ cannot be the character inserted by $a$.
+  We therefore only need to consider two cases: (1)~the record inserted by $a$ has an earlier position in the internal state than the record updated by $b$; or (2) vice versa.
+
+  Case (1): If we replay $a$ before $b$, we first apply $a$, then retreat $a$, then apply $b$ (and also retreat/advance other events before applying, like in @lemma-ins-ins).
+  Applying $a$ inserts a record into the internal state, and after retreating $a$ this record has $s_p = mono("NotInsertedYet")$ and $s_e = mono("Ins")$.
+  When subsequently applying $b$ we update an internal state record at a later position.
+  The record inserted by $a$ is not counted when mapping $b$'s index to an internal record, but it is counted when mapping the internal record back to a transformed index, resulting in $b$'s transformed index being one greater than it would have been without earlier applying $a$.
+  On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears after $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
+  The transformed operations therefore converge.
+
+  Case (2): If we replay $b$ before $a$, we first apply $b$, then retreat $b$, then apply $a$ (plus other retreats/advances).
+  Applying $b$ updates an existing record in the internal state (possibly splitting a placeholder in the process).
+  After retreating $b$ this record has either $s_p = mono("Ins")$ (if no concurrent deletion of the same character was applied previously, in which case the transformed operation for $b$ is still a deletion) or $s_p = mono("Del") k$ (if $k>0$ concurrent deletions of the same character have been applied, in which case the transformed operation for $b$ is a no-op).
+  $b$'s record has $s_e = mono("Del")$ in any case.
+  We next apply $a$, which by assumption inserts a record into the internal state at a later position than $b$'s record.
+  If $s_p = mono("Ins")$, $b$'s record is counted when mapping $a$'s index to an internal record position, but not counted when mapping the internal record back to a transformed index, resulting in $a$'s transformed index being one less than it would have been without earlier applying $b$, as required given that $b$ has deleted an earlier character.
+  If $s_p = mono("Del") k$, $b$'s record is not counted during either index mapping, so the index of $a$ is not affected by $b$, as required given that the transformed operation for $b$ is a no-op.
+  On the other hand, if we replay $a$ before $b$, the record inserted by $a$ appears after $b$'s record in the internal state, so the transformation of $b$ is not affected by $a$, and the transformed operations converge.
+]
+
+#lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Delete")(i)$ and $b.italic("op") = italic("Delete")(j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-del-del>
+#proof[TODO.]
+
 #lemma[Let $G$ be a valid event graph with ${a, b} subset.eq sans("Version")(G)$. Let the event sequence $E = angle.l e_1, e_2, ..., e_n angle.r$ be a topological sort of $G - {a, b}$. Then replaying the events $E$ in order, followed by $a$ and then $b$, results in the same document state as replaying $E$ followed by $b$ and then $a$.] <lemma-commute>
 #proof[
   By induction over $n$, the length of $E$.
 
-  Base case ($n=0$). WLOG we consider three cases: (1)~$a.italic("op") = italic("Insert")(i, c_i)$ and $b.italic("op") = italic("Insert")(j, c_j)$; (2)~$a.italic("op") = italic("Insert")(i, c)$ and $b.italic("op") = italic("Delete")(j)$; (3)~$a.italic("op") = italic("Delete")(i)$ and $b.italic("op") = italic("Delete")(j)$.
-  The case where $a$ is a deletion and $b$ is an insertion is equivalent to case (2).
-
-  TODO
+  Base case ($n=0$).
+  There three subcases: if $a$ and $b$ are both insertions, the document states are the same by @lemma-ins-ins.
+  If one of $a$ and $b$ is an insertion and the other is a deletion, we use @lemma-ins-del.
+  If both $a$ and $b$ are deletions, we use @lemma-del-del.
 
   Inductive step.
   Inductive hypothesis: replaying $E_1 = angle.l e_1, e_2, ..., e_k, a, b angle.r$ results in document state $d$, and $E_2 = angle.l e_1, e_2, ..., e_k, b, a angle.r$ results in the same document $d$.
