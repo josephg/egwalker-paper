@@ -1,13 +1,13 @@
 // #import "@preview/cetz:0.1.2": canvas, plot, draw
 // #import "@preview/fletcher:0.2.0" as fletcher: node, edge
 #import "@preview/fletcher:0.3.0" as fletcher: node, edge
-#import "@preview/ctheorems:1.1.0": *
+#import "@preview/ctheorems:1.1.2": *
 #import "@preview/algo:0.3.3": algo, i, d, comment, code
 // #import "@preview/lovelace:0.1.0": *
 #import "@preview/algorithmic:0.1.0": algorithm
 #import "@preview/cetz:0.1.2"
 #import "charts.typ"
-#show: thmrules
+#show: thmrules.with(qed-symbol: $square$)
 
 // Might be worth pulling these two fields in from a config file instead
 #let anonymous = true
@@ -86,15 +86,9 @@
   #it.body
 ]))
 
-#let definition = thmbox("definition", "Definition",
-  base_level: 0,
-  fill: rgb("#f8e8e8")
-)
-
-#let claim = thmbox("claim", "Claim",
-  base_level: 0,
-  fill: rgb("#e8e8f8")
-)
+#let theorem = thmplain("theorem", "Theorem", base_level: 0, titlefmt: strong).with(inset: 0pt)
+#let lemma = thmplain("theorem", "Lemma", base_level: 0, titlefmt: strong).with(inset: 0pt)
+#let proof = thmproof("proof", "Proof").with(inset: 0pt)
 
 #if draft {
   align(center, text(16pt)[
@@ -106,7 +100,7 @@
   align(center, text(20pt)[*Fast and memory-efficient collaborative text editing*])
   align(center, text(12pt)[
     Anonymous Author(s) \
-    Submission ID: TODO
+    Submission ID: 223
   ])
 } else {
   align(center, text(20pt)[*Collaborative Text Editing: Better, Faster, Smaller*])
@@ -237,7 +231,7 @@ We make no timing assumptions and can tolerate arbitrary network delay, but we a
 A key property that the collaboration algorithm must satisfy is _convergence_: any two replicas that have seen the same set of operations must be in the same document state (i.e., a text consisting of the same sequence of characters), even if the operations arrived in a different order at each replica.
 If the underlying broadcast protocol ensures that every non-crashed replica eventually receives every operation, the algorithm achieves _strong eventual consistency_ @Shapiro2011.
 
-== Event graphs
+== Event graphs <event-graphs>
 
 We represent the editing history of a document as an _event graph_: a directed acyclic graph (DAG) in which every node is an _event_ consisting of an operation (insert/delete a character), a unique ID, and a set of IDs of its _parent nodes_.
 When $a$ is a _parent_ of $b$, we also say $b$ is a _child_ of $a$, and the graph contains an edge from $a$ to $b$.
@@ -308,7 +302,7 @@ The set of parents of an event in the graph is the version of the document in wh
 The version can hence be seen as a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
 Even if the event graph is large, in practice a version rarely consists of more than two events.
 
-== Replaying editing history
+== Replaying editing history <replay>
 
 Collaborative editing algorithms are usually defined in terms of sending and receiving messages over a network.
 The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a pure function $sans("replay")(G)$ of an event graph $G$.
@@ -1074,6 +1068,82 @@ The statistics given in @traces-table are after duplication.
 
 = Proof of Correctness <proofs>
 
-TODO
+We now demonstrate that #algname is a correct collaborative text algorithm by showing that it satisfies the _strong list specification_ proposed by Attiya et al. @Attiya2016.
+Informally speaking, this specification requires that replicas converge to the same document state, that this state contains exactly those characters that were inserted but not deleted, and that inserted characters appear in the correct place relative to the characters that surrounded it at the time it was inserted.
+Assuming network partitions are eventually repaired, this is a stronger specification than _strong eventual consistency_ @Shapiro2011, which is a standard correctness criterion for CRDTs @Gomes2017verifying.
+
+With a suitable algorithm for ordering concurrent insertions at the same position, #algname is also able to achieve maximal non-interleaving @fugue.
+However, since that algorithm is out of scope of this paper, we also leave the proof of non-interleaving out of scope.
+
+Let $sans("Char")$ be the set of characters that can be inserted in a document.
+Let $sans("Op") = {italic("Insert")(i, c) | i in NN and c in sans("Char")} union {italic("Delete")(i) | i in NN}$ be the set of possible operations.
+Let $sans("ID")$ be the set of unique event identifiers, and let $sans("Evt") = sans("ID") times cal(P)(sans("ID")) times sans("Op")$ be the set of possible events consisting of a unique ID, a set of parent event IDs, and an operation.
+When $e in G$ and $e = (i,p,o)$ we also use the notation $e.italic("id") = i$, $e.italic("parents") = p$, and $e.italic("op") = o$.
+
+We say that an event graph $G subset.eq sans("Evt")$ is _valid_ if:
+1. every event $e in G$ has an ID $e.italic("id")$ that is unique in $G$;
+2. for every event $e in G$, every parent ID $p in e.italic("parents")$ is the ID of some other event in $G$;
+3. the graph is acyclic, i.e. there is no subset of events ${e_1, e_2, ..., e_n} subset.eq G$ such that $e_1$ is a parent of $e_2$, $e_2$ is a parent of $e_3$, ..., and $e_n$ is a parent of $e_1$; and
+4. for every event $e in G$, the index at which $e.italic("op")$ inserts or deletes is an index that exists (is not beyond the end of the document) in the document version defined by the parents $e.italic("parents")$.
+
+Since event graphs grow monotonically and we never remove events, it is easy to ensure that the graph remains valid whenever a new event is added to it.
+
+Given an event graph $G$ we define a replay function $sans("replay")(G)$ as introduced in @replay, based on the #algname algorithm.
+It iterates over the events in $G$ in some topologically sorted order, transforming the operation in each event as described in @algorithm, and then applying the transformed operation to the document state resulting from the operations applied so far (starting with the empty document).
+In a real implementation, $sans("replay")$ returns the final document state as a concatenated sequence of characters.
+For the sake of this proof, we define $sans("replay")$ to instead return a sequence of $(italic("id"), c)$ pairs, where $italic("id")$ is the unique ID of the event that inserted the character $c$.
+This allows us to distinguish between different occurrences of the same character.
+The text of the document can be recovered by simply ignoring the $italic("id")$ of each pair and concatenating the characters.
+
+#lemma[Let $G$ be a valid event graph with ${a, b} subset.eq sans("Version")(G)$. Let the event sequence $E = angle.l e_1, e_2, ..., e_n angle.r$ be a topological sort of $G - {a, b}$. Then replaying the events $E$ in order, followed by $a$ and then $b$, results in the same document state as replaying $E$ followed by $b$ and then $a$.] <lemma-commute>
+#proof[
+  By induction over $n$, the length of $E$.
+
+  Base case ($n=0$). WLOG we consider three cases: (1)~$a.italic("op") = italic("Insert")(i, c_i)$ and $b.italic("op") = italic("Insert")(j, c_j)$; (2)~$a.italic("op") = italic("Insert")(i, c)$ and $b.italic("op") = italic("Delete")(j)$; (3)~$a.italic("op") = italic("Delete")(i)$ and $b.italic("op") = italic("Delete")(j)$.
+  The case where $a$ is a deletion and $b$ is an insertion is equivalent to case (2).
+
+  TODO
+
+  Inductive step.
+  Inductive hypothesis: replaying $E_1 = angle.l e_1, e_2, ..., e_k, a, b angle.r$ results in document state $d$, and $E_2 = angle.l e_1, e_2, ..., e_k, b, a angle.r$ results in the same document $d$.
+  We must show that replaying $E'_1 = angle.l e_1, e_2, ..., e_k, e_l, a, b angle.r$ results in the same document state as replaying $E'_2 = angle.l e_1, e_2, ..., e_k, e_l, b, a angle.r$, where $e_l$ is the next event after $e_k$ in $E$.
+
+  TODO
+]
+
+#lemma[Given a valid event graph $G$, $sans("replay")(G)$ is a deterministic function.] <lemma-deterministic>
+#proof[
+  The algorithms to transform an operation and to apply a transformed operation to the document state are by definition deterministic.
+  This leaves as the only source of nondeterminism the choice of topologically sorted order ($G$ is valid and hence acyclic, thus at least one such order exists, but there may be several topologically sorted orders if $G$ contains concurrent events).
+  We show that all sort orders result in the same final document state.
+
+  Let $E = angle.l e_1, e_2, ..., e_n angle.r$ and $E' = angle.l e'_1, e'_2, ..., e'_n angle.r$ be two topological sort orders of $G = {e_1, e_2, ..., e_n}$.
+  Then $E'$ must be a permutation of $E$.
+  Both sequences are in some causal order, that is: if $e_i -> e_j$ ($e_i$ happens before $e_j$, as defined in @event-graphs), then $e_i$ must appear before $e_j$ in both $E$ and $E'$.
+  If $e_i parallel e_j$ (they are concurrent), the events could appear in either order.
+  Therefore, it is possible to transform $E$ into $E'$ by repeatedly swapping two concurrent events that are adjacent in the sequence.
+  We show that at each such swap we maintain the invariant that the document state resulting from applying the events in the order before the swap is equal to the document state resulting from applying the events in the order after the swap.
+  Therefore, the document state resulting from replaying $E$ is equal to that resulting from $E'$.
+
+  Let $angle.l e_1, e_2, ..., e_i, e_j, ..., e_n angle.r$ be the sequence of events prior to one of these swaps, and $e_i$, $e_j$ are the events to be swapped.
+  The set of events $G' = {e_1, e_2, ..., e_i, e_j}$ in the prefix of this sequence up to and including $e_j$ also forms a valid event graph (in a topological sort, an event's parents must always appear earlier in the sequence, so the removal of a suffix cannot remove a parent of an event in the prefix).
+  Moreover, $e_i$ and $e_j$ must both be in the frontier set of $G'$, since they are concurrent and they cannot be the parent of any other event in $G'$.
+  By @lemma-commute, replaying the events in the prefix results in the same document state as replaying the events in a variant of the prefix in which $e_i$ and $e_j$ are swapped.
+  Replaying the events in the suffix is a deterministic algorithm based on this document state.
+  Therefore, replaying $angle.l e_1, e_2, ..., e_i, e_j, ..., e_n angle.r$ results in the same document state as replaying $angle.l e_1, e_2, ..., e_j, e_i, ..., e_n angle.r$.
+]
+
+#theorem[The #algname algorithm complies with the strong list specification @Attiya2016.] <main-theorem>
+#proof[
+  Attiya et al. make a simplifying assumption that every insertion operation has a unique character.
+  We use a slightly stronger version of the specification that avoids this assumption.
+  We also simplify the specification by using our event graph definition instead of the original abstract execution definition (containing message broadcast/receive events and a visibility relation).
+  These changes do not affect the substance of the proof; the transitive closure of our event graph is equivalent to the visibility relation.
+
+  Our version of the strong list specification requires that for every finite event graph $G subset.eq sans("Evt")$ there exists a relation $italic("lo") subset.eq G times G$ called the _list order_, such that:
+  1. For every event $e in G$, let $sans("replay")({e} union sans("Events")(e.italic("parents")))$... TODO
+]
+
+#lemma[TODO]
 
 // "given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event" (end of Section 2)
