@@ -1095,11 +1095,19 @@ For the sake of this proof, we define $sans("replay")$ to instead return a seque
 This allows us to distinguish between different occurrences of the same character.
 The text of the document can be recovered by simply ignoring the $italic("id")$ of each pair and concatenating the characters.
 
+#lemma[Let $e$ be an event in a valid event graph such that $e.italic("op") = italic("Delete")(i)$. In the internal state immediately before applying $e$ (in which all events that happened before $e$ have been advanced and all others have been retreated), either the record that $e$ will update has $s_p = mono("Ins")$, or it is part of a placeholder (which behaves like a sequence of $s_p = mono("Ins")$ records).] <lemma-prepare-delete>
+#proof[
+  If we had $s_p = mono("NotInsertedYet")$, that would imply that we retreated the insertion of the character deleted by $e$, which contradicts the fact that the insertion of a character must happen before any deletion of the same character.
+  Furthermore, if we had $s_p = mono("Del") k$ for some $k$, that would imply that an event that happened before $e$ already deleted the same character, in which case it would not be possible to generate $e$.
+  This leaves $s_p = mono("Ins")$ or placeholder as the only options that do not result in a contradiction.
+]
+
 #lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Insert")(i, c_i)$ and $b.italic("op") = italic("Insert")(j, c_j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-ins-ins>
 // TODO: technically the internal states will not be the same since the prepare states differ. But the next retreat/advance to a specific version should fix that up.
 #proof[
   To replay $a$ followed by $b$, we first retreat/advance so that the prepare state corresponds to $a.italic("parents")$, then apply $a$, then retreat $a$, then retreat/advance so that the prepare state corresponds to $b.italic("parents")$, then apply $b$.
   Applying $a$ inserts a record into the internal state, and after retreating $a$ this record has $s_p = mono("NotInsertedYet")$ and $s_e = mono("Ins")$.
+  Since $b$ is concurrent to $a$, $a$ cannot be a critical version, and therefore the internal state is not cleared after applying $a$.
   When $b$ is applied, the presence of the record inserted by $a$ is the only difference between the internal state when applying $b$ after $a$ compared to applying $b$ without applying $a$ first (all other records are set to the same state by the retreat/advance process). // TODO: do we need a lemma for that?
   When determining the insertion position in the internal state for $b$'s record based on $b$'s index $j$, the record inserted by $a$ does not count since it has $s_p = mono("NotInsertedYet")$.
   Therefore, $b$'s record is inserted into the internal state at the same position relative to its neighbours, regardless of whether $a$ has been applied previously.
@@ -1108,6 +1116,9 @@ The text of the document can be recovered by simply ignoring the $italic("id")$ 
   As explained in @prepare-effect-versions, the internal state uses a CRDT algorithm to place the records in the internal state in a consistent order, regardless of the order in which the events are applied.
   The details of that algorithm go beyond the scope of this paper.
   The key property of that algorithm is that the final sequence of internal state records is the same, regardless of whether we apply first $a$ and then $b$, or vice versa.
+  For example, if we first apply $a$ then $b$, and if the final position of $b$'s record in the internal state is after $a$'s record, then the CRDT algorithm has to skip over $a$'s record (and potentially other, concurrently inserted records) when determining the insertion position for $b$'s record.
+  This process never needs to skip over a placeholder, since placeholders represent characters that were inserted before the last critical version.
+  It only ever needs to skip over records for insertions that are concurrent with $a$ or $b$; by the definition of critical versions, all such insertion events appear after the last critical version (and hence after the last internal state clearing) in the topological sort, and therefore they are represented by explicit internal state records, not placeholders.
 
   Now we consider the document state.
   WLOG assume that the record inserted by $a$ appears at an earlier position in the internal state than the record inserted by $b$ (regardless of the order of applying $a$ and $b$).
@@ -1135,20 +1146,43 @@ The text of the document can be recovered by simply ignoring the $italic("id")$ 
 
   Case (2): If we replay $b$ before $a$, we first apply $b$, then retreat $b$, then apply $a$ (plus other retreats/advances).
   Applying $b$ updates an existing record in the internal state (possibly splitting a placeholder in the process).
-  After retreating $b$ this record has either $s_p = mono("Ins")$ (if no concurrent deletion of the same character was applied previously, in which case the transformed operation for $b$ is still a deletion) or $s_p = mono("Del") k$ (if $k>0$ concurrent deletions of the same character have been applied, in which case the transformed operation for $b$ is a no-op).
-  $b$'s record has $s_e = mono("Del")$ in any case.
+  Before applying $b$ this record must have $s_p = mono("Ins")$ (by @lemma-prepare-delete), and it can have either $s_e = mono("Ins")$ (in which case, the transformed operation for $b$ is $italic("Delete")(j')$ for some transformed index $j'$) or $s_e = mono("Del")$ (in which case, $b$ is transformed into a no-op).
+  After applying and retreating $b$ this record has $s_p = mono("Ins")$ and $s_e = mono("Del")$ in any case.
   We next apply $a$, which by assumption inserts a record into the internal state at a later position than $b$'s record.
-  If $s_p = mono("Ins")$, $b$'s record is counted when mapping $a$'s index to an internal record position, but not counted when mapping the internal record back to a transformed index, resulting in $a$'s transformed index being one less than it would have been without earlier applying $b$, as required given that $b$ has deleted an earlier character.
-  If $s_p = mono("Del") k$, $b$'s record is not counted during either index mapping, so the index of $a$ is not affected by $b$, as required given that the transformed operation for $b$ is a no-op.
+  If we had $s_e = mono("Del")$ before applying $b$, the process of applying and retreating $b$ did not change the internal state, so the transformed operation for $a$ is the same as if $b$ had not been applied, which is consistent with the fact that $b$ was transformed into a no-op.
+  If we had $s_e = mono("Ins")$ before applying $b$, $b$'s record is counted when mapping $a$'s index to an internal record position, but not counted when mapping the internal record back to a transformed index, resulting in $a$'s transformed index being one less than it would have been without earlier applying $b$, as required given that $b$ has deleted an earlier character.
   On the other hand, if we replay $a$ before $b$, the record inserted by $a$ appears after $b$'s record in the internal state, so the transformation of $b$ is not affected by $a$, and the transformed operations converge.
 ]
 
 #lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Delete")(i)$ and $b.italic("op") = italic("Delete")(j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-del-del>
-#proof[TODO.]
+#proof[
+  WLOG we need to consider two cases: (1)~the record updated by $a$ has an earlier position in the internal state than the record updated by $b$; or (2)~$a$ and $b$ update the same internal state record. The case where $a$'s record has a later position than $b$'s record is symmetric to (1).
+
+  Case (1): We further consider two sub-cases: (1a)~the record that $a$ will update has $s_e = mono("Ins")$ prior to applying $a$; or (1b)~the record has $s_e = mono("Del")$.
+
+  Case (1a): Say we replay $a$ before $b$.
+  Before applying $a$, the record that $a$ will update must have $s_p = mono("Ins")$ (by @lemma-prepare-delete).
+  After applying and retreating $a$, the record updated by $a$ has $s_p = mono("Ins")$ and $s_e = mono("Del")$, and the transformed operation for $a$ is $italic("Delete")(i')$ for some transformed index $i'$.
+  We subsequently apply $b$, which by assumption updates an internal state record that is later than $a$'s.
+  $a$'s record is therefore counted when mapping the index of $b.italic("op")$ to an internal record position, but not counted when mapping the internal record back to a transformed index.
+  If $a$ had not been replayed previously, it would have been counted during both mappings.
+  Thus, if the record updated by $b$ has $s_e = mono("Ins")$, the transformed operation for $b$ is $italic("Delete")(j'-1)$, where $j'$ is the transformed index of $b$'s operation if $a$ had not been replayed previously, and $j'-1 gt.eq i'$, as required.
+  If $b$'s record previously has $s_e = mono("Del")$, it is transformed into a no-op.
+  On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears later than $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
+
+  Case (1b): Say we replay $a$ before $b$.
+  Before applying $a$, the record that $a$ will update must have $s_p = mono("Ins")$ (by @lemma-prepare-delete), and $s_e = mono("Del")$ by assumption.
+  After applying and retreating $a$, the record updated by $a$ remains in the same state ($s_p = mono("Ins")$, $s_e = mono("Del")$), and the transformed operation for $a$ is a no-op.
+  When we subsequently apply $b$, the transformed operation is therefore the same as if $a$ had not been applied, as required.
+  On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears later than $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
+
+  Case (2): TODO
+]
 
 #lemma[Let $G$ be a valid event graph with ${a, b} subset.eq sans("Version")(G)$. Let the event sequence $E = angle.l e_1, e_2, ..., e_n angle.r$ be a topological sort of $G - {a, b}$. Then replaying the events $E$ in order, followed by $a$ and then $b$, results in the same document state as replaying $E$ followed by $b$ and then $a$.] <lemma-commute>
 #proof[
   By induction over $n$, the length of $E$.
+  // TODO: not sure that reasoning is sound. Even if we start off with a valid graph, removing an event that's not in the frontier would make it invalid.
 
   Base case ($n=0$).
   There three subcases: if $a$ and $b$ are both insertions, the document states are the same by @lemma-ins-ins.
@@ -1179,6 +1213,7 @@ The text of the document can be recovered by simply ignoring the $italic("id")$ 
   Let $angle.l e_1, e_2, ..., e_i, e_j, ..., e_n angle.r$ be the sequence of events prior to one of these swaps, and $e_i$, $e_j$ are the events to be swapped.
   The set of events $G' = {e_1, e_2, ..., e_i, e_j}$ in the prefix of this sequence up to and including $e_j$ also forms a valid event graph (in a topological sort, an event's parents must always appear earlier in the sequence, so the removal of a suffix cannot remove a parent of an event in the prefix).
   Moreover, $e_i$ and $e_j$ must both be in the frontier set of $G'$, since they are concurrent and they cannot be the parent of any other event in $G'$.
+  // TODO: It is never the case that we clear the internal state between the two events being swapped
   By @lemma-commute, replaying the events in the prefix results in the same document state as replaying the events in a variant of the prefix in which $e_i$ and $e_j$ are swapped.
   Replaying the events in the suffix is a deterministic algorithm based on this document state.
   Therefore, replaying $angle.l e_1, e_2, ..., e_i, e_j, ..., e_n angle.r$ results in the same document state as replaying $angle.l e_1, e_2, ..., e_j, e_i, ..., e_n angle.r$.
