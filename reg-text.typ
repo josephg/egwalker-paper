@@ -1,13 +1,13 @@
 // #import "@preview/cetz:0.1.2": canvas, plot, draw
 // #import "@preview/fletcher:0.2.0" as fletcher: node, edge
 #import "@preview/fletcher:0.3.0" as fletcher: node, edge
-#import "@preview/ctheorems:1.1.0": *
+#import "@preview/ctheorems:1.1.2": *
 #import "@preview/algo:0.3.3": algo, i, d, comment, code
 // #import "@preview/lovelace:0.1.0": *
 #import "@preview/algorithmic:0.1.0": algorithm
 #import "@preview/cetz:0.1.2"
 #import "charts.typ"
-#show: thmrules
+#show: thmrules.with(qed-symbol: $square$)
 
 // Might be worth pulling these two fields in from a config file instead
 #let anonymous = true
@@ -86,15 +86,9 @@
   #it.body
 ]))
 
-#let definition = thmbox("definition", "Definition",
-  base_level: 0,
-  fill: rgb("#f8e8e8")
-)
-
-#let claim = thmbox("claim", "Claim",
-  base_level: 0,
-  fill: rgb("#e8e8f8")
-)
+#let theorem = thmplain("theorem", "Theorem", base_level: 0, titlefmt: strong).with(inset: 0pt)
+#let lemma = thmplain("theorem", "Lemma", base_level: 0, titlefmt: strong).with(inset: 0pt)
+#let proof = thmproof("proof", "Proof").with(inset: 0pt)
 
 #if draft {
   align(center, text(16pt)[
@@ -106,7 +100,7 @@
   align(center, text(20pt)[*Fast and memory-efficient collaborative text editing*])
   align(center, text(12pt)[
     Anonymous Author(s) \
-    Submission ID: TODO
+    Submission ID: 223
   ])
 } else {
   align(center, text(20pt)[*Collaborative Text Editing: Better, Faster, Smaller*])
@@ -237,7 +231,7 @@ We make no timing assumptions and can tolerate arbitrary network delay, but we a
 A key property that the collaboration algorithm must satisfy is _convergence_: any two replicas that have seen the same set of operations must be in the same document state (i.e., a text consisting of the same sequence of characters), even if the operations arrived in a different order at each replica.
 If the underlying broadcast protocol ensures that every non-crashed replica eventually receives every operation, the algorithm achieves _strong eventual consistency_ @Shapiro2011.
 
-== Event graphs
+== Event graphs <event-graphs>
 
 We represent the editing history of a document as an _event graph_: a directed acyclic graph (DAG) in which every node is an _event_ consisting of an operation (insert/delete a character), a unique ID, and a set of IDs of its _parent nodes_.
 When $a$ is a _parent_ of $b$, we also say $b$ is a _child_ of $a$, and the graph contains an edge from $a$ to $b$.
@@ -308,7 +302,7 @@ The set of parents of an event in the graph is the version of the document in wh
 The version can hence be seen as a _logical clock_, describing the point in time at which a replica knows about the exact set of events in $G$.
 Even if the event graph is large, in practice a version rarely consists of more than two events.
 
-== Replaying editing history
+== Replaying editing history <replay>
 
 Collaborative editing algorithms are usually defined in terms of sending and receiving messages over a network.
 The abstraction of an event graph allows us to reframe these algorithms in a simpler way: a collaborative text editing algorithm is a pure function $sans("replay")(G)$ of an event graph $G$.
@@ -1074,6 +1068,168 @@ The statistics given in @traces-table are after duplication.
 
 = Proof of Correctness <proofs>
 
-TODO
+We now demonstrate that #algname is a correct collaborative text algorithm by showing that it satisfies the _strong list specification_ proposed by Attiya et al. @Attiya2016.
+Informally speaking, this specification requires that replicas converge to the same document state, that this state contains exactly those characters that were inserted but not deleted, and that inserted characters appear in the correct place relative to the characters that surrounded it at the time it was inserted.
+Assuming network partitions are eventually repaired, this is a stronger specification than _strong eventual consistency_ @Shapiro2011, which is a standard correctness criterion for CRDTs @Gomes2017verifying.
+
+With a suitable algorithm for ordering concurrent insertions at the same position, #algname is also able to achieve maximal non-interleaving @fugue.
+However, since that algorithm is out of scope of this paper, we also leave the proof of non-interleaving out of scope.
+
+Let $sans("Char")$ be the set of characters that can be inserted in a document.
+Let $sans("Op") = {italic("Insert")(i, c) | i in NN and c in sans("Char")} union {italic("Delete")(i) | i in NN}$ be the set of possible operations.
+Let $sans("ID")$ be the set of unique event identifiers, and let $sans("Evt") = sans("ID") times cal(P)(sans("ID")) times sans("Op")$ be the set of possible events consisting of a unique ID, a set of parent event IDs, and an operation.
+When $e in G$ and $e = (i,p,o)$ we also use the notation $e.italic("id") = i$, $e.italic("parents") = p$, and $e.italic("op") = o$.
+
+We say that an event graph $G subset.eq sans("Evt")$ is _valid_ if:
+1. every event $e in G$ has an ID $e.italic("id")$ that is unique in $G$;
+2. for every event $e in G$, every parent ID $p in e.italic("parents")$ is the ID of some other event in $G$;
+3. the graph is acyclic, i.e. there is no subset of events ${e_1, e_2, ..., e_n} subset.eq G$ such that $e_1$ is a parent of $e_2$, $e_2$ is a parent of $e_3$, ..., and $e_n$ is a parent of $e_1$; and
+4. for every event $e in G$, the index at which $e.italic("op")$ inserts or deletes is an index that exists (is not beyond the end of the document) in the document version defined by the parents $e.italic("parents")$.
+
+Since event graphs grow monotonically and we never remove events, it is easy to ensure that the graph remains valid whenever a new event is added to it.
+
+Given an event graph $G$ we define a replay function $sans("replay")(G)$ as introduced in @replay, based on the #algname algorithm.
+It iterates over the events in $G$ in some topologically sorted order, transforming the operation in each event as described in @algorithm, and then applying the transformed operation to the document state resulting from the operations applied so far (starting with the empty document).
+In a real implementation, $sans("replay")$ returns the final document state as a concatenated sequence of characters.
+For the sake of this proof, we define $sans("replay")$ to instead return a sequence of $(italic("id"), c)$ pairs, where $italic("id")$ is the unique ID of the event that inserted the character $c$.
+This allows us to distinguish between different occurrences of the same character.
+The text of the document can be recovered by simply ignoring the $italic("id")$ of each pair and concatenating the characters.
+
+#lemma[Let $e$ be an event in a valid event graph such that $e.italic("op") = italic("Delete")(i)$. In the internal state immediately before applying $e$ (in which all events that happened before $e$ have been advanced and all others have been retreated), either the record that $e$ will update has $s_p = mono("Ins")$, or it is part of a placeholder (which behaves like a sequence of $s_p = mono("Ins")$ records).] <lemma-prepare-delete>
+#proof[
+  If we had $s_p = mono("NotInsertedYet")$, that would imply that we retreated the insertion of the character deleted by $e$, which contradicts the fact that the insertion of a character must happen before any deletion of the same character.
+  Furthermore, if we had $s_p = mono("Del") k$ for some $k$, that would imply that an event that happened before $e$ already deleted the same character, in which case it would not be possible to generate $e$.
+  This leaves $s_p = mono("Ins")$ or placeholder as the only options that do not result in a contradiction.
+]
+
+#lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Insert")(i, c_i)$ and $b.italic("op") = italic("Insert")(j, c_j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-ins-ins>
+// TODO: technically the internal states will not be the same since the prepare states differ. But the next retreat/advance to a specific version should fix that up.
+#proof[
+  To replay $a$ followed by $b$, we first retreat/advance so that the prepare state corresponds to $a.italic("parents")$, then apply $a$, then retreat $a$, then retreat/advance so that the prepare state corresponds to $b.italic("parents")$, then apply $b$.
+  Applying $a$ inserts a record into the internal state, and after retreating $a$ this record has $s_p = mono("NotInsertedYet")$ and $s_e = mono("Ins")$.
+  Since $b$ is concurrent to $a$, $a$ cannot be a critical version, and therefore the internal state is not cleared after applying $a$.
+  When $b$ is applied, the presence of the record inserted by $a$ is the only difference between the internal state when applying $b$ after $a$ compared to applying $b$ without applying $a$ first (all other records are set to the same state by the retreat/advance process). // TODO: do we need a lemma for that?
+  When determining the insertion position in the internal state for $b$'s record based on $b$'s index $j$, the record inserted by $a$ does not count since it has $s_p = mono("NotInsertedYet")$.
+  Therefore, $b$'s record is inserted into the internal state at the same position relative to its neighbours, regardless of whether $a$ has been applied previously.
+  By similar argument the same holds for $a$'s record.
+
+  As explained in @prepare-effect-versions, the internal state uses a CRDT algorithm to place the records in the internal state in a consistent order, regardless of the order in which the events are applied.
+  The details of that algorithm go beyond the scope of this paper.
+  The key property of that algorithm is that the final sequence of internal state records is the same, regardless of whether we apply first $a$ and then $b$, or vice versa.
+  For example, if we first apply $a$ then $b$, and if the final position of $b$'s record in the internal state is after $a$'s record, then the CRDT algorithm has to skip over $a$'s record (and potentially other, concurrently inserted records) when determining the insertion position for $b$'s record.
+  This process never needs to skip over a placeholder, since placeholders represent characters that were inserted before the last critical version.
+  It only ever needs to skip over records for insertions that are concurrent with $a$ or $b$; by the definition of critical versions, all such insertion events appear after the last critical version (and hence after the last internal state clearing) in the topological sort, and therefore they are represented by explicit internal state records, not placeholders.
+
+  Now we consider the document state.
+  WLOG assume that the record inserted by $a$ appears at an earlier position in the internal state than the record inserted by $b$ (regardless of the order of applying $a$ and $b$).
+  Let $i'$ be the transformed index of $a.italic("op")$ when $a$ is applied first, and let $j'$ be the transformed index of $b.italic("op")$ when $b$ is applied first.
+
+  Say we replay $a$ before $b$.
+  When computing the transformed index for $b$, the internal state record for $a$ has $s_p = mono("NotInsertedYet")$, and hence it is not counted when mapping $b.italic("op")$'s index $j$ to $b$'s internal state record.
+  However, $a$'s record _is_ counted when mapping $b$'s internal state record back to an index, since $a$'s record has $s_e = mono("Ins")$ and it appears before $b$'s record.
+  Therefore the transformed index for $b.italic("op")$ is $j' + 1$ when applied after $a$.
+  On the other hand, if we replay $b$ before $a$, the record for $b$ appears after the record for $a$ in the internal state, so the transformed index for $a$ is $i'$, unaffected by $b$.
+  Thus, we have the situation as shown in @two-inserts, and the effect of the two insertions $a$ and $b$ on the document state is the same regardless of their order.
+]
+
+#lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Insert")(i, c)$ and $b.italic("op") = italic("Delete")(j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-ins-del>
+#proof[
+  Since $a$ and $b$ are concurrent, the character being deleted by $b$ cannot be the character inserted by $a$.
+  We therefore only need to consider two cases: (1)~the record inserted by $a$ has an earlier position in the internal state than the record updated by $b$; or (2) vice versa.
+
+  Case (1): If we replay $a$ before $b$, we first apply $a$, then retreat $a$, then apply $b$ (and also retreat/advance other events before applying, like in @lemma-ins-ins).
+  Applying $a$ inserts a record into the internal state, and after retreating $a$ this record has $s_p = mono("NotInsertedYet")$ and $s_e = mono("Ins")$.
+  When subsequently applying $b$ we update an internal state record at a later position.
+  The record inserted by $a$ is not counted when mapping $b$'s index to an internal record, but it is counted when mapping the internal record back to a transformed index, resulting in $b$'s transformed index being one greater than it would have been without earlier applying $a$.
+  On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears after $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
+  The transformed operations therefore converge.
+
+  Case (2): If we replay $b$ before $a$, we first apply $b$, then retreat $b$, then apply $a$ (plus other retreats/advances).
+  Applying $b$ updates an existing record in the internal state (possibly splitting a placeholder in the process).
+  Before applying $b$ this record must have $s_p = mono("Ins")$ (by @lemma-prepare-delete), and it can have either $s_e = mono("Ins")$ (in which case, the transformed operation for $b$ is $italic("Delete")(j')$ for some transformed index $j'$) or $s_e = mono("Del")$ (in which case, $b$ is transformed into a no-op).
+  After applying and retreating $b$ this record has $s_p = mono("Ins")$ and $s_e = mono("Del")$ in any case.
+  We next apply $a$, which by assumption inserts a record into the internal state at a later position than $b$'s record.
+  If we had $s_e = mono("Del")$ before applying $b$, the process of applying and retreating $b$ did not change the internal state, so the transformed operation for $a$ is the same as if $b$ had not been applied, which is consistent with the fact that $b$ was transformed into a no-op.
+  If we had $s_e = mono("Ins")$ before applying $b$, $b$'s record is counted when mapping $a$'s index to an internal record position, but not counted when mapping the internal record back to a transformed index, resulting in $a$'s transformed index being one less than it would have been without earlier applying $b$, as required given that $b$ has deleted an earlier character.
+  On the other hand, if we replay $a$ before $b$, the record inserted by $a$ appears after $b$'s record in the internal state, so the transformation of $b$ is not affected by $a$, and the transformed operations converge.
+]
+
+#lemma[Let $a$ and $b$ be two concurrent events such that $a.italic("op") = italic("Delete")(i)$ and $b.italic("op") = italic("Delete")(j)$. If we start with some internal state and document state and then replay $a$ followed by $b$, the resulting internal state and document state are the same as if we had replayed $b$ followed by $a$.] <lemma-del-del>
+#proof[
+  WLOG we need to consider two cases: (1)~the record updated by $a$ has an earlier position in the internal state than the record updated by $b$; or (2)~$a$ and $b$ update the same internal state record. The case where $a$'s record has a later position than $b$'s record is symmetric to (1).
+
+  Case (1): We further consider two sub-cases: (1a)~the record that $a$ will update has $s_e = mono("Ins")$ prior to applying $a$; or (1b)~the record has $s_e = mono("Del")$.
+
+  Case (1a): Say we replay $a$ before $b$.
+  Before applying $a$, the record that $a$ will update must have $s_p = mono("Ins")$ (by @lemma-prepare-delete).
+  After applying and retreating $a$, the record updated by $a$ has $s_p = mono("Ins")$ and $s_e = mono("Del")$, and the transformed operation for $a$ is $italic("Delete")(i')$ for some transformed index $i'$.
+  We subsequently apply $b$, which by assumption updates an internal state record that is later than $a$'s.
+  $a$'s record is therefore counted when mapping the index of $b.italic("op")$ to an internal record position, but not counted when mapping the internal record back to a transformed index.
+  If $a$ had not been replayed previously, it would have been counted during both mappings.
+  Thus, if the record updated by $b$ has $s_e = mono("Ins")$, the transformed operation for $b$ is $italic("Delete")(j'-1)$, where $j'$ is the transformed index of $b$'s operation if $a$ had not been replayed previously, and $j'-1 gt.eq i'$, as required.
+  If $b$'s record previously has $s_e = mono("Del")$, it is transformed into a no-op.
+  On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears later than $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
+
+  Case (1b): Say we replay $a$ before $b$.
+  Before applying $a$, the record that $a$ will update must have $s_p = mono("Ins")$ (by @lemma-prepare-delete), and $s_e = mono("Del")$ by assumption.
+  After applying and retreating $a$, the record updated by $a$ remains in the same state ($s_p = mono("Ins")$, $s_e = mono("Del")$), and the transformed operation for $a$ is a no-op.
+  When we subsequently apply $b$, the transformed operation is therefore the same as if $a$ had not been applied, as required.
+  On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears later than $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
+
+  Case (2): TODO
+]
+
+#lemma[Let $G$ be a valid event graph with ${a, b} subset.eq sans("Version")(G)$. Let the event sequence $E = angle.l e_1, e_2, ..., e_n angle.r$ be a topological sort of $G - {a, b}$. Then replaying the events $E$ in order, followed by $a$ and then $b$, results in the same document state as replaying $E$ followed by $b$ and then $a$.] <lemma-commute>
+#proof[
+  By induction over $n$, the length of $E$.
+  // TODO: not sure that reasoning is sound. Even if we start off with a valid graph, removing an event that's not in the frontier would make it invalid.
+
+  Base case ($n=0$).
+  There three subcases: if $a$ and $b$ are both insertions, the document states are the same by @lemma-ins-ins.
+  If one of $a$ and $b$ is an insertion and the other is a deletion, we use @lemma-ins-del.
+  If both $a$ and $b$ are deletions, we use @lemma-del-del.
+
+  Inductive step.
+  Inductive hypothesis: replaying $E_1 = angle.l e_1, e_2, ..., e_k, a, b angle.r$ results in document state $d$, and $E_2 = angle.l e_1, e_2, ..., e_k, b, a angle.r$ results in the same document $d$.
+  We must show that replaying $E'_1 = angle.l e_1, e_2, ..., e_k, e_l, a, b angle.r$ results in the same document state as replaying $E'_2 = angle.l e_1, e_2, ..., e_k, e_l, b, a angle.r$, where $e_l$ is the next event after $e_k$ in $E$.
+
+  TODO
+]
+
+#lemma[Given a valid event graph $G$, $sans("replay")(G)$ is a deterministic function.] <lemma-deterministic>
+#proof[
+  The algorithms to transform an operation and to apply a transformed operation to the document state are by definition deterministic.
+  This leaves as the only source of nondeterminism the choice of topologically sorted order ($G$ is valid and hence acyclic, thus at least one such order exists, but there may be several topologically sorted orders if $G$ contains concurrent events).
+  We show that all sort orders result in the same final document state.
+
+  Let $E = angle.l e_1, e_2, ..., e_n angle.r$ and $E' = angle.l e'_1, e'_2, ..., e'_n angle.r$ be two topological sort orders of $G = {e_1, e_2, ..., e_n}$.
+  Then $E'$ must be a permutation of $E$.
+  Both sequences are in some causal order, that is: if $e_i -> e_j$ ($e_i$ happens before $e_j$, as defined in @event-graphs), then $e_i$ must appear before $e_j$ in both $E$ and $E'$.
+  If $e_i parallel e_j$ (they are concurrent), the events could appear in either order.
+  Therefore, it is possible to transform $E$ into $E'$ by repeatedly swapping two concurrent events that are adjacent in the sequence.
+  We show that at each such swap we maintain the invariant that the document state resulting from applying the events in the order before the swap is equal to the document state resulting from applying the events in the order after the swap.
+  Therefore, the document state resulting from replaying $E$ is equal to that resulting from $E'$.
+
+  Let $angle.l e_1, e_2, ..., e_i, e_j, ..., e_n angle.r$ be the sequence of events prior to one of these swaps, and $e_i$, $e_j$ are the events to be swapped.
+  The set of events $G' = {e_1, e_2, ..., e_i, e_j}$ in the prefix of this sequence up to and including $e_j$ also forms a valid event graph (in a topological sort, an event's parents must always appear earlier in the sequence, so the removal of a suffix cannot remove a parent of an event in the prefix).
+  Moreover, $e_i$ and $e_j$ must both be in the frontier set of $G'$, since they are concurrent and they cannot be the parent of any other event in $G'$.
+  // TODO: It is never the case that we clear the internal state between the two events being swapped
+  By @lemma-commute, replaying the events in the prefix results in the same document state as replaying the events in a variant of the prefix in which $e_i$ and $e_j$ are swapped.
+  Replaying the events in the suffix is a deterministic algorithm based on this document state.
+  Therefore, replaying $angle.l e_1, e_2, ..., e_i, e_j, ..., e_n angle.r$ results in the same document state as replaying $angle.l e_1, e_2, ..., e_j, e_i, ..., e_n angle.r$.
+]
+
+#theorem[The #algname algorithm complies with the strong list specification @Attiya2016.] <main-theorem>
+#proof[
+  Attiya et al. make a simplifying assumption that every insertion operation has a unique character.
+  We use a slightly stronger version of the specification that avoids this assumption.
+  We also simplify the specification by using our event graph definition instead of the original abstract execution definition (containing message broadcast/receive events and a visibility relation).
+  These changes do not affect the substance of the proof; the transitive closure of our event graph is equivalent to the visibility relation.
+
+  Our version of the strong list specification requires that for every finite event graph $G subset.eq sans("Evt")$ there exists a relation $italic("lo") subset.eq G times G$ called the _list order_, such that:
+  1. For every event $e in G$, let $sans("replay")({e} union sans("Events")(e.italic("parents")))$... TODO
+]
+
+#lemma[TODO]
 
 // "given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event" (end of Section 2)
