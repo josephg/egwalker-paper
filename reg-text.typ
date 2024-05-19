@@ -762,10 +762,13 @@ When sending a subset of events over the network (e.g., a single event during re
 // Can use a service like https://anonymous.4open.science/
 
 We created a TypeScript implementation of #algname optimised for simplicity and readability#if not anonymous {[ @reference-reg]}, and a production-ready Rust implementation optimised for performance#if not anonymous {[ @dt]}.
-The TypeScript version omits several optimisations, including run-length encoding of the internal state, the B-trees, and topological sorting heuristics.
-The performance results in this section are based on the Rust implementation.
+The TypeScript version omits the run-length encoding of internal state, B-trees, and topological sorting heuristics.
 
-We compare #algname with two popular CRDT libraries: Automerge v0.5.9 @automerge (Rust) and Yjs v13.6.10 @yjs (JavaScript).#footnote[We also tested Yrs @yrs, the Rust rewrite of Yjs by the original authors. At the time of writing it performs worse than Yjs, so we have omitted it from our results.]
+To evaluate the correctness of #algname we proved that the algorithm complies with Attiya et al.'s _strong list specification_ @Attiya2016 (see @proofs).
+We also performed extensive randomised property testing on the implementations, including checking that our implementations converge to the same result.
+This uncovered several implementation bugs.
+
+To evaluate its performance, we compare the Rust implementation of #algname with two popular CRDT libraries: Automerge v0.5.9 @automerge (Rust) and Yjs v13.6.10 @yjs (JavaScript).#footnote[We also tested Yrs @yrs, the Rust rewrite of Yjs by the original authors. At the time of writing it performs worse than Yjs, so we have omitted it from our results.]
 We only test their collaborative text datatypes, and not the other features they support.
 However, the performance of these libraries varies widely.
 In an effort to distinguish between implementation differences and algorithmic differences, we have also implemented our own performance-optimised reference CRDT library.
@@ -899,15 +902,14 @@ To ensure a like-for-like comparison we have disabled #algname's built-in LZ4 an
 
 // TODO: I wonder if it would be worth adding zlib compression (matching automerge)? It would be a small change.
 
-Automerge stores the full editing history of a document, and @chart-dt-vs-automerge shows the resulting file sizes relative to the raw concatenated text content of all insertions, with and without a cached copy of the final document text.
-In all of our traces, #algname has a significantly smaller overhead.
-
+Automerge stores the full editing history of a document, and @chart-dt-vs-automerge shows the resulting file sizes relative to the raw concatenated text content of all insertions, with and without a cached copy of the final document state (to enable fast loads).
+Even with this additional document text, #algname's files are smaller on all traces except S1.
 
 // TODO: Is this worth adding?
 // Note that storing the raw editing trace in this compact form removes one of the principle benefits of #algname, as the event graph must be replayed in order to determine the current document text. To improve load time, the current text content can be cached and stored alongside the event graph on disk. Alternately, the transformed operation positions can also be stored in the file. In our testing, this resulted in a tiny increase in file size while improving load performance by an order of magnitude.
 
-In contrast, Yjs only stores the text of the resulting, merged document. This results in a smaller file size, and in the case of #algname, much faster loading times. However, the resulting systems cannot reconstruct earlier document states.
-@chart-dt-vs-yjs compares Yjs to the equivalent event graph encoding in which we only store the resulting document text and operation metadata.
+In contrast, Yjs only stores the text of the final, merged document. This results in a smaller file size, at the cost of making it impossible to reconstruct earlier document states.
+@chart-dt-vs-yjs compares Yjs to the equivalent event graph encoding in which we only store the final document text and operation metadata.
 Our encoding is smaller than Yjs on all traces. The overhead of storing the event graph is between 20% and 3$times$ the final plain text file size.
 // Using this scheme, #algname can still merge editing events and load the document text directly from disk.
 
