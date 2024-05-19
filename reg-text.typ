@@ -88,6 +88,7 @@
 
 #let theorem = thmplain("theorem", "Theorem", base_level: 0, titlefmt: strong).with(inset: 0pt)
 #let lemma = thmplain("theorem", "Lemma", base_level: 0, titlefmt: strong).with(inset: 0pt)
+#let definition = thmplain("theorem", "Definition", base_level: 0, titlefmt: strong).with(inset: 0pt)
 #let proof = thmproof("proof", "Proof").with(inset: 0pt)
 
 #if draft {
@@ -996,7 +997,7 @@ We also believe that #algname can be extended to other file types such as rich t
 )
 
 #counter(heading).update(0)
-#set heading(numbering: "A", supplement: "Appendix")
+#set heading(numbering: "A.1", supplement: "Appendix")
 
 = Editing Traces <traces-appendix>
 
@@ -1068,25 +1069,34 @@ The statistics given in @traces-table are after duplication.
 
 = Proof of Correctness <proofs>
 
-We now demonstrate that #algname is a correct collaborative text algorithm by showing that it satisfies the _strong list specification_ proposed by Attiya et al. @Attiya2016.
+We now demonstrate that #algname is a correct collaborative text algorithm by showing that it satisfies the _strong list specification_ proposed by Attiya et al. @Attiya2016, a formal specification of collaborative text editing.
 Informally speaking, this specification requires that replicas converge to the same document state, that this state contains exactly those characters that were inserted but not deleted, and that inserted characters appear in the correct place relative to the characters that surrounded it at the time it was inserted.
 Assuming network partitions are eventually repaired, this is a stronger specification than _strong eventual consistency_ @Shapiro2011, which is a standard correctness criterion for CRDTs @Gomes2017verifying.
 
-With a suitable algorithm for ordering concurrent insertions at the same position, #algname is also able to achieve maximal non-interleaving @fugue.
+With a suitable algorithm for ordering concurrent insertions at the same position, #algname is also able to achieve maximal non-interleaving @fugue, which is a further strengthening of the strong list specification.
 However, since that algorithm is out of scope of this paper, we also leave the proof of non-interleaving out of scope.
+
+== Definitions
 
 Let $sans("Char")$ be the set of characters that can be inserted in a document.
 Let $sans("Op") = {italic("Insert")(i, c) | i in NN and c in sans("Char")} union {italic("Delete")(i) | i in NN}$ be the set of possible operations.
 Let $sans("ID")$ be the set of unique event identifiers, and let $sans("Evt") = sans("ID") times cal(P)(sans("ID")) times sans("Op")$ be the set of possible events consisting of a unique ID, a set of parent event IDs, and an operation.
 When $e in G$ and $e = (i,p,o)$ we also use the notation $e.italic("id") = i$, $e.italic("parents") = p$, and $e.italic("op") = o$.
 
-We say that an event graph $G subset.eq sans("Evt")$ is _valid_ if:
-1. every event $e in G$ has an ID $e.italic("id")$ that is unique in $G$;
-2. for every event $e in G$, every parent ID $p in e.italic("parents")$ is the ID of some other event in $G$;
-3. the graph is acyclic, i.e. there is no subset of events ${e_1, e_2, ..., e_n} subset.eq G$ such that $e_1$ is a parent of $e_2$, $e_2$ is a parent of $e_3$, ..., and $e_n$ is a parent of $e_1$; and
-4. for every event $e in G$, the index at which $e.italic("op")$ inserts or deletes is an index that exists (is not beyond the end of the document) in the document version defined by the parents $e.italic("parents")$.
+#definition[
+  An event graph $G subset.eq sans("Evt")$ is _valid_ if:
+  1. every event $e in G$ has an ID $e.italic("id")$ that is unique in $G$;
+  2. for every event $e in G$, every parent ID $p in e.italic("parents")$ is the ID of some other event in $G$;
+  3. the graph is acyclic, i.e. there is no subset of events ${e_1, e_2, ..., e_n} subset.eq G$ such that $e_1$ is a parent of $e_2$, $e_2$ is a parent of $e_3$, ..., and $e_n$ is a parent of $e_1$; and
+  4. for every event $e in G$, the index at which $e.italic("op")$ inserts or deletes is an index that exists (is not beyond the end of the document) in the document version defined by the parents $e.italic("parents")$.
+] <valid-graph>
 
 Since event graphs grow monotonically and we never remove events, it is easy to ensure that the graph remains valid whenever a new event is added to it.
+
+Attiya et al. make a simplifying assumption that every insertion operation has a unique character.
+We use a slightly stronger version of the specification that avoids this assumption.
+We also simplify the specification by using our event graph definition instead of the original abstract execution definition (containing message broadcast/receive events and a visibility relation).
+These changes do not affect the substance of the proof: each node of our event graph corresponds to a _do_ event in the original strong list specification, and the transitive closure of our event graph is equivalent to the visibility relation.
 
 Given an event graph $G$ we define a replay function $sans("replay")(G)$ as introduced in @replay, based on the #algname algorithm.
 It iterates over the events in $G$ in some topologically sorted order, transforming the operation in each event as described in @algorithm, and then applying the transformed operation to the document state resulting from the operations applied so far (starting with the empty document).
@@ -1094,6 +1104,28 @@ In a real implementation, $sans("replay")$ returns the final document state as a
 For the sake of this proof, we define $sans("replay")$ to instead return a sequence of $(italic("id"), c)$ pairs, where $italic("id")$ is the unique ID of the event that inserted the character $c$.
 This allows us to distinguish between different occurrences of the same character.
 The text of the document can be recovered by simply ignoring the $italic("id")$ of each pair and concatenating the characters.
+
+We can now state our modified definition of the strong list specification:
+
+#definition[
+  A collaborative text editing algorithm with a replay function $sans("replay")(G)$ satisfies the _strong list specification_ if for every valid event graph $G subset sans("Evt")$ there exists a relation $italic("lo") subset sans("ID") times sans("ID")$ called the _list order_, such that:
+  1. For event $e in G$, let $G_e = {e} union sans("Events")(e.italic("parents"))$ be the subset of $G$ consisting of $e$ and all events that happened before $e$.
+    Let $italic("doc")_e = sans("replay")(G_e) = angle.l (italic("id")_0, c_0), ..., (italic("id")_(n-1), c_(n-1)) angle.r$ be the document state immediately after locally generating $e$, where $c_i in sans("Char")$ and $italic("id")_i in sans("ID")$. Then:
+    #enum(numbering: "(a)", indent: 0.5em, body-indent: 0.5em,
+      [$italic("doc")_e$ contains exactly the elements that have been inserted but not deleted in $G_e$: #text(9pt, [
+      $ (exists i in [0, n-1]: italic("doc")_e [i] = (italic("id"), c)) <==> \
+        (exists a in G_e, j in NN: a.italic("id") = italic("id") and a.italic("op") = italic("Insert")(j,c)) and \
+        (exists.not b in G_e, k in NN: b.italic("op") = italic("Delete")(k) and \
+        sans("replay")(sans("Events")(b.italic("parents")))[k] = (italic("id"), c)). $])],
+      [The order of the elements in $italic("doc")_e$ is consistent with the list order: #text(9pt, [
+      $ forall i, j in [0, n-1]: i<j ==> (italic("id")_i, italic("id")_j) in italic("lo"). $])],
+      [Elements are inserted at the specified position: #text(9pt, [
+      $ forall i, c: e.italic("op") = italic("Insert")(i,c) ==> italic("doc")_e [i] = (e.italic("id"), c) $])]
+    )
+  2. The list order $italic("lo")$ is transitive, irreflexive, and total, and thus determines the order of all insert operations in the event graph.
+] <strong-list-spec>
+
+== Proving Convergence
 
 #lemma[Let $e$ be an event in a valid event graph such that $e.italic("op") = italic("Delete")(i)$. In the internal state immediately before applying $e$ (in which all events that happened before $e$ have been advanced and all others have been retreated), either the record that $e$ will update has $s_p = mono("Ins")$, or it is part of a placeholder (which behaves like a sequence of $s_p = mono("Ins")$ records).] <lemma-prepare-delete>
 #proof[
@@ -1221,17 +1253,73 @@ The text of the document can be recovered by simply ignoring the $italic("id")$ 
   This shows that concurrent operations commute.
 ]
 
-#theorem[The #algname algorithm complies with the strong list specification @Attiya2016.] <main-theorem>
-#proof[
-  Attiya et al. make a simplifying assumption that every insertion operation has a unique character.
-  We use a slightly stronger version of the specification that avoids this assumption.
-  We also simplify the specification by using our event graph definition instead of the original abstract execution definition (containing message broadcast/receive events and a visibility relation).
-  These changes do not affect the substance of the proof; the transitive closure of our event graph is equivalent to the visibility relation.
+== Satisfying the Strong List Specification
 
-  Our version of the strong list specification requires that for every finite event graph $G subset.eq sans("Evt")$ there exists a relation $italic("lo") subset.eq G times G$ called the _list order_, such that:
-  1. For every event $e in G$, let $sans("replay")({e} union sans("Events")(e.italic("parents")))$... TODO
+#lemma[
+  Let $G$ be a valid event graph. Then $italic("doc") = sans("replay")(G)$ contains exactly the elements that have been inserted but not deleted in $G$:
+  $ (exists i in [0, n-1]: italic("doc")[i] = (italic("id"), c)) <==> \
+    (exists a in G, i in NN: a.italic("id") = italic("id") and a.italic("op") = italic("Insert")(i,c)) and \
+    (exists.not b in G, i in NN: b.italic("op") = italic("Delete")(i) and \
+    sans("replay")(sans("Events")(b.italic("parents")))[i] = (italic("id"), c)). $
+]
+#proof[
+  Let $E = angle.l e_1, e_2, ..., e_n angle.r$ be some topological sort of $G$, and assume that we replay $G$ in this order.
+  By @lemma-deterministic it does not matter which of the possible orders we choose.
+  We then prove the thesis by induction over $n$, the number of events in $G$.
+  The base case is trivial: $G={}$, $italic("doc")=angle.l angle.r$.
+
+  Inductive step: Let $E_k = angle.l e_1, e_2, ..., e_k angle.r$ with $k<n$ be a prefix of $E$.
+  Since the set of events in $E_k$ also forms a valid event graph, we can assume the inductive hypothesis, namely that replaying $E_k$ results in a document containing exactly those elements that have been inserted but not deleted by an operation in $E_k$.
+  We now add $e_(k+1)$, the next event in the sequence $E$, to the replay.
+  We do this by transforming $e_(k+1)$ using the internal state obtained by replaying $E_k$, and applying the transformed operation to the document state from $E_k$.
+  We need to show that the invariant is still preserved in the following two cases: either (1)~$e_(k+1).italic("op") = italic("Insert")(j,c)$ for some $j$, $c$, or (2)~$e_(k+1).italic("op") = italic("Delete")(j)$ for some $j$.
+
+  Case (1): The set of elements that have been inserted but not deleted grows by $(e_(k+1).italic("id"), c)$ and otherwise stays unchanged.
+  The transformation of an insertion operation is always another insertion operation.
+  The document state is therefore updated by inserting the same element $(e_(k+1).italic("id"), c)$ at some index, and otherwise remains unchanged, as required.
+
+  Case (2): The element being deleted is at index $j$ in the document at the time $e_(k+1)$ was generated, which is $sans("replay")(sans("Events")(e_(k+1).italic("parents")))$.
+  #algname computes this element by retreating and advancing events until the prepare version equals $e_(k+1).italic("parents")$, and then finding the $j$th (zero-indexed) record in the internal state that has $s_p = mono("Ins")$.
+
+  TODO more...
 ]
 
-#lemma[TODO]
+#lemma[
+  Let $G$ be a valid event graph. Then the order of the elements in $italic("doc") = sans("replay")(G)$ is consistent with the list order:
+  $ forall i, j in [0, n-1]: i<j ==> (italic("id")_i, italic("id")_j) in italic("lo"). $
+]
+
+#lemma[
+  Elements are inserted at the specified position:
+  $ forall i, c: e.italic("op") = italic("Insert")(i,c) ==> italic("doc")_e [i] = (e.italic("id"), c) $
+]
+
+#theorem[The #algname algorithm satisfies the strong list specification (@strong-list-spec).] <main-theorem>
+#proof[
+  Given a valid event graph $G$, let $sans("replay")(G)$ be the replay function based on #algname, as introduced earlier.
+  We must show that there exists a list order $italic("lo") subset sans("ID") times sans("ID")$ that satisfies the conditions given in @strong-list-spec.
+  We claim that this list order corresponds exactly to the sequence of records and placeholders in the internal state after replaying the entire event graph $G$.
+  This correspondence is more apparent if we assume a variant of #algname that does not clear the internal state on critical versions, but we also claim that performing the opimisations in @clearing preserves this property.
+
+  To begin, note that the internal state is a totally ordered sequence of records, and that (aside from clearing the internal state) we only ever modify this sequence by inserting records or by updating the $s_p$ and $s_e$ properties of existing records.
+  Thus, if a record with ID $italic("id")_i$ appears before a record with ID $italic("id")_j$ at some point in the replay, the order of those IDs remains unchanged for the rest of the replay.
+
+  Let $e in G$ be any event in the graph, and let $G_e = {e} union sans("Events")(e.italic("parents"))$ be the subset of $G$ consisting of $e$ and all events that happened before $e$.
+  Note that $G_e$ satisfies the conditions in @valid-graph, so it is also valid.
+  Let $italic("doc")_e = sans("replay")(G_e) = angle.l (italic("id")_0, c_0), ..., (italic("id")_(n-1), c_(n-1)) angle.r$ be the document state immediately after locally generating $e$.
+  Since $sans("replay")$ is deterministic (@lemma-deterministic), $italic("doc")_e$ exists and is unique.
+
+  TODO more...
+]
+
+/*
+    #enum(numbering: "(a)", indent: 0.5em, body-indent: 0.5em,
+      [The order of the elements in $italic("doc")_e$ is consistent with the list order: #text(9pt, [
+      $ forall i, j in [0, n-1]: i<j ==> (italic("id")_i, italic("id")_j) in italic("lo"). $])],
+      [Elements are inserted at the specified position: #text(9pt, [
+      $ forall i, c: e.italic("op") = italic("Insert")(i,c) ==> italic("doc")_e [i] = (e.italic("id"), c) $])]
+    )
+  2. The list order $italic("lo")$ is transitive, irreflexive, and total, and thus determines the order of all insert operations in the event graph.
 
 // "given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event" (end of Section 2)
+*/
