@@ -11,7 +11,7 @@
 
 // Might be worth pulling these two fields in from a config file instead
 #let anonymous = true
-#let draft = true
+#let draft = false
 
 
 #let algname = "Eg-walker"
@@ -746,12 +746,12 @@ Each column stores some different fields of the event data. The columns are:
 // - _Cached transform positions (optional)._ We can optionally store the transformed positions of each event. This allows the document state to be recomputed much faster in many cases. And because of the similarity between transformed positions and original positions, this data adds a very small amount of file overhead in practice.
 
 // TODO: the next two paragraphs could be omitted if we're short of space
-We use several further tricks to reduce file size. For example, we run-length-encode deletions in reverse direction (due to holding down backspace). We express operation indexes relative to the end of the previous event, so that the number fits in fewer bytes. We deduplicate replica IDs, and so on.
+// We use several further tricks to reduce file size. For example, we run-length-encode deletions in reverse direction (due to holding down backspace). We express operation indexes relative to the end of the previous event, so that the number fits in fewer bytes. We deduplicate replica IDs, and so on.
 
-Peers can optionally also store a copy of the document's content, after all changes have been merged. This allows documents to be loaded directly from disk, without any additional overhead. (The event graph is only needed when merging concurrent changes).
+Replicas can optionally also store a copy of the final document state reflecting all events. This allows documents to be loaded from disk without replaying the event graph.
 
 We send the same data format over the network when replicating the entire event graph.
-When sending a subset of events over the network (e.g., a single event during real-time collaboration), references to parent events outside of that subset need to be encoded using the $(italic("replicaID"), italic("seqNo"))$ event IDs, but otherwise a similar encoding can be used.
+When sending a subset of events over the network (e.g., a single event during real-time collaboration), references to parent events outside of that subset need to be encoded using event IDs of the form $(italic("replicaID"), italic("seqNo"))$, but otherwise the encoding is similar.
 
 = Evaluation <benchmarking>
 
@@ -763,7 +763,7 @@ When sending a subset of events over the network (e.g., a single event during re
 
 We created a TypeScript implementation of #algname optimised for simplicity and readability#if not anonymous {[ @reference-reg]}, and a production-ready Rust implementation optimised for performance#if not anonymous {[ @dt]}.
 The TypeScript version omits several optimisations, including run-length encoding of the internal state, the B-trees, and topological sorting heuristics.
-The results in this section are based on the Rust implementation.
+The performance results in this section are based on the Rust implementation.
 
 We compare #algname with two popular CRDT libraries: Automerge v0.5.9 @automerge (Rust) and Yjs v13.6.10 @yjs (JavaScript).#footnote[We also tested Yrs @yrs, the Rust rewrite of Yjs by the original authors. At the time of writing it performs worse than Yjs, so we have omitted it from our results.]
 We only test their collaborative text datatypes, and not the other features they support.
@@ -778,7 +778,7 @@ We have also implemented a simple OT library using the TTF algorithm @Oster2006T
 
 We compare these implementations along 3 dimensions:
 #footnote[Experimental setup: We ran the benchmarks on a Ryzen 7950x CPU running Linux 6.5.0-28 and 64GB of RAM.
-We compiled Rust code with rustc v1.78.0 in release mode with `-C target-cpu=native`. Rust code was pinned to a single CPU core to improve run-to-run stability. // (The reason is that different cores of the same CPU are clocked differently due to thermal reasons. Using a single core improves run-to-run stability).
+We compiled Rust code with rustc v1.78.0 in release mode with `-C target-cpu=native`. Rust code was pinned to a single CPU core to reduce variance across runs. // (The reason is that different cores of the same CPU are clocked differently due to thermal reasons. Using a single core improves run-to-run stability).
 For JavaScript (Yjs) we used Node.js v21.7.0. // Javascript wasn't pinned to a single core. Nodejs uses additional cores to run the V8 optimizer.
 All reported time measurements are the mean of at least 100 test iterations (except for the case where OT takes an hour to merge trace A2, which we ran 10 times).
 The standard deviation for all benchmark results was less than 1%, hence we do not show error bars.]
@@ -789,13 +789,13 @@ The standard deviation for all benchmark results was less than 1%, hence we do n
 
 == Editing traces
 
-As there is no existing benchmark for collaborative text editing, we collected a set of editing traces from real documents.
+As there is no established benchmark for collaborative text editing, we collected a set of editing traces from real documents.
 #if anonymous {
   [All code and data used in our benchmarks is available for anybody to reproduce.#footnote[TODO: anonymised link to download]]
 } else {
   [We have made these traces freely available on GitHub @editing-traces.]
 }
-For this evaluation we replay seven traces, which fall in three categories:
+For this evaluation we use seven traces, which fall into three categories:
 
 / Sequential Traces: (S1, S2, S3): One author, or multiple authors taking turns (no concurrency).
 / Concurrent Traces: (C1, C2): Multiple users concurrently editing the same document with $approx$1 second latency. Many short-lived branches with frequent merges.
@@ -808,20 +808,20 @@ See @traces-appendix for details.
 
 == Time taken to load and merge changes
 
-// TODO(seph): Long sentence. Revise.
-The slowest operations in many collaborative editors are merging a large set of edits from a remote replica into the local replica state, and loading a document from disk so that it can be displayed and edited.
+The slowest operations in many collaborative editors are:
+- merging a large set of edits from a remote replica into the local state (e.g. reconnecting after working offline);
+- loading a document from disk into memory so that it can be displayed and edited.
 To simulate a worst-case merge, we start with an empty document and then merge an entire editing trace into it.
 In the case of #algname this means replaying the full trace.
-@chart-remote shows the time taken by each algorithm to perform this merge.
+@chart-remote shows the merge time for each implementation.
 // For the CRDT implementations, all events were preprocessed into the appropriate CRDT message format. The time taken to do this is not included in our measurements.
 
 After completing this merge, we saved the resulting local replica state to disk and measured the CPU time to load it back into memory.
 In the CRDT implementations we tested, loading a document from disk is equivalent to merging the remote events, so we do not show CRDT loading times separately in @chart-remote.
-OT and #algname can load documents hundreds of times faster by caching the final document state on disk, and reloading the document text directly.
-These algorithms only need to reload historical events when merging concurrent changes or to reconstruct old document versions.
-However, this comes at the cost of consuming additional space.
-// TODO(seph): This sentence is awkward. We talk about CRDTs, then OT+egwalker, then CRDTs again? Clean me!
-Existing CRDTs cannot defer this work as they require the CRDT state to be in memory to allow a user to make local edits.
+In these algorithms, the CRDT metadata needs to be in memory for the user to be able to edit the document, or to apply any updates received from other replicas (even when there is no concurrency).
+In contrast, OT and #algname can load documents orders of magnitude faster than CRDTs by caching the final document state on disk, and loading just this data (essentially a plain text file).
+#algname and OT only need to load the event graph when merging concurrent changes or to reconstruct old document versions.
+Document edits by the local user or applying non-concurrent remote events do not need the event graph.
 
 // For completeness, we also measured the time taken to process local editing events. However, all of the systems we tested can process events many orders of magnitude much faster than any human's typing speed. We have not shown this data as at that speed, the differences between systems are irrelevant.
 
@@ -860,8 +860,6 @@ Automerge's merge times on traces C1 and C2 are outliers. This appears to be a b
 
 When merging an event graph with very high concurrency (like A2), the performance of #algname is highly dependent on the order in which events are traversed.
 A poorly chosen traversal order can make this trace as much as 8$times$ slower to merge. Our topological sort algorithm (@graph-walk) tries to avoid such pathological cases.
-// (Seph) This is no longer true - I optimised it.
-// However, the topological sort itself also takes time: in the C1 and C2 traces, about 40% of the runtime is the topological sort, as there are thousands of tiny branch and merge points due to the fine-grained concurrency.
 
 == RAM usage
 
