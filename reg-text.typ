@@ -1242,56 +1242,57 @@ We can now state our modified definition of the strong list specification:
   We show that at each such swap we maintain the invariant that the document state and the internal state resulting from replaying the events in the order before the swap are equal to the states resulting from replaying the events in the order after the swap.
   Therefore, the document state and the internal state resulting from replaying $E$ are equal to those resulting from $E'$.
 
-  Let $angle.l e_1, e_2, ..., e_i, e_j, ..., e_n angle.r$ be the sequence of events prior to one of these swaps, and $e_i$, $e_j$ are the events to be swapped.
+  Let $angle.l e_1, e_2, ..., e_i, e_(i+1), ..., e_n angle.r$ be the sequence of events prior to one of these swaps, and $e_i$, $e_(i+1)$ are the events to be swapped.
   Replaying the events in the prefix $angle.l e_1, e_2, ..., e_(i-1) angle.r$ is a deterministic algorithm resulting in some document state and some internal state.
-  Next, we replay either $e_i$ followed by $e_j$, or $e_j$ followed by $e_i$.
-  Since $e_i$ and $e_j$ are concurrent, it is not possible for only one of the two to be contained in a critical version, and therefore no state clearing will take place between applying these two events.
-  If $e_i$ and $e_j$ are both insertions, the resulting states in either order are the same by @lemma-ins-ins.
-  If one of $e_i$ and $e_j$ is an insertion and the other is a deletion, we use @lemma-ins-del.
-  If both $e_i$ and $e_j$ are deletions, we use @lemma-del-del.
-  Finally, replaying the suffix $angle.l e_(j+1), ..., e_n angle.r$ is a deterministic algorithm.
+  Next, we replay either $e_i$ followed by $e_(i+1)$, or $e_(i+1)$ followed by $e_i$.
+  Since $e_i$ and $e_(i+1)$ are concurrent, it is not possible for only one of the two to be contained in a critical version, and therefore no state clearing will take place between applying these two events.
+  If $e_i$ and $e_(i+1)$ are both insertions, the resulting states in either order are the same by @lemma-ins-ins.
+  If one of $e_i$ and $e_(i+1)$ is an insertion and the other is a deletion, we use @lemma-ins-del.
+  If both $e_i$ and $e_(i+1)$ are deletions, we use @lemma-del-del.
+  Finally, replaying the suffix $angle.l e_(i+2), ..., e_n angle.r$ is a deterministic algorithm.
   This shows that concurrent operations commute.
 ]
 
 == Satisfying the Strong List Specification
 
 #lemma[
-  Let $G$ be a valid event graph. Then $italic("doc") = sans("replay")(G)$ contains exactly the elements that have been inserted but not deleted in $G$:
+  Let $G$ be a valid event graph, let $italic("doc") = sans("replay")(G)$ be the document state resulting from replaying $G$, and let $S$ be the internal state after replaying $G$. Then the $i$th element in $italic("doc")$ corresponds to the $i$th record with $s_e = mono("Ins")$ in the internal state (counting placeholders as having $s_e = mono("Ins")$, and not counting records with $s_e = mono("Del")$). Moreover, the set of elements in $italic("doc")$ is exactly the elements that have been inserted but not deleted in $G$:
   $ (exists i in [0, n-1]: italic("doc")[i] = (italic("id"), c)) <==> \
     (exists a in G, i in NN: a.italic("id") = italic("id") and a.italic("op") = italic("Insert")(i,c)) and \
     (exists.not b in G, i in NN: b.italic("op") = italic("Delete")(i) and \
     sans("replay")(sans("Events")(b.italic("parents")))[i] = (italic("id"), c)). $
-]
+] <state-correspondence>
 #proof[
   Let $E = angle.l e_1, e_2, ..., e_n angle.r$ be some topological sort of $G$, and assume that we replay $G$ in this order.
   By @lemma-deterministic it does not matter which of the possible orders we choose.
   We then prove the thesis by induction over $n$, the number of events in $G$.
-  The base case is trivial: $G={}$, $italic("doc")=angle.l angle.r$.
+  The base case is trivial: $G={}$, $italic("doc")=angle.l angle.r$, so there are no events, no records in the internal state, and no elements in the document state.
 
   Inductive step: Let $E_k = angle.l e_1, e_2, ..., e_k angle.r$ with $k<n$ be a prefix of $E$.
-  Since the set of events in $E_k$ also forms a valid event graph, we can assume the inductive hypothesis, namely that replaying $E_k$ results in a document containing exactly those elements that have been inserted but not deleted by an operation in $E_k$.
+  Since the set of events in $E_k$ also forms a valid event graph, we can assume the inductive hypothesis, namely that replaying $E_k$ results in a document corresponding to the records with $s_e = mono("Ins")$ in the resulting internal state, and the document contains exactly those elements that have been inserted but not deleted by an operation in $E_k$.
   We now add $e_(k+1)$, the next event in the sequence $E$, to the replay.
   We do this by transforming $e_(k+1)$ using the internal state obtained by replaying $E_k$, and applying the transformed operation to the document state from $E_k$.
   We need to show that the invariant is still preserved in the following two cases: either (1)~$e_(k+1).italic("op") = italic("Insert")(j,c)$ for some $j$, $c$, or (2)~$e_(k+1).italic("op") = italic("Delete")(j)$ for some $j$.
+  We also have to consider the case where the internal state is cleared, but we begin with the case where no state clearing occurs.
 
   Case (1): The set of elements that have been inserted but not deleted grows by $(e_(k+1).italic("id"), c)$ and otherwise stays unchanged.
   The transformation of an insertion operation is always another insertion operation.
-  The document state is therefore updated by inserting the same element $(e_(k+1).italic("id"), c)$ at some index, and otherwise remains unchanged, as required.
+  The document state is therefore updated by inserting the same element $(e_(k+1).italic("id"), c)$, and otherwise remains unchanged.
+  Moreover, the transformed index of that insertion is computed by counting the number of internal state records with $s_e = mono("Ins")$ that appear before the new record in the internal state, and the new record also has $s_e = mono("Ins")$, and the $s_e$ property of no other record is updated, so the correspondence between internal state records and document state is preserved.
 
   Case (2): The element being deleted is at index $j$ in the document at the time $e_(k+1)$ was generated, which is $sans("replay")(sans("Events")(e_(k+1).italic("parents")))$.
-  #algname computes this element by retreating and advancing events until the prepare version equals $e_(k+1).italic("parents")$, and then finding the $j$th (zero-indexed) record in the internal state that has $s_p = mono("Ins")$.
+  We compute this element by retreating and advancing events until the prepare version equals $e_(k+1).italic("parents")$, and then finding the $j$th (zero-indexed) record in the internal state that has $s_p = mono("Ins")$.
+  The records with $s_p = mono("Ins")$ are those that have been inserted but not deleted in events that happened before $e_(k+1)$, and therefore the $j$th such record is the record corresponding to $sans("replay")(sans("Events")(e_(k+1).italic("parents")))[j]$.
+  Before applying $e_(k+1)$, this record may have either $s_e = mono("Ins")$ or $s_e = mono("Del")$.
+  If $s_e = mono("Ins")$, we update it to $s_e = mono("Del")$, and transform $e_(k+1)$ into a deletion whose index is the number of $s_e = mono("Ins")$ to the left of the target record in the internal state; by the inductive hypothesis, this is the correct document element to be deleted.
+  If $s_e = mono("Del")$ before applying $e_(k+1)$, that event is transformed into a no-op, since another operation in $E_k$ has already deleted the element in question from the document state.
+  In either case, we preserve the invariants of the induction.
 
-  TODO more...
-]
-
-#lemma[
-  Let $G$ be a valid event graph. Then the order of the elements in $italic("doc") = sans("replay")(G)$ is consistent with the list order:
-  $ forall i, j in [0, n-1]: i<j ==> (italic("id")_i, italic("id")_j) in italic("lo"). $
-]
-
-#lemma[
-  Elements are inserted at the specified position:
-  $ forall i, c: e.italic("op") = italic("Insert")(i,c) ==> italic("doc")_e [i] = (e.italic("id"), c) $
+  If $e_(k+1)$ is a critical version, we clear the internal state and replace it with a placeholder.
+  By the definition of critical version, every event in $E_k$ and $e_(k+1)$ happened before every event in the rest of $E$.
+  Therefore, after retreating and advancing any event after $e_(k+1)$, any internal state record with $s_e = mono("Del")$ will also have $s_p = mono("Del") k$ for some $k>0$, and any internal state record with $s_e = mono("Ins")$ will also have $s_p = mono("Ins")$ unless it is deleted by an event after $e_(k+1)$.
+  Since an internal state with $s_e = mono("Del")$ can never move to state $s_e = mono("Ins")$, this means that any records with $s_e = mono("Del")$ as of the critical version can be discarded, since they will never again be needed for transforming the index of an operation after $e_(k+1)$.
+  Moreover, since all of the remaining records have $s_e = s_p = mono("Ins")$ as of the critical version, and since the replay of the remaining events in $E$ will never need to advance or retreat an event prior to the critical version, all of the records in the internal state can all be replaced by a single placeholder while still preserving the invariants of the induction.
 ]
 
 #theorem[The #algname algorithm satisfies the strong list specification (@strong-list-spec).] <main-theorem>
@@ -1299,27 +1300,26 @@ We can now state our modified definition of the strong list specification:
   Given a valid event graph $G$, let $sans("replay")(G)$ be the replay function based on #algname, as introduced earlier.
   We must show that there exists a list order $italic("lo") subset sans("ID") times sans("ID")$ that satisfies the conditions given in @strong-list-spec.
   We claim that this list order corresponds exactly to the sequence of records and placeholders in the internal state after replaying the entire event graph $G$.
+  By @lemma-deterministic, this internal state exists and is unique.
   This correspondence is more apparent if we assume a variant of #algname that does not clear the internal state on critical versions, but we also claim that performing the opimisations in @clearing preserves this property.
 
   To begin, note that the internal state is a totally ordered sequence of records, and that (aside from clearing the internal state) we only ever modify this sequence by inserting records or by updating the $s_p$ and $s_e$ properties of existing records.
   Thus, if a record with ID $italic("id")_i$ appears before a record with ID $italic("id")_j$ at some point in the replay, the order of those IDs remains unchanged for the rest of the replay.
+  We define the list order $italic("lo")$ to be the ordering relation among IDs in the internal state after replaying $G$ using a #algname variant that does not clear the internal state.
+  This order exists, is unique (@lemma-deterministic), and is by definition transitive, irreflexive, and total, so it meets requirement (2) of @strong-list-spec.
 
   Let $e in G$ be any event in the graph, and let $G_e = {e} union sans("Events")(e.italic("parents"))$ be the subset of $G$ consisting of $e$ and all events that happened before $e$.
   Note that $G_e$ satisfies the conditions in @valid-graph, so it is also valid.
   Let $italic("doc")_e = sans("replay")(G_e) = angle.l (italic("id")_0, c_0), ..., (italic("id")_(n-1), c_(n-1)) angle.r$ be the document state immediately after locally generating $e$.
   Since $sans("replay")$ is deterministic (@lemma-deterministic), $italic("doc")_e$ exists and is unique.
 
-  TODO more...
+  By @state-correspondence, $italic("doc")_e$ contains exactly the elements that have been inserted but not deleted in $G_e$, which is requirement (1a) of @strong-list-spec.
+  Also by @state-correspondence, the $i$th element in $italic("doc")_e$ corresponds to the $i$th record with $s_e = mono("Ins")$ in the internal state obtained by replaying $G_e$.
+  Since any pair of IDs that are ordered by the internal state derived from $G_e$ retain the same ordering in the internal state derived from $G$, we know that the ordering of elements in $italic("doc")_e$ is consistent with the list order $italic("lo")$, satsifying requirement (1b) of @strong-list-spec.
+
+  Finally, to demonstrate requirement (1c) of @strong-list-spec we assume that $e.italic("op") = italic("Insert")(i,c)$, and we need to show that $italic("doc")_e [i] = (e.italic("id"), c)$.
+  Since $G_e$ contains only $e$ and events that happened before $e$, but no events concurrent with $e$, we know that immediately before applying $e$, every record in the internal state will have $s_p = mono("Ins")$ if and only if it has $s_e = mono("Ins")$ (because there are no events that are reflected in the effect version but not in the prepare version $e.italic("parents")$).
+  Therefore, the set of records that are counted while mapping the original insertion index $i$ to an internal state record equals the set of records that are counted while mapping the internal record back to a transformed index.
+  Thus, the transformed index of the insertion is also $i$, and therefore the new element is inserted at index $i$ of the document as required.
+  This completes the proof that #algname satisfies the strong list specification.
 ]
-
-/*
-    #enum(numbering: "(a)", indent: 0.5em, body-indent: 0.5em,
-      [The order of the elements in $italic("doc")_e$ is consistent with the list order: #text(9pt, [
-      $ forall i, j in [0, n-1]: i<j ==> (italic("id")_i, italic("id")_j) in italic("lo"). $])],
-      [Elements are inserted at the specified position: #text(9pt, [
-      $ forall i, c: e.italic("op") = italic("Insert")(i,c) ==> italic("doc")_e [i] = (e.italic("id"), c) $])]
-    )
-  2. The list order $italic("lo")$ is transitive, irreflexive, and total, and thus determines the order of all insert operations in the event graph.
-
-// "given an event to be added to an existing event graph, return the (index-based) operation that must be applied to the current document state so that the resulting document is identical to replaying the entire event graph including the new event" (end of Section 2)
-*/
