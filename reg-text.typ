@@ -211,7 +211,7 @@ This paper makes the following contributions:
 - In @algorithm we introduce #algname, a hybrid CRDT/OT algorithm for text that is faster and has a vastly smaller memory footprint than existing CRDTs.
 - Since there is no established benchmark for collaborative text editing, we are also publishing a suite of editing traces of text files for benchmarking. They are derived from real documents and demonstrate various patterns of sequential and concurrent editing.
 - In @benchmarking we use those editing traces to evaluate the performance of our implementation of #algname, comparing it to selected CRDTs and an OT implementation. We measure CPU time to load a document, CPU time to merge edits from a remote replica, memory usage, and file size. #algname improves the state of the art by orders of magnitude in the best cases, and is only slightly slower in the worst cases.
-- We prove the correctness of #algname in @proofs. // TODO!
+- We prove the correctness of #algname in @proofs.
 
 = Background
 
@@ -1301,7 +1301,7 @@ We can now state our modified definition of the strong list specification:
   We must show that there exists a list order $italic("lo") subset sans("ID") times sans("ID")$ that satisfies the conditions given in @strong-list-spec.
   We claim that this list order corresponds exactly to the sequence of records and placeholders in the internal state after replaying the entire event graph $G$.
   By @lemma-deterministic, this internal state exists and is unique.
-  This correspondence is more apparent if we assume a variant of #algname that does not clear the internal state on critical versions, but we also claim that performing the opimisations in @clearing preserves this property.
+  This correspondence is more apparent if we assume a variant of #algname that does not clear the internal state on critical versions, but we also claim that performing the optimisations in @clearing preserves this property.
 
   To begin, note that the internal state is a totally ordered sequence of records, and that (aside from clearing the internal state) we only ever modify this sequence by inserting records or by updating the $s_p$ and $s_e$ properties of existing records.
   Thus, if a record with ID $italic("id")_i$ appears before a record with ID $italic("id")_j$ at some point in the replay, the order of those IDs remains unchanged for the rest of the replay.
@@ -1315,7 +1315,7 @@ We can now state our modified definition of the strong list specification:
 
   By @state-correspondence, $italic("doc")_e$ contains exactly the elements that have been inserted but not deleted in $G_e$, which is requirement (1a) of @strong-list-spec.
   Also by @state-correspondence, the $i$th element in $italic("doc")_e$ corresponds to the $i$th record with $s_e = mono("Ins")$ in the internal state obtained by replaying $G_e$.
-  Since any pair of IDs that are ordered by the internal state derived from $G_e$ retain the same ordering in the internal state derived from $G$, we know that the ordering of elements in $italic("doc")_e$ is consistent with the list order $italic("lo")$, satsifying requirement (1b) of @strong-list-spec.
+  Since any pair of IDs that are ordered by the internal state derived from $G_e$ retain the same ordering in the internal state derived from $G$, we know that the ordering of elements in $italic("doc")_e$ is consistent with the list order $italic("lo")$, satisfying requirement (1b) of @strong-list-spec.
 
   Finally, to demonstrate requirement (1c) of @strong-list-spec we assume that $e.italic("op") = italic("Insert")(i,c)$, and we need to show that $italic("doc")_e [i] = (e.italic("id"), c)$.
   Since $G_e$ contains only $e$ and events that happened before $e$, but no events concurrent with $e$, we know that immediately before applying $e$, every record in the internal state will have $s_p = mono("Ins")$ if and only if it has $s_e = mono("Ins")$ (because there are no events that are reflected in the effect version but not in the prepare version $e.italic("parents")$).
