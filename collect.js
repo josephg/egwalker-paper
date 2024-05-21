@@ -2,6 +2,7 @@
 // Eg, importantly results/timings.json.
 
 const fs = require('fs')
+const assert = require('assert/strict')
 // const zlib = require('zlib')
 
 // const datasets = ['automerge-paper', 'seph-blog1', 'clownschool', 'friendsforever', 'git-makefile', 'node_nodecc', 'clownschool_flat', 'friendsforever_flat', 'egwalker',
@@ -22,13 +23,69 @@ const tests = [
   'dt-crdt/process_remote_edits', // from run_on_old
   // 'dt-crdt/local',
 
-  'automerge/local',
+  // 'automerge/local',
   'automerge/remote',
-  'cola/local',
-  'cola-nocursor/local',
+  // 'cola/local',
+  // 'cola-nocursor/local',
 
   'ot',
 ]
+
+const lerp = (a, b, x) => (a * (1-x) + b * x)
+
+const percentile = (samples, at) => {
+  assert(at >= 0)
+  assert(at <= 1)
+
+  // at between 0 and 1.
+  samples.sort((a, b) => a < b)
+
+  // from https://docs.rs/stats-cli/latest/src/inc_stats/lib.rs.html#498-500
+  const pIdx = (samples.length - 1) * at
+  const lowIdx = Math.floor(pIdx)
+  const highIdx = Math.ceil(pIdx)
+  // const low = ordering.order_index(lowIdx);
+  // const high = ordering.order_index(highIdx);
+  const weight = pIdx - lowIdx
+
+  // console.log(samples)
+  // console.log(pIdx, lowIdx, highIdx, weight)
+  // const p = at * (samples.length + 1)
+  // if (Number.isInteger(p)
+  return lerp(samples[lowIdx], samples[highIdx], weight)
+}
+
+const stddev = (samples) => {
+  assert(samples.length >= 1)
+
+  // samples.sort((a, b) => a < b)
+  const n = samples.length
+  const mean = samples.reduce((a, b) => a + b) / n
+  const variance = samples
+  .map(s => s - mean) // move to the mean
+  .map(v => v * v)
+  .reduce((a, b) => a + b) / n // mean of variance
+  return Math.sqrt(variance)
+}
+
+// console.log(lerp(1, 2, 0.5))
+// console.log(percentile([1,2,2,8,10], 0.4))
+
+// Samples is a list of sample times. For criterion this comes from dividing times by iters.
+const getStats = samples => {
+  samples.sort((a, b) => a < b)
+  const n = samples.length
+
+  const mean = samples.reduce((a, b) => a + b) / n
+  const p10 = percentile(samples, 0.10)
+  const p25 = percentile(samples, 0.25)
+  const p75 = percentile(samples, 0.75)
+  const p90 = percentile(samples, 0.90)
+
+  return {
+    mean, p10, p90, stddev: stddev(samples)
+  }
+}
 
 function emitSpeeds() {
   const speeds = {}
@@ -37,13 +94,28 @@ function emitSpeeds() {
     let s = speeds[test.replace(/\//g, '_')] = {}
     for (const d of datasets) {
       try {
-        // let project = test == 'automerge/remote' ? 'automerge-converter' : 'diamond-types'
-        const data = JSON.parse(fs.readFileSync(`target/criterion/${test}/${d}/base/estimates.json`, 'utf8'))
+        const {iters, times} = JSON.parse(fs.readFileSync(`target/criterion/${test}/${d}/base/sample.json`, 'utf8'))
+        assert.equal(iters.length, times.length)
+        // console.log(iters.length, times.length)
+        // Convert from ns to ms.
+        const timesMs = times.map((x, i) => x / iters[i] * 1e-6)
+        const stats = getStats(timesMs)
+        // console.log(d, stats.stddev)
 
-        console.log('t', test, 'd', d, data.mean.point_estimate)
+        if ((stats.stddev / stats.mean) > 0.01) {
+          console.log('stddev more than 1%', test, d, 'it is', stats.stddev / stats.mean)
+        }
+
+        // let project = test == 'automerge/remote' ? 'automerge-converter' : 'diamond-types'
+        // const estimates = JSON.parse(fs.readFileSync(`target/criterion/${test}/${d}/base/estimates.json`, 'utf8'))
+        // console.log(estimates.mean.point_estimate * 1e-6)
+        // console.log(d, estimates.std_dev.point_estimate * 1e-6)
+
+        // console.log('t', test, 'd', d, data.mean.point_estimate)
 
         // speeds[`${test.replace(/\//g, '_')}_${d}`] = data.mean.point_estimate
-        s[d] = data.mean.point_estimate / 1e6
+        // s[d] = estimates.mean.point_estimate / 1e6
+        s[d] = stats
       } catch (e) {
         if (e.code == 'ENOENT') {
           console.warn('Warning: No data for', test, d)
@@ -81,14 +153,24 @@ function emitSpeeds() {
     if (jsData[k] == null) {
       console.warn('Missing js data for key ' + k)
     } else {
-      const mean = jsData[k].meanTime
+      const samples = jsData[k].sampleTimes
+      const stats = getStats(samples)
+      // const mean = jsData[k].meanTime
       // console.log(d, mean)
-      yjs[d] = mean
+
+      // console.log(d, stats)
+
+
+      if ((stats.stddev / stats.mean) > 0.01) {
+        console.log('stddev more than 1%', d, 'it is', stats.stddev / stats.mean)
+      }
+
+      yjs[d] = stats
     }
   }
 
   fs.writeFileSync('results/timings.json', JSON.stringify(speeds, null, 2))
-  console.log(JSON.stringify(speeds, null, 2))
+  // console.log(JSON.stringify(speeds, null, 2))
 }
 
 // function emitTestDataStats() {
@@ -201,7 +283,7 @@ function emitFilesizes() {
   const sizes = {}
 
   for (const d of datasets) {
-    console.log(d)
+    // console.log(d)
 
     sizes[d] = {
       yjs: fs.statSync(`datasets/${d}.yjs`).size,
@@ -213,12 +295,10 @@ function emitFilesizes() {
   }
 
   fs.writeFileSync('results/yjs_am_sizes.json', JSON.stringify(sizes, null, 2))
-  console.log(sizes)
+  // console.log(sizes)
 }
 
 emitSpeeds()
 emitFilesizes()
 
 
-// emitTestDataStats()
-// emitDTFileSizes()
