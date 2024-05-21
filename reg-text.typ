@@ -245,7 +245,7 @@ The _frontier_ is the set of events with no children.
 Whenever a user performs an operation, a new event containing that operation is added to the graph, and the previous frontier in the replica's local copy of the graph becomes the new event's parents.
 The new event and its parent edges are then replicated over the network, and each replica adds them to its copy of the graph.
 If any parent events are missing, the replica waits for them to arrive before adding them to the graph; the result is a simple causal broadcast protocol @Birman1991 @Cachin2011.
-Two replicas can merge their event graphs by simply taking the union of their sets of events.
+Two replicas can merge their event graphs by taking the union of their sets of events.
 Events in the graph are immutable; they always represents the operation as originally generated, and not as a result of any transformation.
 
 #figure(
@@ -642,7 +642,7 @@ We extend the tree into an _order statistic tree_ @CLRS2009 (also known as _rank
 Every time $s_p$ or $s_e$ are updated, we also update those numbers on the path from the updated record to the root.
 As the tree is balanced, this update takes $O(log n)$.
 
-Now it is easy to find the $i$th record with $s_p = mono("Ins")$ in logarithmic time by starting at the root of the tree, and adding up the values in the subtrees that have been skipped.
+Now we can find the $i$th record with $s_p = mono("Ins")$ in logarithmic time by starting at the root of the tree, and adding up the values in the subtrees that have been skipped.
 Moreover, once we have a record in the sequence we can efficiently determine its index in the effect state by going in the opposite direction: working upwards in the tree towards the root, and summing the numbers of records with $s_e = mono("Ins")$ that lie in subtrees to the left of the starting record.
 This allows us to efficiently transform the index of an operation from the prepare version into the effect version.
 If the character was already deleted in the effect version ($s_e = mono("Del")$), the transformed operation is a no-op.
@@ -961,23 +961,25 @@ Most of the time the event graph can remain on disk.
 Gu et al.'s _mark & retrace_ method @Gu2005 builds a CRDT-like structure containing the entire editing history, not only the parts being merged.
 Differential synchronization @Fraser2009 relies on heuristics such as similarity-matching of text to perform merges, which is not guaranteed to converge.
 
-Version control systems such as Git @Coglan2019, Pijul @pijul, and Darcs @darcs also track the editing history of text files and include algorithms for merging concurrent changes.
-However, they do not support real-time collaboration, and they are line-based (for code), not character-based (better for prose).
-
-
+Version control systems such as Git @Coglan2019, Pijul @pijul, and Darcs @darcs also track the editing history of text files.
+However, they do not support real-time collaboration, and they are line-based (good for code), whereas #algname is character-based (which is better for prose).
+Git uses a three-way merge, which is not reliable on files containing substantial repeated text @Khanna2007.
+Merges in Darcs have worst-case exponential complexity @darcs-book, and Pijul merges using a CRDT that assigns a unique ID to every line @pijul-theory.
 
 = Conclusion
 
-#algname is a new approach to collaborative text editing.
-It is orders of magnitude faster than existing OT and CRDT algorithms in the best cases, and competitive with the fastest existing implementations in the worst cases.
-Compared to CRDTs, it uses less memory, files are smaller and faster to load, and edits from other users are merged much faster in documents with largely sequential editing.
-Compared to OT, large merges (e.g., from users who did a significant amount of work while offline) are much faster, and peer-to-peer collaboration is robustly supported.
+#algname is a new approach to collaborative text editing that has characteristics of both CRDTs and OT.
+It is orders of magnitude faster than existing algorithms in the best cases, and competitive with the fastest existing implementations in the worst cases.
+Compared to existing CRDTs, it uses orders of magnitude less memory in the steady state, files are vastly faster to load for editing, and in documents with largely sequential editing edits from other users are merged much faster.
+Compared to OT, large merges (e.g., when two users each did a significant amount of work while offline) are much faster, and #algname supports arbitrary branching/merging patterns (e.g., in peer-to-peer collaboration).
 
-Since #algname stores the full keystroke-granularity editing history of a document, it allows applications to show that history to the user, and to restore arbitrary past versions of a document by replaying subsets of the graph.
-The underlying event graph is a straightforward representation of the edits that have occurred, which is easy to replicate over any network, and which is not specific to the #algname algorithm.
-We expect that the same data format will be able to support future collaborative editing algorithms as well, without requiring the data format to be changed.
+Since #algname stores a fine-grained editing history of a document, it allows applications to show that history to the user, and to restore arbitrary past versions of a document by replaying subsets of the graph.
+The underlying event graph is not specific to the #algname algorithm, so we expect that the same data format will be able to support future collaborative editing algorithms as well.
+The core idea of #algname is not specific to plain text; we believe it can be extended to other file types such as rich text, graphics, or spreadsheets.
 
-We also believe that #algname can be extended to other file types such as rich text, graphics, or spreadsheets, and we believe that this is a promising direction for future research in realtime editing.
+Until now, many applications have been implemented using centralised server-based OT to avoid the overheads of CRDTs.
+#algname is the first CRDT to surpass OT's performance, and it requires no server.
+This breakthrough makes it possible for decentralised, local-first software @Kleppmann2019localfirst to become competitive with traditional cloud software.
 
 #if not anonymous [
   #heading(numbering: none, [Acknowledgements])
@@ -1034,7 +1036,7 @@ We also believe that #algname can be extended to other file types such as rich t
       [*Graph runs*],
       [*Authors*],
       [*Chars remaining (%)*],
-      [*Final size (KB)*],
+      [*Final size (kB)*],
       // [*\# RLE Ops (k)*],
     ),
     table.hline(stroke: 0.4pt),
@@ -1056,7 +1058,7 @@ We also believe that #algname can be extended to other file types such as rich t
     _Average concurrency_: mean number of concurrent branches per event in the trace.
     _Graph runs_: number of sequential runs of events (linear event sequences without branching/merging).
     _Authors_: number of users who added at least one event.
-    _Chars remaining_: the percent of inserted characters which remain in the document (ie, are never deleted) after all events have been merged.
+    _Chars remaining_: percentage of inserted characters that remain in the document (i.e., are never deleted) after all events have been merged.
     _Final size_: Resulting document size in kilobytes after all events have been merged.
   ]
 ) <traces-table>
@@ -1074,7 +1076,7 @@ All traces are freely available for benchmarking collaborative text editing algo
 }
 The traces represent the editing history of the following documents:
 
-/ Sequential Traces: These traces have no concurrency. They were recorded using an instrumented text editor that recorded keystroke-granularity editing events. Trace S1 is the LaTeX source of a journal paper #if not anonymous {[@Kleppmann2017 @automerge-perf]} written by two authors who took turns. S2 is the text of an 8,800-word, single-author blog post#if not anonymous {[ @crdts-go-brrr]}. S3 is the text of this paper that you are currently reading.
+/ Sequential Traces: These traces have no concurrency. They were recorded using an instrumented text editor that recorded keystroke-granularity editing events. Trace S1 is the LaTeX source of a journal paper #if not anonymous {[@Kleppmann2017 @automerge-perf]} written by two authors who took turns. S2 is the text of an 8,800-word, single-author blog post#if not anonymous {[ @crdts-go-brrr]}. S3 is the Typst source of this paper that you are currently reading.
 / Concurrent Traces: Trace C1 is two users in the same document, writing a reflection on an episode of a TV series they have just watched. C2 is two users collaboratively reflecting on going to clown school together. We recorded these real-time collaborations with keystroke granularity, and we added 1~sec (C1) or 0.5~sec (C2) artificial latency between the collaborating users to increase the incidence of concurrent operations.
 / Asynchronous Traces: We reconstructed the editing trace of some files in Git repositories. The event graph mirrors the branching/merging of Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations necessary to perform each commit's diff. Trace A1 is `src/node.cc` from the Git repository for Node.js @node-src-nodecc, and A2 is `Makefile` from the Git repository for Git itself @git-makefile.
 
@@ -1083,8 +1085,8 @@ We recorded the sequential and concurrent traces ourselves, collaborating with f
 All contributors to the traces have given their consent for their recorded keystroke data to be made publicly available and to be used for benchmarking purposes.
 The asynchronous traces are derived from public data on GitHub.
 
-The recorded editing traces originally varied a great deal in size.
-To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters. (With the exception of S3, which significantly exceeds this size.)
+The recorded editing traces originally varied a great deal in length.
+To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters (with the exception of S3, which significantly exceeds this size).
 We did this by duplicating the shorter event graphs multiple times in our data files, without introducing any concurrency (that is, all events from one run of the trace happen either before or after all events from another run).
 We repeat the original S1 and S2 traces 3 times, the original C1 and C2 traces 25 times, and the original A2 trace twice.
 The statistics given in @traces-table are after duplication.

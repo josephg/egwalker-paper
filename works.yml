@@ -158,7 +158,18 @@ pijul:
   author: ["Meunier, Pierre-Étienne", "Becker, Florent"]
   url: https://pijul.org/
 
+pijul-theory:
+  type: web
+  title: "The Pijul manual: Theory"
+  url: https://pijul.org/manual/theory.html
+
 darcs:
   type: web
   title: Darcs
   url: https://darcs.net/
+
+darcs-book:
+  type: web
+  author: ["Kow, Eric"]
+  title: Understanding Darcs
+  url: https://en.wikibooks.org/wiki/Understanding_Darcs/Print_Version
