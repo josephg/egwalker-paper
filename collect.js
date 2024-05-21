@@ -298,7 +298,22 @@ function emitFilesizes() {
   // console.log(sizes)
 }
 
+
+
+function scanMemSizes(filename) {
+  const data = JSON.parse(fs.readFileSync(filename, 'utf-8'))
+
+  for (const d of datasets) {
+    const {steady_state, peak} = data[d]
+    console.log(filename, d, (steady_state / peak) * 100)
+  }
+}
+
+
+
 emitSpeeds()
 emitFilesizes()
 
-
+scanMemSizes('results/dtcrdt_memusage.json')
+scanMemSizes('results/automerge_memusage.json')
+// scanMemSizes('results/yjs_memusage.json')

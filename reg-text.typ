@@ -807,7 +807,7 @@ For this evaluation we use seven traces, which fall into three categories:
 / Asynchronous Traces: (A1, A2): Event graphs derived from branching/merging Git commit histories. Multiple long-running branches and infrequent merges.
 
 We recorded the sequential and concurrent traces with keystroke granularity using an instrumented text editor.
-To make the traces easier to compare, we normalised them so that each trace contains $approx$500k inserted characters (>100 printed pages).
+To make the traces easier to compare, we normalised them so that each trace contains $approx$500k inserted characters (about 100 printed pages).
 We extended shorter traces to this length by repeating them several times.
 See @traces-appendix for details.
 
@@ -870,7 +870,7 @@ A poorly chosen traversal order can make this trace as much as 8$times$ slower t
 
 @chart-memusage shows the memory footprint (retained heap size) of each algorithm.
 The memory used by #algname and OT is split into peak usage (during the merge process) and the "steady state" memory usage, after temporary data such as #algname's internal state is discarded and the event graph is written out to disk.
-For the CRDTs the difference between peak and steady-state memory use is small.
+For the CRDTs the difference between peak and steady-state memory use is small. The diagram shows steady state memory usage. Peak memory usage is up to 25% larger.
 
 #algname's peak memory use is similar to our reference CRDT: slightly lower on the sequential traces, and approximately double for the concurrent traces.
 However, the steady-state memory use of #algname is 1--2 orders of magnitude lower than the best CRDT.
