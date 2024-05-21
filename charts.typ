@@ -145,17 +145,30 @@
 )
 
 #let timings = json("results/timings.json")
+
+#let map_dict(d, f) = {
+  let result = (:)
+  for (key, val) in d.pairs() {
+    result.insert(key, f(val))
+  }
+  return result
+}
+
+#let get_mean(d) = {
+  return map_dict(d, t => t.mean)
+}
+
 #let merge_times = (
   // "dt", "ot", "dtcrdt", "yjs", "automerge"
-  dt: timings.dt_merge_norm,
-  ot: timings.ot,
-  dtcrdt: timings.at("dt-crdt_process_remote_edits"),
-  yjs: timings.yjs_remote,
-  automerge: timings.automerge_remote,
+  dt: get_mean(timings.dt_merge_norm),
+  ot: get_mean(timings.ot),
+  dtcrdt: get_mean(timings.at("dt-crdt_process_remote_edits")),
+  yjs: get_mean(timings.yjs_remote),
+  automerge: get_mean(timings.automerge_remote),
 )
 #let load_times = (
-  dt: timings.dt_opt_load,
-  ot: timings.dt_opt_load,
+  dt: get_mean(timings.dt_opt_load),
+  ot: get_mean(timings.dt_opt_load),
   dtcrdt: merge_times.dtcrdt,
   yjs: merge_times.yjs,
   automerge: merge_times.automerge,
@@ -170,15 +183,7 @@
   return calc.root(prod, items.len())
 }
 
-#let map_dict(d, f) = {
-  let result = (:)
-  for (key, val) in d.pairs() {
-    result.insert(key, f(val))
-  }
-  return result
-}
-
-#let avg_opt_load_time = am(timings.dt_opt_load.values())
+#let avg_opt_load_time = am(get_mean(timings.dt_opt_load).values())
 
 // #let xxx = map_dict(("hi": 3), x => x + 1)
 
