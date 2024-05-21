@@ -120,7 +120,7 @@
   )
 }
 
-#show: columns.with(2, gutter: 8mm)
+#columns(2, gutter: 8mm, [
 
 #heading(numbering: none, [Abstract])
 
@@ -991,9 +991,56 @@ We also believe that #algname can be extended to other file types such as rich t
   title: "References",
   style: "association-for-computing-machinery"
 )
+]) // end of two-column layout
 
+#pagebreak()
 #counter(heading).update(0)
 #set heading(numbering: "A.1", supplement: "Appendix")
+
+#let stats_for(name, type, repeats, num_authors: none) = {
+  let data = json("results/dataset_stats.json").at(name)
+
+  // let a = num_authors
+  if num_authors == none {
+    num_authors = data.num_agents
+  }
+
+  (
+    name,
+    type,
+    str(calc.round(data.total_keystrokes / 1000)),
+    str(repeats),
+    str(calc.round(data.concurrency_estimate, digits: 2)),
+    str(data.graph_rle_size),
+    str(num_authors)
+  )
+}
+
+#figure(
+  text(8pt, table(
+    columns: (auto, auto, auto, auto, auto, auto, auto),
+    align: (center, center, right, right, right, right, right),
+    stroke: none,
+    table.hline(stroke: 0.8pt),
+    table.header([*Name*], [*Type*], [*Events (k)*], [*Repeats*], [*Avg. Concurrency*], [*Runs*], [*Authors*]),
+    table.hline(stroke: 0.4pt),
+
+    ..stats_for("S1", "sequential", 3, num_authors: 2),
+    ..stats_for("S2", "sequential", 3),
+    ..stats_for("S3", "sequential", 1, num_authors: 2),
+    ..stats_for("C1", "concurrent", 25),
+    ..stats_for("C2", "concurrent", 25, num_authors: 2),
+    ..stats_for("A1", "asynchronous", 1),
+    ..stats_for("A2", "asynchronous", 2),
+    table.hline(stroke: 0.8pt),
+  )),
+  placement: top,
+  caption: [
+    The text editing traces used in our evaluation. _Events_: total number of editing events, in thousands, including repeats. Each inserted or deleted character counts as one event. _Repeats_: Number of times the original trace was repeated to normalise its length relative to the other traces. _Average concurrency_: mean number of concurrent branches per event in the trace. _Runs_: number of sequential runs (linear event sequences without branching/merging). _Authors_: number of users who added at least one event.
+  ]
+) <traces-table>
+
+#columns(2, gutter: 8mm, [
 
 = Editing Traces <traces-appendix>
 
@@ -1009,48 +1056,6 @@ The traces represent the editing history of the following documents:
 / Sequential Traces: These traces have no concurrency. They were recorded using an instrumented text editor that recorded keystroke-granularity editing events. Trace S1 is the LaTeX source of a journal paper #if not anonymous {[@Kleppmann2017 @automerge-perf]} written by two authors who took turns. S2 is the text of an 8,800-word, single-author blog post#if not anonymous {[ @crdts-go-brrr]}. S3 is the text of this paper that you are currently reading.
 / Concurrent Traces: Trace C1 is two users in the same document, writing a reflection on an episode of a TV series they have just watched. C2 is two users collaboratively reflecting on going to clown school together. We recorded these real-time collaborations with keystroke granularity, and we added 1~sec (C1) or 0.5~sec (C2) artificial latency between the collaborating users to increase the incidence of concurrent operations.
 / Asynchronous Traces: We reconstructed the editing trace of some files in Git repositories. The event graph mirrors the branching/merging of Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations necessary to perform each commit's diff. Trace A1 is `src/node.cc` from the Git repository for Node.js @node-src-nodecc, and A2 is `Makefile` from the Git repository for Git itself @git-makefile.
-
-#let stats_for(name, type, num_authors: none) = {
-  let data = json("results/dataset_stats.json").at(name)
-
-  // let a = num_authors
-  if num_authors == none {
-    num_authors = data.num_agents
-  }
-
-  (
-    name,
-    type,
-    str(calc.round(data.total_keystrokes / 1000)),
-    str(calc.round(data.concurrency_estimate, digits: 2)),
-    str(data.graph_rle_size),
-    str(num_authors)
-  )
-}
-
-#figure(
-  text(8pt, table(
-    columns: (auto, auto, auto, auto, auto, auto),
-    align: (center, center, right, right, right, right),
-    stroke: none,
-    table.hline(stroke: 0.8pt),
-    table.header([*Name*], [*Type*], [*Events (k)*], [*Avg. Conc.*], [*Runs*], [*Authors*]),
-    table.hline(stroke: 0.4pt),
-
-    ..stats_for("S1", "seq", num_authors: 2),
-    ..stats_for("S2", "seq"),
-    ..stats_for("S3", "seq", num_authors: 2),
-    ..stats_for("C1", "conc"),
-    ..stats_for("C2", "conc", num_authors: 2),
-    ..stats_for("A1", "async"),
-    ..stats_for("A2", "async"),
-    table.hline(stroke: 0.8pt),
-  )),
-  placement: top,
-  caption: [
-    The text editing traces used in our evaluation. _Events_: total number of editing events, in thousands. Each inserted or deleted character counts as one event. _Average concurrency_: mean number of concurrent branches per event in the trace. _Runs_: number of sequential runs (linear event sequences without branching/merging). _Authors_: number of users who added at least one event.
-  ]
-) <traces-table>
 
 We recorded the sequential and concurrent traces ourselves, collaborating with friends or colleagues.
 #if anonymous {[Please note that as a result, the trace data contains the names of the authors of this paper, and it is not anonymised.]}
@@ -1319,3 +1324,4 @@ We can now state our modified definition of the strong list specification:
   Thus, the transformed index of the insertion is also $i$, and therefore the new element is inserted at index $i$ of the document as required.
   This completes the proof that #algname satisfies the strong list specification.
 ]
+])
