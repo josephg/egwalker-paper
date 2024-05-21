@@ -151,3 +151,14 @@ sharedb:
   title: ShareDB
   author: ["Gentle, Joseph"]
   url: https://github.com/share/sharedb
+
+pijul:
+  type: web
+  title: Pijul
+  author: ["Meunier, Pierre-Étienne", "Becker, Florent"]
+  url: https://pijul.org/
+
+darcs:
+  type: web
+  title: Darcs
+  url: https://darcs.net/

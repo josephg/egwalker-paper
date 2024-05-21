@@ -746,7 +746,6 @@ Each column stores some different fields of the event data. The columns are:
 - _Event IDs._ Each event is uniquely identified by a pair of a replica ID and a per-replica sequence number. This column stores runs of event IDs, for example: "the first 1085 events are from replica $A$, starting with sequence number 0; the next 595 events are from replica $B$, starting with sequence number 0;" and so on.
 // - _Cached transform positions (optional)._ We can optionally store the transformed positions of each event. This allows the document state to be recomputed much faster in many cases. And because of the similarity between transformed positions and original positions, this data adds a very small amount of file overhead in practice.
 
-// TODO: the next two paragraphs could be omitted if we're short of space
 // We use several further tricks to reduce file size. For example, we run-length-encode deletions in reverse direction (due to holding down backspace). We express operation indexes relative to the end of the previous event, so that the number fits in fewer bytes. We deduplicate replica IDs, and so on.
 
 Replicas can optionally also store a copy of the final document state reflecting all events. This allows documents to be loaded from disk without replaying the event graph.
@@ -759,17 +758,13 @@ When sending a subset of events over the network (e.g., a single event during re
 // Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
 // Benchmarking crimes to avoid https://gernot-heiser.org/benchmarking-crimes.html
 
-// TODO: anonymise the references to repos for the conference submission
-// Can use a service like https://anonymous.4open.science/
-
 We created a TypeScript implementation of #algname optimised for simplicity and readability#if not anonymous {[ @reference-reg]}, and a production-ready Rust implementation optimised for performance#if not anonymous {[ @dt]}.
 The TypeScript version omits the run-length encoding of internal state, B-trees, and topological sorting heuristics.
 
 To evaluate the correctness of #algname we proved that the algorithm complies with Attiya et al.'s _strong list specification_ @Attiya2016 (see @proofs).
-We also performed extensive randomised property testing on the implementations, including checking that our implementations converge to the same result.
-This uncovered several implementation bugs.
+We also performed randomised property testing on the implementations, including checking that our implementations converge to the same result.
 
-To evaluate its performance, we compare the Rust implementation of #algname with two popular CRDT libraries: Automerge v0.5.9 @automerge (Rust) and Yjs v13.6.10 @yjs (JavaScript).#footnote[We also tested Yrs @yrs, the Rust rewrite of Yjs by the original authors. At the time of writing it performs worse than Yjs, so we have omitted it from our results.]
+To evaluate its performance, we compare the Rust implementation of #algname with two popular CRDT libraries: Automerge v0.5.9 @automerge (Rust) and Yjs v13.6.10 @yjs (JavaScript).#footnote[We also tested Yrs @yrs, the Rust rewrite of Yjs by the original authors. It performed worse than Yjs, so we omitted it from our results.]
 We only test their collaborative text datatypes, and not the other features they support.
 However, the performance of these libraries varies widely.
 In an effort to distinguish between implementation differences and algorithmic differences, we have also implemented our own performance-optimised reference CRDT library.
@@ -785,7 +780,7 @@ We compare these implementations along 3 dimensions:
 We compiled Rust code with rustc v1.78.0 in release mode with `'-C target-cpu=native'`. Rust code was pinned to a single CPU core to reduce variance across runs. // (The reason is that different cores of the same CPU are clocked differently due to thermal reasons. Using a single core improves run-to-run stability).
 For JavaScript (Yjs) we used Node.js v22.2.0. // Javascript wasn't pinned to a single core. Nodejs uses additional cores to run the V8 optimizer.
 All reported time measurements are the mean of at least 100 test iterations (except for the case where OT takes an hour to merge trace A2, which we ran 10 times).
-The standard deviation for all benchmark results was less than 2%, except for Yjs which had a peak standard deviation of 5.6%. Error bars are too small to seen at the scales involved.
+The standard deviation for all benchmark results was less than 1.2% of the mean, except for the Yjs measurements, which had a stddev of less than 6%. Error bars on our graphs are too small to be visible.
 ]
 
 / Speed: The CPU time to load a document into memory, and to merge a set of updates from a remote replica.
@@ -796,7 +791,7 @@ The standard deviation for all benchmark results was less than 2%, except for Yj
 
 As there is no established benchmark for collaborative text editing, we collected a set of editing traces from real documents.
 #if anonymous {
-  [All code and data used in our benchmarks is available for anybody to reproduce.#footnote[TODO: anonymised link to download]]
+  [All code and data used in our benchmarks is available for anybody to reproduce.#footnote[https://figshare.com/s/0fb13e5d179aaa6957d7]]
 } else {
   [We have made these traces freely available on GitHub @editing-traces.]
 }
@@ -870,16 +865,16 @@ A poorly chosen traversal order can make this trace as much as 8$times$ slower t
 
 @chart-memusage shows the memory footprint (retained heap size) of each algorithm.
 The memory used by #algname and OT is split into peak usage (during the merge process) and the "steady state" memory usage, after temporary data such as #algname's internal state is discarded and the event graph is written out to disk.
-For the CRDTs the difference between peak and steady-state memory use is small. The diagram shows steady state memory usage. Peak memory usage is up to 25% larger.
+For the CRDTs the figure shows steady state memory usage; peak usage is up to 25% higher.
 
-#algname's peak memory use is similar to our reference CRDT: slightly lower on the sequential traces, and approximately double for the concurrent traces.
+#algname's peak memory use is similar to our reference CRDT's steady state: slightly lower on the sequential traces, and approximately double for the concurrent traces.
 However, the steady-state memory use of #algname is 1--2 orders of magnitude lower than the best CRDT.
 This is a significant result, since the steady state is what matters during normal operation while a document is being edited.
-Note also that peak memory usage would be lower when replaying a subset of an event graph, which is likely to be the common case.
+Note that peak memory usage would be lower when replaying a subset of an event graph, which is the common case.
 
 // (seph): The peak memory usage could be reduced a lot if I first divide up the graph into chunks by the critical versions. Right now, the implementation makes a "merge plan" for the whole thing (which is stored in memory) then processes the entire plan. The plan itself uses up a lot of memory. A better approach would chunk it in sections separated by critical versions. That would dramatically reduce peak memory usage!
 
-Yjs has slightly higher memory use than our reference CRDT, and Automerge significantly higher.
+Yjs has 2--3$times$ greater memory use than our reference CRDT on most traces, and Automerge an order of magnitude greater.
 Automerge's very high memory use on C1 and C2 is probably a bug.
 The computer we used for benchmarking had enough RAM to prevent swapping in all cases.
 
@@ -942,7 +937,7 @@ MRDTs for various datatypes have been defined, but so far none offers text with 
 
 Toomim's _time machines_ approach @time-machines shares a conceptual foundation with #algname: both are based on traversing an event graph, with operations being transformed from their original form into a form that can be applied in topologically sorted order.
 Toomim also points out that CRDTs can implement this transformation.
-#algname is a concrete, optimised implementation of the time machine approach; novel contributions of #algname include updating the prepare version by retreating and advancing, as well as the details of partial event graph replay.
+#algname is a concrete, optimised implementation of the time machine approach; novel contributions of #algname include updating the prepare version by retreating and advancing, as well as the details of internal state clearing and partial event graph replay.
 
 #algname is also an _operational transformation_ (OT) algorithm @Ellis1989. // since it takes operations that insert or delete characters at some index, and transforms them into operations that can be applied to the local replica state to have an effect equivalent to the original operation in the state in which it was generated.
 OT has a long lineage of research going back to the 1990s @Nichols1995 @Ressel1996 @Sun1998.
@@ -963,12 +958,12 @@ In contrast, #algname uses unique IDs only transiently during replay but does no
 #algname needs to store the event graph as long as concurrent operations may arrive, but this takes less space than CRDT state, and it only needs to be in-memory while merging concurrent operations.
 Most of the time the event graph can remain on disk.
 
-Gu et al.'s _mark & retrace_ method @Gu2005 is superficially similar to #algname, but it differs in several important details: it builds a CRDT-like structure containing the entire editing history, not only the parts being merged, and its ordering of concurrent insertions is prone to interleaving.
+Gu et al.'s _mark & retrace_ method @Gu2005 builds a CRDT-like structure containing the entire editing history, not only the parts being merged.
+Differential synchronization @Fraser2009 relies on heuristics such as similarity-matching of text to perform merges, which is not guaranteed to converge.
 
-// TODO: also mention Pijul and Darcs?
-Version control systems such as Git, as well as differential synchronization @Fraser2009, perform merges by diffing the old and new states on one branch, and applying the diff to the other branch.
-Applying patches relies on heuristics, such as searching for some amount of context before and after the modified text passage, which can apply the patch in the wrong place if the same context exists in multiple locations, and which can fail if the context has concurrently been modified.
-These systems therefore require manual merge conflict resolution and don't guarantee automatic convergence.
+Version control systems such as Git @Coglan2019, Pijul @pijul, and Darcs @darcs also track the editing history of text files and include algorithms for merging concurrent changes.
+However, they do not support real-time collaboration, and they are line-based (for code), not character-based (better for prose).
+
 
 
 = Conclusion
