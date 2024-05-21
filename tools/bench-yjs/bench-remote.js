@@ -1,21 +1,24 @@
 const fs = require('fs')
 const Y = require('yjs')
-const {bench, saveReportsSync, reportTable} = require('smolbench')
+const {bench, saveReportsSync, reportTable, reports} = require('smolbench')
 
 // const DATASETS = ["automerge-paper", "seph-blog1", "clownschool", "friendsforever", "node_nodecc", 'egwalker']
 const DATASETS = ["S1", "S2", "S3", "C1", "C2", "A1", "A2"]
 
+// This is designed to either run directly or from the root of the repo.
+const stem = process.cwd() === __dirname ? '../..' : '.'
 
 for (const d of DATASETS) {
 // for (const d of ['seph-blog1']) {
-  const data = fs.readFileSync(`../../datasets/${d}.yjs`)
+  const data = fs.readFileSync(`${stem}/datasets/${d}.yjs`)
   bench(`yjs/remote/${d}`, () => {
     let doc = new Y.Doc()
     Y.applyUpdateV2(doc, data)
   })
 }
 
-saveReportsSync('../../results/js.json')
+reports.nodeVersion = process.version
+saveReportsSync(`${stem}/results/js.json`)
 reportTable()
 
 // for (const d of DATASETS) {
