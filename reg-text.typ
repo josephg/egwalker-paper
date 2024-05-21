@@ -1008,21 +1008,35 @@ We also believe that #algname can be extended to other file types such as rich t
   (
     name,
     type,
-    str(calc.round(data.total_keystrokes / 1000)),
     str(repeats),
+    str(calc.round(data.total_keystrokes / 1000)),
     str(calc.round(data.concurrency_estimate, digits: 2)),
     str(data.graph_rle_size),
-    str(num_authors)
+    str(num_authors),
+    str(calc.round(100 * data.final_doc_len_chars / data.num_insert_keystrokes, digits: 1)),
+    // str(calc.round(data.op_stats.len / 1000, digits: 1)),
+    str(calc.round(data.final_doc_len_utf8 / 1024, digits: 1)),
   )
 }
 
 #figure(
   text(8pt, table(
-    columns: (auto, auto, auto, auto, auto, auto, auto),
+    columns: stats_for("S2", "sequential", 3).map(x => auto),
     align: (center, center, right, right, right, right, right),
     stroke: none,
     table.hline(stroke: 0.8pt),
-    table.header([*Name*], [*Type*], [*Events (k)*], [*Repeats*], [*Avg. Concurrency*], [*Runs*], [*Authors*]),
+    table.header(
+      [*Name*],
+      [*Type*],
+      [*Repeats*],
+      [*Events (k)*],
+      [*Avg Concurrency*],
+      [*Graph runs*],
+      [*Authors*],
+      [*Chars remaining (%)*],
+      [*Final size (KB)*],
+      // [*\# RLE Ops (k)*],
+    ),
     table.hline(stroke: 0.4pt),
 
     ..stats_for("S1", "sequential", 3, num_authors: 2),
@@ -1036,7 +1050,14 @@ We also believe that #algname can be extended to other file types such as rich t
   )),
   placement: top,
   caption: [
-    The text editing traces used in our evaluation. _Events_: total number of editing events, in thousands, including repeats. Each inserted or deleted character counts as one event. _Repeats_: Number of times the original trace was repeated to normalise its length relative to the other traces. _Average concurrency_: mean number of concurrent branches per event in the trace. _Runs_: number of sequential runs (linear event sequences without branching/merging). _Authors_: number of users who added at least one event.
+    The text editing traces used in our evaluation.
+    _Repeats_: Number of times the original trace was repeated to normalise its length relative to the other traces.
+    _Events_: total number of editing events, in thousands, including repeats. Each inserted or deleted character counts as one event.
+    _Average concurrency_: mean number of concurrent branches per event in the trace.
+    _Graph runs_: number of sequential runs of events (linear event sequences without branching/merging).
+    _Authors_: number of users who added at least one event.
+    _Chars remaining_: the percent of inserted characters which remain in the document (ie, are never deleted) after all events have been merged.
+    _Final size_: Resulting document size in kilobytes after all events have been merged.
   ]
 ) <traces-table>
 
@@ -1063,7 +1084,7 @@ All contributors to the traces have given their consent for their recorded keyst
 The asynchronous traces are derived from public data on GitHub.
 
 The recorded editing traces originally varied a great deal in size.
-To allow easier comparison of measurements between traces, we have roughly standardised the sizes of all editing traces to contain approximately 500k inserted characters.
+To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters. (With the exception of S3, which significantly exceeds this size.)
 We did this by duplicating the shorter event graphs multiple times in our data files, without introducing any concurrency (that is, all events from one run of the trace happen either before or after all events from another run).
 We repeat the original S1 and S2 traces 3 times, the original C1 and C2 traces 25 times, and the original A2 trace twice.
 The statistics given in @traces-table are after duplication.

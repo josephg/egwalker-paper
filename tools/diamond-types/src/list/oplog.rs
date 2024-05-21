@@ -462,6 +462,7 @@ pub struct ListOpLogStats {
     pub total_keystrokes: usize,
     pub ins_content_len_utf8: usize,
     pub final_doc_len_chars: usize,
+    /// The number of bytes when the document is stored in UTF8.
     pub final_doc_len_utf8: usize,
 
     pub concurrency_estimate: f32,
