@@ -785,7 +785,7 @@ We compare these implementations along 3 dimensions:
 We compiled Rust code with rustc v1.78.0 in release mode with `'-C target-cpu=native'`. Rust code was pinned to a single CPU core to reduce variance across runs. // (The reason is that different cores of the same CPU are clocked differently due to thermal reasons. Using a single core improves run-to-run stability).
 For JavaScript (Yjs) we used Node.js v22.2.0. // Javascript wasn't pinned to a single core. Nodejs uses additional cores to run the V8 optimizer.
 All reported time measurements are the mean of at least 100 test iterations (except for the case where OT takes an hour to merge trace A2, which we ran 10 times).
-The standard deviation for all benchmark results was less than 2%, except for Yjs which had a peak standard deviation of 5.6%. Error bars are too small to see at the scales involved.
+The standard deviation for all benchmark results was less than 2%, except for Yjs which had a peak standard deviation of 5.6%. Error bars are too small to seen at the scales involved.
 ]
 
 / Speed: The CPU time to load a document into memory, and to merge a set of updates from a remote replica.
