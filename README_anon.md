@@ -32,8 +32,8 @@ To get started, you'll need a recent version of nodejs and rust installed on you
 Then run:
 
 ```
-$ make clean
-$ make
+$ make clean -f Makefile_anon
+$ make -f Makefile_anon
 ```
 
 It takes about 24 hours to run all of the benchmarks. Almost all of this time is taken up by:
@@ -41,6 +41,8 @@ It takes about 24 hours to run all of the benchmarks. Almost all of this time is
 - automerge/C1 (3hrs for 100 samples)
 - automerge/C2 (11.5hrs for 100 samples)
 - OT/A2 (10 hours for 10 samples).
+
+But you can run all the tools individually. Read the makefile to see all the commands run. (Or run `make --dry-run -f Makefile_anon` to see the full list of commands).
 
 The results we used to generate the paper are stored as a set of JSON files in `results/`. `make clean` will remove all current benchmark results.
 
