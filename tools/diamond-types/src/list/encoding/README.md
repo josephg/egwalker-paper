@@ -41,7 +41,7 @@ The operation log is stored in a highly compact binary format. This file format 
 
 - Martin Kleppman did the initial set of work to RLE positional data. This [compacted a 146MB JSON format to 100kb](https://youtu.be/x7drE24geUw?t=4075)
 - Kevin Jahns improved on this in [Yjs](https://github.com/yjs/yjs), bringing the same data set down to 50kb on disk
-- I (Seph Gentle) have made some additional changes, including special handling for backspace events. This brings the same data set down to 21kb.
+- I have made some additional changes, including special handling for backspace events. This brings the same data set down to 21kb.
 
 In diamond types lists, there are (so far) only two types of edits:
 

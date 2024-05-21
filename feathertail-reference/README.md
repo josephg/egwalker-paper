@@ -25,7 +25,7 @@ Unlike CRDT based systems, the operations are stored in this original form, rega
 
 The upcoming paper will have a lot more detail about this algorithm. Stay tuned.
 
-This algorithm was first created in the [diamond types](https://github.com/josephg/diamond-types) library. This implementation is designed to be fully compatible with diamond types, and tested as such. (See included conformance tests).
+This implementation is designed to be fully compatible with the Rust implementation of the algorithm, and tested as such. (See included conformance tests).
 
 ## Usage example
 

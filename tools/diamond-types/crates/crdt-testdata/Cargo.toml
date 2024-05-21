@@ -1,7 +1,7 @@
 [package]
 name = "crdt-testdata"
 version = "0.0.0"
-authors = ["Seph Gentle <me@josephg.com>"]
+authors = ["elided for anonymous review"]
 edition = "2021"
 
 [dependencies]

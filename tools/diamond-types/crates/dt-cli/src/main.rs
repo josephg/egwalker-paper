@@ -216,8 +216,6 @@ enum Commands {
 
     /// Export a diamond types file to raw JSON. This produces an editing log which can be processed
     /// by other compatible CRDT libraries for benchmarking and testing.
-    ///
-    /// See https://github.com/josephg/editing-traces for detail.
     ExportTrace {
         /// File to export
         dt_filename: OsString,
