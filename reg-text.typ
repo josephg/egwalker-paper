@@ -782,10 +782,11 @@ We have also implemented a simple OT library using the TTF algorithm @Oster2006T
 
 We compare these implementations along 3 dimensions:
 #footnote[Experimental setup: We ran the benchmarks on a Ryzen 7950x CPU running Linux 6.5.0-28 and 64GB of RAM.
-We compiled Rust code with rustc v1.78.0 in release mode with `-C target-cpu=native`. Rust code was pinned to a single CPU core to reduce variance across runs. // (The reason is that different cores of the same CPU are clocked differently due to thermal reasons. Using a single core improves run-to-run stability).
+We compiled Rust code with rustc v1.78.0 in release mode with `'-C target-cpu=native'`. Rust code was pinned to a single CPU core to reduce variance across runs. // (The reason is that different cores of the same CPU are clocked differently due to thermal reasons. Using a single core improves run-to-run stability).
 For JavaScript (Yjs) we used Node.js v22.2.0. // Javascript wasn't pinned to a single core. Nodejs uses additional cores to run the V8 optimizer.
 All reported time measurements are the mean of at least 100 test iterations (except for the case where OT takes an hour to merge trace A2, which we ran 10 times).
-The standard deviation for all benchmark results was less than 1%, hence we do not show error bars.]
+The standard deviation for all benchmark results was less than 2%, except for Yjs which had a peak standard deviation of 5.6%. Error bars are too small to see at the scales involved.
+]
 
 / Speed: The CPU time to load a document into memory, and to merge a set of updates from a remote replica.
 / Memory usage: The RAM used while a document is loaded and while merging remote updates.
