@@ -9,6 +9,8 @@ const anonymous = true
 // const anonymous = false
 const egwalkerName = anonymous ? 'Feathertail' : 'Eg-walker'
 
+const stem = process.cwd() === import.meta.dirname ? '..' : '.'
+
 const savePlot = (plot, filename) => {
   // plot.setAttribute('style', "background-color:green")
   // plot.setAttribute('fill', "green")
@@ -21,11 +23,11 @@ const savePlot = (plot, filename) => {
   // console.log(plot.outerHTML)
   // console.log(plot.innerHTML)
   // plot.
-  fs.writeFileSync('../diagrams/' + filename, plot.outerHTML)
+  fs.writeFileSync(`${stem}/diagrams/` + filename, plot.outerHTML)
 }
 
-const loadJson = filename => JSON.parse(fs.readFileSync(filename, 'utf8'))
-const rawTimings = loadJson('../results/timings.json')
+const loadJson = filename => JSON.parse(fs.readFileSync(`${stem}/${filename}`, 'utf8'))
+const rawTimings = loadJson('results/timings.json')
 
 
 let datasets = ["S1", "S2", "S3", "C1", "C2", "A1", "A2"]
@@ -122,15 +124,15 @@ const plotTimes = () => {
 
   const baseline = 1.2
 
-  const means = [
-    meanFor('dtmerge', rawTimings.dt_merge_norm),
-    meanFor('dtload', rawTimings.dt_opt_load),
-    meanFor('otmerge', rawTimings.ot),
-    meanFor('otload', rawTimings.dt_opt_load),
-    meanFor('dtcrdt', rawTimings['dt-crdt_process_remote_edits']),
-    meanFor('automerge', rawTimings.automerge_remote),
-    meanFor('yjs', rawTimings.yjs_remote),
-  ] //.filter(m => m.val > baseline)
+  // const means = [
+  //   meanFor('dtmerge', rawTimings.dt_merge_norm),
+  //   meanFor('dtload', rawTimings.dt_opt_load),
+  //   meanFor('otmerge', rawTimings.ot),
+  //   meanFor('otload', rawTimings.dt_opt_load),
+  //   meanFor('dtcrdt', rawTimings['dt-crdt_process_remote_edits']),
+  //   meanFor('automerge', rawTimings.automerge_remote),
+  //   meanFor('yjs', rawTimings.yjs_remote),
+  // ] //.filter(m => m.val > baseline)
 
   // console.log(data)
 
@@ -151,7 +153,7 @@ const plotTimes = () => {
       'font-family': 'Helvetica Neue, Helvetica, Arial, sans-serif',
     },
     fy: {
-      paddingInner: 0.18,
+      // paddingInner: 0.18,
     },
     // fy: {
     //   // tickRotate: '-90',
@@ -216,21 +218,28 @@ const plotTimes = () => {
       //   opacity: 0.1,
       // }),
 
+      // Plot.link(data, {
+      //   y: 'dataset', fy: 'type',
+      //   x1: d => Math.max(baseline, d.val.p10),
+      //   // x2: d => Math.max(baseline, d.val.p90 * 2),
+      //   x2: d => Math.max(baseline, d.val.p90),
+      //   // stroke: 'black',
+      // }),
 
-      Plot.ruleX(means.filter(m => m.val > baseline), {
-        x: d => Math.max(d.val, baseline),
-        fy: 'type',
-        stroke: 'black',
-        opacity: 0.4,
-        strokeWidth: 1,
-        inset: 2,
-      }),
+      // Plot.ruleX(means.filter(m => m.val > baseline), {
+      //   x: d => Math.max(d.val, baseline),
+      //   fy: 'type',
+      //   stroke: 'black',
+      //   opacity: 0.4,
+      //   strokeWidth: 1,
+      //   inset: 2,
+      // }),
       Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5, inset: -7}),
       Plot.barX(data, {
         y: 'dataset',
         fy: 'type',
         x1: baseline,
-        x2: d => Math.max(d.val, baseline),
+        x2: d => Math.max(d.val.mean, baseline),
         // fill: 'type',
         fill: d => dstype[d.dataset],
         // sort: null,
@@ -270,30 +279,30 @@ const plotTimes = () => {
         opacity: 0.7,
         lineHeight: 1.1,
       }),
-      Plot.tickX(data, {fy: 'type', x: d => Math.max(d.val, baseline), y: "dataset"}),
+      Plot.tickX(data, {fy: 'type', x: d => Math.max(d.val.mean, baseline), y: "dataset"}),
       Plot.text(data, {
         y: 'dataset', fy: 'type',
-        x: d => Math.max(d.val, baseline),
+        x: d => Math.max(d.val.mean, baseline),
         // text: d => d.val < baseline ? '<1ms' : `${formatMs(d.val)}`,
-        text: d => `${formatMs(d.val)}`,
+        text: d => `${formatMs(d.val.mean)}`,
         fontSize: 9,
         textAnchor: 'start',
         fill: 'black',
         dx: 6,
       }),
 
-      Plot.textX(means, {
-        x: d => Math.max(d.val, baseline),
-        fy: 'type',
-        text: d => `x̄ = ${formatMs(d.val)}`,
-        fontWeight: 700,
-        fontSize: 9,
-        opacity: 0.6,
+      // Plot.textX(means, {
+      //   x: d => Math.max(d.val, baseline),
+      //   fy: 'type',
+      //   text: d => `x̄ = ${formatMs(d.val)}`,
+      //   fontWeight: 700,
+      //   fontSize: 9,
+      //   opacity: 0.6,
 
-        frameAnchor: 'top',
-        dy: -8,
-        // textAnchor: 'bottom',
-      }),
+      //   frameAnchor: 'top',
+      //   dy: -8,
+      //   // textAnchor: 'bottom',
+      // }),
 
       // Plot.text(data, {
       //   y: 'dataset', fy: 'type',
@@ -321,6 +330,7 @@ const plotTimes = () => {
       //   strokeWidth: 1.5
       // }),
       // Plot.ruleY([0]),
+
     ]
   })
 }
@@ -339,11 +349,11 @@ const plotMemusage = () => {
     automerge: ["Automerge", ''],
   }
 
-  const dtmem = loadJson("../results/dt_memusage.json")
-  const dtcrdtmem = loadJson("../results/dtcrdt_memusage.json")
-  const otmem = loadJson("../results/ot_memusage.json")
-  const yjsmem = loadJson("../results/yjs_memusage.json")
-  const ammem = loadJson("../results/automerge_memusage.json")
+  const dtmem = loadJson("results/dt_memusage.json")
+  const dtcrdtmem = loadJson("results/dtcrdt_memusage.json")
+  const otmem = loadJson("results/ot_memusage.json")
+  const yjsmem = loadJson("results/yjs_memusage.json")
+  const ammem = loadJson("results/automerge_memusage.json")
 
   const data = [
     ...datasets.map(dataset => ({ dataset, type: 'dtpeak', val: dtmem[dataset].peak, })),
@@ -352,9 +362,9 @@ const plotMemusage = () => {
     ...datasets.map(dataset => ({ dataset, type: 'otsteady', val: otmem[dataset].steady_state, })),
 
     // Steady and peak are basically the same for the CRDT data sets
-    ...datasets.map(dataset => ({ dataset, type: 'dtcrdt', val: dtcrdtmem[dataset].peak, })),
-    ...datasets.map(dataset => ({ dataset, type: 'yjs', val: yjsmem[dataset].peak, })),
-    ...datasets.map(dataset => ({ dataset, type: 'automerge', val: ammem[dataset].peak, })),
+    ...datasets.map(dataset => ({ dataset, type: 'dtcrdt', val: dtcrdtmem[dataset].steady_state, })),
+    ...datasets.map(dataset => ({ dataset, type: 'yjs', val: yjsmem[dataset].steady_state, })),
+    ...datasets.map(dataset => ({ dataset, type: 'automerge', val: ammem[dataset].steady_state, })),
     // ...datasets.map(dataset => ({ dataset, type: 'dtcrdtsteady', val: dtcrdtmem[dataset].steady_state, })),
 
     // ...datasets.map(dataset => ({ dataset, type: 'otmerge', val: rawTimings.ot[dataset], })),
@@ -363,15 +373,15 @@ const plotMemusage = () => {
     // ...datasets.map(dataset => ({ dataset, type: 'yjs', val: rawTimings.yjs_remote[dataset], })),
   ]
 
-  const means = [
-    meanFor('dtpeak', dataset => dtmem[dataset].peak),
-    meanFor('dtsteady', dataset => dtmem[dataset].steady_state),
-    meanFor('otpeak', dataset => otmem[dataset].peak),
-    meanFor('otsteady', dataset => otmem[dataset].steady_state),
-    meanFor('dtcrdt', dataset => dtcrdtmem[dataset].peak),
-    meanFor('yjs', dataset => yjsmem[dataset].peak),
-    meanFor('automerge', dataset => ammem[dataset].peak),
-  ] //.filter(m => m.val > baseline)
+  // const means = [
+  //   meanFor('dtpeak', dataset => dtmem[dataset].peak),
+  //   meanFor('dtsteady', dataset => dtmem[dataset].steady_state),
+  //   meanFor('otpeak', dataset => otmem[dataset].peak),
+  //   meanFor('otsteady', dataset => otmem[dataset].steady_state),
+  //   meanFor('dtcrdt', dataset => dtcrdtmem[dataset].peak),
+  //   meanFor('yjs', dataset => yjsmem[dataset].peak),
+  //   meanFor('automerge', dataset => ammem[dataset].peak),
+  // ] //.filter(m => m.val > baseline)
 
 
   // console.log(data)
@@ -403,7 +413,7 @@ const plotMemusage = () => {
     //   // axis: 'left',
     // },
     fy: {
-      paddingInner: 0.15,
+      // paddingInner: 0.15,
     },
     y: {
       // label: 'Algorithm',
@@ -461,14 +471,14 @@ const plotMemusage = () => {
       //   opacity: 0.1,
       // }),
 
-      Plot.ruleX(means.filter(m => m.val > baseline), {
-        x: d => Math.max(d.val, baseline),
-        fy: 'type',
-        stroke: 'black',
-        opacity: 0.4,
-        strokeWidth: 1,
-        inset: 2,
-      }),
+      // Plot.ruleX(means.filter(m => m.val > baseline), {
+      //   x: d => Math.max(d.val, baseline),
+      //   fy: 'type',
+      //   stroke: 'black',
+      //   opacity: 0.4,
+      //   strokeWidth: 1,
+      //   inset: 2,
+      // }),
       Plot.barX(data, {
         y: 'dataset',
         fy: 'type',
@@ -519,24 +529,24 @@ const plotMemusage = () => {
         x: d => Math.max(d.val, baseline),
         // text: d => d.val < baseline ? '<1ms' : `${formatMs(d.val)}`,
         text: d => `${formatBytes(d.val)}`,
-        fontSize: 9,
+        fontSize: 8.5,
         textAnchor: 'start',
         fill: 'black',
         dx: 6,
       }),
 
-      Plot.textX(means, {
-        x: d => Math.max(d.val, baseline),
-        fy: 'type',
-        text: d => `x̄ = ${formatBytes(d.val)}`,
-        fontWeight: 700,
-        fontSize: 9,
-        opacity: 0.6,
+      // Plot.textX(means, {
+      //   x: d => Math.max(d.val, baseline),
+      //   fy: 'type',
+      //   text: d => `x̄ = ${formatBytes(d.val)}`,
+      //   fontWeight: 700,
+      //   fontSize: 9,
+      //   opacity: 0.6,
 
-        frameAnchor: 'top',
-        dy: -8,
-        // textAnchor: 'bottom',
-      }),
+      //   frameAnchor: 'top',
+      //   dy: -8,
+      //   // textAnchor: 'bottom',
+      // }),
 
       // Plot.text(data, {
       //   y: 'dataset', fy: 'type',
@@ -569,8 +579,8 @@ const plotMemusage = () => {
 }
 
 
-const yjs_am_sizes = loadJson("../results/yjs_am_sizes.json")
-const dt_stats = loadJson("../results/dataset_stats.json")
+const yjs_am_sizes = loadJson("results/yjs_am_sizes.json")
+const dt_stats = loadJson("results/dataset_stats.json")
 
 const plotSize = (algnames, data, totals, max, opts = {}) => {
 
@@ -875,16 +885,16 @@ const plotFF = () => {
   }
 
   const data = [
-    ...datasets.map(dataset => ({ dataset, type: 'ff_on', val: rawTimings.dt_merge_norm[dataset], })),
+    ...datasets.map(dataset => ({ dataset, type: 'ff_on', val: rawTimings.dt_merge_norm[dataset].mean, })),
 
     //...datasets.map(dataset => ({ dataset, type: 'ff_on', val: rawTimings.dt_ff_on[dataset], })),
-    ...datasets.map(dataset => ({ dataset, type: 'ff_off', val: rawTimings.dt_ff_off[dataset], })),
+    ...datasets.map(dataset => ({ dataset, type: 'ff_off', val: rawTimings.dt_ff_off[dataset].mean, })),
   ]
 
-  const means = [
-    meanFor('ff_on', rawTimings.dt_merge_norm),
-    meanFor('ff_off', rawTimings.dt_ff_off),
-  ] //.filter(m => m.val > baseline)
+  // const means = [
+  //   meanFor('ff_on', rawTimings.dt_merge_norm),
+  //   meanFor('ff_off', rawTimings.dt_ff_off),
+  // ] //.filter(m => m.val > baseline)
 
   // console.log(data)
 
