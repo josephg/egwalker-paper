@@ -220,7 +220,7 @@ $(DIAGRAMS) &: svg-plot/node_modules $(ALL_RESULTS)
 	cd svg-plot && node render.js
 
 # This is the master target.
-reg-text.pdf: reg-text.typ charts.typ $(DIAGRAMS) $(ALL_RESULTS)
+reg-text.pdf: reg-text.typ $(DIAGRAMS) $(ALL_RESULTS)
 	typst compile reg-text.typ
 
 paper_data_anon.zip: #| $(ALL_RESULTS)
