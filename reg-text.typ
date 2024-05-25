@@ -3,7 +3,7 @@
 #show: thmrules.with(qed-symbol: $square$)
 
 // Might be worth pulling these two fields in from a config file instead
-#let anonymous = true
+#let anonymous = false
 #let draft = false
 
 

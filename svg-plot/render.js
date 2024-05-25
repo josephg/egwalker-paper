@@ -6,7 +6,7 @@ import {JSDOM} from "jsdom";
 const {window} = new JSDOM("")
 
 
-const anonymous = true
+const anonymous = false
 // const anonymous = false
 const egwalkerName = anonymous ? 'Feathertail' : 'Eg-walker'
 
