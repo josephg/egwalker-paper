@@ -5,6 +5,7 @@ import {JSDOM} from "jsdom";
 
 const {window} = new JSDOM("")
 
+
 const anonymous = true
 // const anonymous = false
 const egwalkerName = anonymous ? 'Feathertail' : 'Eg-walker'
@@ -23,7 +24,9 @@ const savePlot = (plot, filename) => {
   // console.log(plot.outerHTML)
   // console.log(plot.innerHTML)
   // plot.
+
   fs.writeFileSync(`${stem}/diagrams/` + filename, plot.outerHTML)
+  console.log('wrote', `${stem}/diagrams/` + filename)
 }
 
 const loadJson = filename => JSON.parse(fs.readFileSync(`${stem}/${filename}`, 'utf8'))
@@ -1056,6 +1059,112 @@ const plotFF = () => {
   })
 }
 
+const plotFFSize = () => {
+  const ff_off = loadJson("results/xf-friendsforever-noff.json")
+  const ff_on = loadJson("results/xf-friendsforever-ff.json")
+
+  // I'm using Plot.tip for this, which uses the SVG library in the browser to measure the size
+  // of text. That isn't supported by jsdom, so this is a workaround using canvas.
+  //
+  // This requires installing the canvas library from npm, which requires some system packages
+  // to work. See:
+  // https://github.com/Automattic/node-canvas/wiki/_pages
+  //
+  // However, after I did all the work to figure this out, I realised that the chart had been
+  // removed from the paper anyway so it doesn't matter. Aaah.
+  Object.defineProperty(window.SVGElement.prototype, 'getBBox', {
+    writable: true,
+    value: function() {
+      // console.log('this', this, Object.keys(this), Object.keys(Object.getPrototypeOf(this)))
+      // console.log('style', Object.getOwnPropertyNames(Object.getPrototypeOf(this.style)))
+
+      let canvas = window.document.createElement("canvas")
+      let context = canvas.getContext("2d")
+      context.font = "10px Helvetica Neue, Helvetica, Arial, sans-serif"
+      let measurements = context.measureText(this.textContent)
+
+      console.log('m', measurements)
+      return {
+        x: 0,
+        y: 0,
+        width: measurements.width,
+        height: measurements.emHeightAscent + measurements.emHeightDescent,
+      }
+    }
+  })
+
+  globalThis.requestAnimationFrame = f => f()
+
+  return Plot.plot({
+    figure: false,
+    document: window.document,
+    // marginLeft: 115,
+    // marginRight: 60,
+    // marginBottom: 40,
+    width: 500,
+    height: 200,
+    style: {
+      background: 'white',
+      // 'background-color': 'green',
+      // "font-size": "14px",
+      'font-family': 'Helvetica Neue, Helvetica, Arial, sans-serif',
+    },
+    y: {
+      // label: 'Algorithm',
+      // label: null,
+      // domain: data.map(d => d.dataset),
+      // axis: null,
+      // tickFormat: 's',
+      // inset: 0.1,
+      grid: true,
+      label: `${egwalkerName} state size (smaller is better)`,
+    },
+    x: {
+      label: 'Events processed, in thousands',
+      fontSize: "20px",
+      grid: true,
+      // domain: [0, 105],
+      // type: 'linear',
+      // nice: true,
+      // type: 'log',
+      axis: 'bottom',
+      // tickSpacing: 50,
+      // marginBottom: 40,
+      // labelOffset: 40,
+      // tickFormat: '1s',
+      // tickSize: 4,
+      // tickSpacing: 40,
+      // strokeOpacity: 1,
+      // tickFormat: (a, b, c) => formatMs(a),
+    },
+    color: {
+      scheme: "Dark2"
+    },
+    marks: [
+      // Plot.ruleY([0], {opacity: 0.5}),
+      Plot.ruleY([0], {}),
+      Plot.line([
+        ...ff_on.map(([x, y]) => [x, y, 'ff_on']),
+        ...ff_off.map(([x, y]) => [x, y, 'ff_off']),
+      ], {
+        // color: d => d[2],
+        stroke: d => d[2],
+      }),
+      Plot.tip(['Without clearing'], {
+        x: ff_off[50][0],
+        y: ff_off[50][1],
+        anchor: 'bottom-right',
+        dy: -3,
+      }),
+      Plot.tip(['With clearing'], {
+        x: ff_on[80][0],
+        y: ff_on[80][1],
+        anchor: 'bottom',
+        dy: -3,
+      }),
+    ]
+  })
+}
 
 
 savePlot(plotTimes(), "timings.svg")
@@ -1063,3 +1172,4 @@ savePlot(plotMemusage(), "memusage.svg")
 savePlot(plotSizeBig(), 'filesize_full.svg')
 savePlot(plotSizeSmol(), 'filesize_smol.svg')
 savePlot(plotFF(), "ff.svg")
+// savePlot(plotFFSize(), "ff_chart.svg")
