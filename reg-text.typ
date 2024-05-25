@@ -1004,9 +1004,14 @@ This breakthrough makes it possible for decentralised, local-first software @Kle
     name,
     type,
     str(repeats),
-    str(calc.round(data.total_keystrokes / 1000)),
-    str(calc.round(data.concurrency_estimate, digits: 2)),
-    str(data.graph_rle_size),
+    str(calc.round(data.total_keystrokes / 1000)), // total events (k)
+
+    // Other columns:
+    // str(calc.round(100 * data.num_insert_keystrokes / data.total_keystrokes, digits: 1)), // % insert events
+    // str(calc.round(data.num_insert_keystrokes / 1000)), // number of insert events
+    // str(calc.round(data.num_delete_keystrokes / 1000)), // number of delete events
+    str(calc.round(data.concurrency_estimate, digits: 2)), // concurrency estimate
+    str(data.graph_rle_size), // number of nodes in the causal graph
     str(num_authors),
     str(calc.round(100 * data.final_doc_len_chars / data.num_insert_keystrokes, digits: 1)),
     // str(calc.round(data.op_stats.len / 1000, digits: 1)),
@@ -1025,6 +1030,8 @@ This breakthrough makes it possible for decentralised, local-first software @Kle
       [*Type*],
       [*Repeats*],
       [*Events (k)*],
+      // [*Inserts (k)*],
+
       [*Avg Concurrency*],
       [*Graph runs*],
       [*Authors*],
@@ -1079,7 +1086,7 @@ All contributors to the traces have given their consent for their recorded keyst
 The asynchronous traces are derived from public data on GitHub.
 
 The recorded editing traces originally varied a great deal in length.
-To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters (with the exception of S3, which significantly exceeds this size).
+To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters (with the exception of S3, which is approximately twice this size).
 We did this by duplicating the shorter event graphs multiple times in our data files, without introducing any concurrency (that is, all events from one run of the trace happen either before or after all events from another run).
 We repeat the original S1 and S2 traces 3 times, the original C1 and C2 traces 25 times, and the original A2 trace twice.
 The statistics given in @traces-table are after duplication.
