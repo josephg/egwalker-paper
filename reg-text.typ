@@ -1,12 +1,5 @@
-// #import "@preview/cetz:0.1.2": canvas, plot, draw
-// #import "@preview/fletcher:0.2.0" as fletcher: node, edge
 #import "@preview/fletcher:0.3.0" as fletcher: node, edge
 #import "@preview/ctheorems:1.1.2": *
-#import "@preview/algo:0.3.3": algo, i, d, comment, code
-// #import "@preview/lovelace:0.1.0": *
-#import "@preview/algorithmic:0.1.0": algorithm
-#import "@preview/cetz:0.1.2"
-#import "charts.typ"
 #show: thmrules.with(qed-symbol: $square$)
 
 // Might be worth pulling these two fields in from a config file instead
@@ -826,7 +819,7 @@ Document edits by the local user or applying non-concurrent remote events do not
 // For completeness, we also measured the time taken to process local editing events. However, all of the systems we tested can process events many orders of magnitude much faster than any human's typing speed. We have not shown this data as at that speed, the differences between systems are irrelevant.
 
 #figure(
-  text(8pt, charts.speed_merge),
+  text(8pt, image("diagrams/timings.svg")),
   caption: [
     The CPU time taken by each algorithm to merge all events in each trace (as received from a remote replica), or to reload the resulting document from disk. The CRDT implementations (Ref CRDT, Automerge and Yjs) take the same amount of time to merge changes as they do to subsequently load the document. The red line at 16 ms indicates the time budget available to an application that wants to show the results of an operation by the next frame, assuming a display with a 60 Hz refresh rate.
   ],
@@ -848,7 +841,7 @@ To quantify this effect, we compare #algname's performance with a version of the
 We see that the optimisation is effective for S1, S2, S3, and A1, whereas for C1, C2, and A2 it makes little difference (A2 contains no critical versions).
 
 #figure(
-  text(8pt, charts.speed_ff),
+  text(8pt, image("diagrams/ff.svg")),
   caption: [
     Time taken for #algname to merge all events in a trace, with and without the optimisations from @clearing.
   ],
@@ -883,7 +876,7 @@ The reason is that our OT implementation memoizes intermediate transformed opera
 This memory use could be reduced at the cost of increased merge times.
 
 #figure(
-  text(7pt, charts.memusage_all),
+  text(7pt, image("diagrams/memusage.svg")),
   caption: [
     RAM used while merging an editing trace received from another replica. #algname and OT only retain the current document text in the steady state, but need additional RAM at peak while merging concurrent changes.
   ],
@@ -911,7 +904,7 @@ Our encoding is smaller than Yjs on all traces. The overhead of storing the even
 // Using this scheme, #algname can still merge editing events and load the document text directly from disk.
 
 #figure(
-  text(8pt, charts.filesize_full),
+  text(8pt, image("diagrams/filesize_full.svg")),
   caption: [
     File size storing edit traces using #algname's event graph encoding (with and without final document caching) compared to Automerge. The lightly shaded region in each bar shows the concatenated length of all stored text. This acts as lower bound on the file size.
   ],
@@ -920,7 +913,7 @@ Our encoding is smaller than Yjs on all traces. The overhead of storing the even
 ) <chart-dt-vs-automerge>
 
 #figure(
-  text(8pt, charts.filesize_smol),
+  text(8pt, image("diagrams/filesize_smol.svg")),
   caption: [File size storing edit traces in which deleted text content has been omitted, as is the case with Yjs. The lightly shaded region in each bar is the size of the final document, which is a lower bound on the file size.],
   kind: image,
   placement: top,
