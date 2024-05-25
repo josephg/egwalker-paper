@@ -15,10 +15,10 @@ use diamond_types_crdt::list::ListCRDT;
 use rand::Rng;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
-use serde::de::Unexpected::Option;
 use smallvec::SmallVec;
 use smartstring::alias::String as SmartString;
 use yrs::{GetString, OffsetKind, Options, ReadTxn, StateVector, Text, TextRef, Transact, Update};
+use yrs::block::ClientID;
 use yrs::updates::decoder::Decode;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -51,16 +51,25 @@ trait TextCRDT: Clone {
     fn merge_from(&mut self, other: &mut Self);
 
     fn commit(&mut self) {}
-    fn fork(&mut self) -> Self;
+    fn fork(&mut self, actor_hint: usize) -> Self;
+
+    fn set_agent(&mut self, actor: usize);
+
     // fn local_del(&mut self, range: Range<usize>);
     //
     // fn local_ins(&mut self, pos: usize, content: &str);
+}
+
+fn am_agent_for_agentid(agent: usize) -> ActorId {
+    let bytes = agent.to_be_bytes();
+    ActorId::from(bytes)
 }
 
 type AutomergeCRDT = (AutoCommit, automerge::ObjId);
 impl TextCRDT for AutomergeCRDT {
     fn new() -> Self {
         let mut doc = AutoCommit::new();
+        doc.set_actor(ActorId::from(&[0xff])); // We'll make the root object with a dummy "root" ActorId
         let id = doc.put_object(automerge::ROOT, "text", ObjType::Text).unwrap();
         (doc, id)
     }
@@ -83,9 +92,18 @@ impl TextCRDT for AutomergeCRDT {
         self.0.commit();
     }
 
-    fn fork(&mut self) -> Self {
+    fn fork(&mut self, _agent_hint: usize) -> Self {
         (self.0.fork(), self.1.clone())
     }
+
+    fn set_agent(&mut self, agent: usize) {
+        self.0.set_actor(am_agent_for_agentid(agent));
+    }
+}
+
+fn to_yjs_agent(agent: usize) -> ClientID {
+    // Yjs's ClientID is a u64.
+    agent as ClientID
 }
 
 type YrsCRDT = (yrs::Doc, TextRef);
@@ -144,7 +162,7 @@ impl TextCRDT for YrsCRDT {
         txn.commit();
     }
 
-    fn fork(&mut self) -> Self {
+    fn fork(&mut self, agent_hint: usize) -> Self {
 
         // Bleh I want to just call clone but then the client IDs match. And there's no way to
         // change the client ID once an object has been created.
@@ -155,6 +173,7 @@ impl TextCRDT for YrsCRDT {
         let mut opts = Options::default();
         opts.offset_kind = OffsetKind::Utf16;
         opts.guid = self.0.options().guid.clone();
+        opts.client_id = to_yjs_agent(agent_hint);
 
         let doc2 = yrs::Doc::with_options(opts);
         let update = self.0.transact().encode_state_as_update_v2(&StateVector::default());
@@ -163,16 +182,26 @@ impl TextCRDT for YrsCRDT {
 
         (doc2, r)
     }
+
+    fn set_agent(&mut self, agent: usize) {
+        // Since there's no way to do this using the yjs API directly, I'll fork the document. Bleh.
+        let client_id = to_yjs_agent(agent);
+        if self.0.options().client_id != client_id {
+            let result = self.fork(agent);
+            self.0 = result.0;
+            self.1 = result.1;
+        }
+    }
 }
 
-fn random_str(len: usize) -> String {
-    let mut str = String::new();
-    let alphabet: Vec<char> = "abcdefghijklmnop ".chars().collect();
-    for _ in 0..len {
-        str.push(alphabet[rand::thread_rng().gen_range(0..alphabet.len())]);
-    }
-    str
-}
+// fn random_str(len: usize) -> String {
+//     let mut str = String::new();
+//     let alphabet: Vec<char> = "abcdefghijklmnop ".chars().collect();
+//     for _ in 0..len {
+//         str.push(alphabet[rand::thread_rng().gen_range(0..alphabet.len())]);
+//     }
+//     str
+// }
 
 
 type DTCRDT = (ListCRDT, u16);
@@ -196,10 +225,14 @@ impl TextCRDT for DTCRDT {
         other.0.replicate_into(&mut self.0);
     }
 
-    fn fork(&mut self) -> Self {
+    fn fork(&mut self, actor_hint: usize) -> Self {
         let mut new_doc = self.0.clone();
-        let agent = new_doc.get_or_create_agent_id(&random_str(10));
+        let agent = new_doc.get_or_create_agent_id(&format!("{:#010x}", actor_hint)); // 10 because the leading "0x" is counted.
         (new_doc, agent)
+    }
+
+    fn set_agent(&mut self, actor: usize) {
+        self.1 = self.0.get_or_create_agent_id(&format!("{:#010x}", actor)); // 10 because the leading "0x" is counted.
     }
 }
 
@@ -222,16 +255,21 @@ fn process<C: TextCRDT>(history: &EditHistory) -> C {
     let mut doc_at_idx: HashMap<usize, (C, usize)> = HashMap::new();
     doc_at_idx.insert(usize::MAX, (doc, num_roots));
 
-    fn take_doc<C: TextCRDT>(doc_at_idx: &mut HashMap<usize, (C, usize)>, idx: usize) -> C {
+    fn take_doc<C: TextCRDT>(doc_at_idx: &mut HashMap<usize, (C, usize)>, agent: Option<usize>, idx: usize) -> C {
         let (parent_doc, retains) = doc_at_idx.get_mut(&idx).unwrap();
-        if *retains == 1 {
+        let mut doc = if *retains == 1 {
             // We'll just take the document.
             doc_at_idx.remove(&idx).unwrap().0
         } else {
             // Fork it and take the fork.
             *retains -= 1;
-            parent_doc.fork()
+            parent_doc.fork(agent.unwrap_or(0))
+        };
+
+        if let Some(agent) = agent {
+            doc.set_agent(agent);
         }
+        doc
     }
 
     // doc_at_idx.insert(usize::MAX)
@@ -247,11 +285,11 @@ fn process<C: TextCRDT>(history: &EditHistory) -> C {
         // First we need to get the doc we're editing.
         let (&first_p, rest_p) = entry.parents.split_first().unwrap_or((&usize::MAX, &[]));
 
-        let mut doc = take_doc(&mut doc_at_idx, first_p);
+        let mut doc = take_doc(&mut doc_at_idx, Some(entry.agent), first_p);
 
         // If there's any more parents, merge them together.
         for p in rest_p {
-            let mut doc2 = take_doc(&mut doc_at_idx, *p);
+            let mut doc2 = take_doc(&mut doc_at_idx, None, *p);
             doc.merge_from(&mut doc2);
         }
 
@@ -399,39 +437,39 @@ fn gen_main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-const DATASETS: &[&str] = &["automerge-paper", "seph-blog1", "clownschool", "friendsforever"];
-// const DATASETS: &[&str] = &["automerge-paper", "seph-blog1"];
-
-fn bench_process(c: &mut Criterion) {
-
-    for &name in DATASETS {
-
-        let mut group = c.benchmark_group("automerge");
-
-        // let name = "friendsforever";
-        let filename = format!("{name}.am");
-        let bytes = std::fs::read(&filename).unwrap();
-
-        group.bench_function(BenchmarkId::new( "remote", name), |b| {
-            b.iter(|| {
-                let doc = AutoCommit::load(&bytes).unwrap();
-                // black_box(doc);
-                let (_, text_id) = doc.get(automerge::ROOT, "text").unwrap().unwrap();
-                let result = doc.text(text_id).unwrap();
-                black_box(result);
-            })
-        });
-    }
-}
-
-fn bench_main() {
-    // benches();
-    let mut c = Criterion::default()
-        .configure_from_args();
-
-    bench_process(&mut c);
-    c.final_summary();
-}
+// const DATASETS: &[&str] = &["automerge-paper", "seph-blog1", "clownschool", "friendsforever"];
+// // const DATASETS: &[&str] = &["automerge-paper", "seph-blog1"];
+//
+// fn bench_process(c: &mut Criterion) {
+//
+//     for &name in DATASETS {
+//
+//         let mut group = c.benchmark_group("automerge");
+//
+//         // let name = "friendsforever";
+//         let filename = format!("{name}.am");
+//         let bytes = std::fs::read(&filename).unwrap();
+//
+//         group.bench_function(BenchmarkId::new( "remote", name), |b| {
+//             b.iter(|| {
+//                 let doc = AutoCommit::load(&bytes).unwrap();
+//                 // black_box(doc);
+//                 let (_, text_id) = doc.get(automerge::ROOT, "text").unwrap().unwrap();
+//                 let result = doc.text(text_id).unwrap();
+//                 black_box(result);
+//             })
+//         });
+//     }
+// }
+//
+// fn bench_main() {
+//     // benches();
+//     let mut c = Criterion::default()
+//         .configure_from_args();
+//
+//     bench_process(&mut c);
+//     c.final_summary();
+// }
 
 fn run_automerge(filename: &Path) {
     println!("Processing {}... to automerge", filename.to_string_lossy());
@@ -468,6 +506,7 @@ fn run_automerge(filename: &Path) {
     // assert_eq!(result, history.end_content);
 }
 
+#[allow(unused)]
 fn run_dt(filename: &Path) {
     // let history = load_history(&format!("{filename}.json"));
     let history = load_history(filename);
