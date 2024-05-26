@@ -25,14 +25,7 @@
   background: background
 )
 
-// 10pt text with 12pt leading
-#set text(font: "Linux Libertine", size: 10pt)
 #let spacing = 0.55em
-#set par(justify: true, first-line-indent: 1em, leading: spacing)
-#show par: set block(spacing: spacing)
-//#show math.equation: set text(font: "Libertinus Math")
-
-#set heading(numbering: "1.1.1")
 
 // Heading formatting from https://gist.github.com/vtta/d6268ba81ebfdd1dc573db4b72df8436
 #show heading: it => locate(loc => {
@@ -97,7 +90,7 @@
     Submission ID: 223
   ])
 } else {
-  align(center, text(20pt)[*Collaborative Text Editing: Better, Faster, Smaller*])
+  align(center, text(20pt)[*Collaborative Text Editing with Eg-walker:\ Better, Faster, Smaller*])
   grid(
     columns: (1fr, 1fr),
     align(center, text(12pt)[
@@ -112,6 +105,14 @@
     ])
   )
 }
+
+// 10pt text with 12pt leading
+#set text(font: "Linux Libertine", size: 10pt)
+#set par(justify: true, first-line-indent: 1em, leading: spacing)
+#show par: set block(spacing: spacing)
+//#show math.equation: set text(font: "Libertinus Math")
+
+#set heading(numbering: "1.1.1")
 
 #columns(2, gutter: 8mm, [
 
@@ -978,6 +979,7 @@ This breakthrough makes it possible for decentralised, local-first software @Kle
   #heading(numbering: none, [Acknowledgements])
 
   This work was made possible by the generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have been possible without financial support and the endless conversations we have shared about collaborative editing.
+  Martin Kleppmann gratefully acknowledges his crowdfunding supporters including Mintter and SoftwareMill.
   Thank you to Matthew Weidner and Joe Hellerstein for feedback on a draft of this paper.
 ]
 
