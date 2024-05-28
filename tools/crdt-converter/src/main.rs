@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 use argh::FromArgs;
-use std::collections::HashMap;
+use std::collections::{BinaryHeap, HashMap};
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
@@ -17,7 +17,7 @@ use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use smartstring::alias::String as SmartString;
-use yrs::{GetString, OffsetKind, Options, ReadTxn, StateVector, Text, TextRef, Transact, Update};
+use yrs::{GetString, OffsetKind, Options, ReadTxn, StateVector, Text, TextRef, Transact, Update, Uuid};
 use yrs::block::ClientID;
 use yrs::updates::decoder::Decode;
 
@@ -40,6 +40,48 @@ pub struct HistoryEntry {
     agent: usize,
     // op: TextOperation,
     patches: SmallVec<[SimpleTextOp; 2]>,
+}
+
+
+fn check_history(hist: &EditHistory) {
+    // Each entry in the history must come causally after all other entries with the same agent.
+    // Let's check thats actually true!
+
+    let mut last_idx_for_agent = vec![usize::MAX; hist.num_agents];
+    for (i, e) in hist.txns.iter().enumerate() {
+        let agent = e.agent;
+        let prev = last_idx_for_agent[agent];
+
+        if prev != usize::MAX {
+            // Check that prev comes causally before i. The first item with the same agent that
+            // we run into in the BFS expansion must be prev.
+            let mut queue = BinaryHeap::new();
+            for parent in e.parents.iter() {
+                queue.push(*parent);
+            }
+
+            while let Some(p_i) = queue.pop() {
+                let p_e = &hist.txns[p_i];
+
+                while let Some(peek_i) = queue.peek() { // Handle graph merging.
+                    if *peek_i != p_i { break; }
+                    queue.pop();
+                }
+
+                if p_e.agent == agent {
+                    assert_eq!(p_i, prev, "Nonlinear edits from agent {agent}: {i} should come after {prev} but instead we found {p_i}");
+                    break;
+                }
+
+                for parent in p_e.parents.iter() {
+                    queue.push(*parent);
+                }
+            }
+
+        }
+
+        last_idx_for_agent[agent] = i;
+    }
 }
 
 
@@ -110,6 +152,9 @@ type YrsCRDT = (yrs::Doc, TextRef);
 impl TextCRDT for YrsCRDT {
     fn new() -> Self {
         let mut opts = Options::default();
+        opts.client_id = to_yjs_agent(0xffff); // Make it deterministic.
+        opts.guid = Uuid::from("DET_PLACEHOLDER"); // This is a bit dirty, but seems fine?
+
         // This also isn't quite right. We're actually using unicode offsets, so this will corrupt
         // if any characters are outside the unicode BMP.
         opts.offset_kind = OffsetKind::Utf16;
@@ -170,13 +215,12 @@ impl TextCRDT for YrsCRDT {
         // dbg!(self.0.client_id(), r.0.client_id());
         // r
 
-        let mut opts = Options::default();
-        opts.offset_kind = OffsetKind::Utf16;
-        opts.guid = self.0.options().guid.clone();
+        let update = self.0.transact().encode_state_as_update_v2(&StateVector::default());
+
+        let mut opts = self.0.options().clone();
         opts.client_id = to_yjs_agent(agent_hint);
 
         let doc2 = yrs::Doc::with_options(opts);
-        let update = self.0.transact().encode_state_as_update_v2(&StateVector::default());
         doc2.transact_mut().apply_update(Update::decode_v2(&update).unwrap());
         let r = doc2.get_or_insert_text("text");
 
@@ -242,6 +286,7 @@ fn load_history<P: AsRef<Path>>(filename: P) -> EditHistory {
 }
 
 fn process<C: TextCRDT>(history: &EditHistory) -> C {
+    check_history(history);
     let doc = C::new();
 
     // There should be exactly one entry with no parents.
@@ -276,7 +321,7 @@ fn process<C: TextCRDT>(history: &EditHistory) -> C {
 
     // let mut root = Some(doc);
     let len = history.txns.len();
-    dbg!(len);
+    // dbg!(len);
     let dot_every = (len / 30) + 1;
 
     for (idx, entry) in history.txns.iter().enumerate() {
@@ -524,7 +569,7 @@ fn run_yrs(filename: &Path) {
     if content != history.end_content {
         std::fs::write("a", &history.end_content).unwrap();
         std::fs::write("b", &content).unwrap();
-        eprintln!("WARNING: Does not match! Written to a / b");
+        eprintln!("WARNING: Yjs output does not match expected output! Written to a / b");
         // panic!("Does not match! Written to a / b");
     }
     // assert_eq!(content, history.end_content, "content does not match");
