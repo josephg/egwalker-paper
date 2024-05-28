@@ -1,4 +1,4 @@
-.phony: all cargo_magic clean
+.phony: all cargo_magic clean all_datasets am_datasets yjs_datasets
 all: reg-text.pdf
 # all: $(ALL_JSON) $(DIAGRAMS)
 
@@ -22,6 +22,9 @@ ALL_JSON = $(patsubst %,datasets/%.json,$(DATASET))
 ALL_YJS = $(patsubst %,datasets/%.yjs,$(DATASET))
 ALL_AM = $(patsubst %,datasets/%.am,$(DATASET))
 
+yjs_datasets: $(ALL_YJS)
+am_datasets: $(ALL_AM)
+all_datasets: $(ALL_JSON) $(ALL_DT) $(ALL_YJS) $(ALL_AM)
 
 DT_BENCHES = \
 	$(patsubst %,target/criterion/dt/merge_norm/%/base/estimates.json,$(DATASET)) \
@@ -123,7 +126,7 @@ $(DT_BENCH_TOOL): cargo_magic
 	cd tools/diamond-types && cargo build --release -p bench
 
 target/criterion/dt/%/base/estimates.json: $(DT_BENCH_TOOL) $(ALL_DT)
-	@echo "Sleeping for 5 seconds to cool down CPU..."
+	@echo "DT - Sleeping for 5 seconds to cool down CPU..."
 	@sleep 5
 	taskset 0x1 nice -10 $< --bench $*
 
@@ -143,7 +146,7 @@ $(DTCRDT_BENCH_TOOL): cargo_magic
 	cd tools/diamond-types && cargo build --release -p run_on_old --features bench
 
 target/criterion/dt-crdt/%/base/estimates.json: $(DTCRDT_BENCH_TOOL) $(ALL_DT)
-	@echo "Sleeping for 5 seconds to cool down CPU..."
+	@echo "DT-CRDT - Sleeping for 5 seconds to cool down CPU..."
 	@sleep 5
 	taskset 0x1 nice -10 $< --bench $*
 
@@ -161,8 +164,8 @@ PAPER_BENCH_TOOL = tools/paper-benchmarks/target/release/paper-benchmarks
 $(PAPER_BENCH_TOOL): cargo_magic
 	cd tools/paper-benchmarks && cargo build --release --features bench
 
-target/criterion/automerge/%/base/estimates.json: $(ALL_AM) | $(PAPER_BENCH_TOOL)
-	@echo "Sleeping for 5 seconds to cool down CPU..."
+target/criterion/automerge/%/base/estimates.json: $(PAPER_BENCH_TOOL) $(ALL_AM)
+	@echo "AM - Sleeping for 5 seconds to cool down CPU..."
 	@sleep 5
 	taskset 0x1 nice -10 $< --bench $*
 
@@ -181,7 +184,7 @@ $(OT_BENCH_TOOL): cargo_magic
 	cd tools/ot-bench && cargo build --release --features bench
 
 target/criterion/ot/%/base/estimates.json: $(OT_BENCH_TOOL) $(ALL_AM)
-	@echo "Sleeping for 5 seconds to cool down CPU..."
+	@echo "OT - Sleeping for 5 seconds to cool down CPU..."
 	@sleep 5
 	taskset 0x1 nice -10 $< --bench $*
 
