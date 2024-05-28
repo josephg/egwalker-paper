@@ -888,20 +888,23 @@ This memory use could be reduced at the cost of increased merge times.
 
 == Storage size
 
-Our binary encoding of event graphs (@storage) results in smaller files than the equivalent internal CRDT state persisted by Automerge or Yjs.
+Our binary encoding of event graphs (@storage) results in smaller files than the equivalent internal CRDT state persisted by Automerge, and in many cases, Yjs.
 To ensure a like-for-like comparison we have disabled #algname's built-in LZ4 and Automerge's built-in gzip compression. Enabling this compression further reduces the file sizes.
 
 // TODO: I wonder if it would be worth adding zlib compression (matching automerge)? It would be a small change.
 
 Automerge stores the full editing history of a document, and @chart-dt-vs-automerge shows the resulting file sizes relative to the raw concatenated text content of all insertions, with and without a cached copy of the final document state (to enable fast loads).
-Even with this additional document text, #algname's files are smaller on all traces except S1.
+// Even with this additional document text, #algname's files are smaller on all traces except S1.
 
 // TODO: Is this worth adding?
 // Note that storing the raw editing trace in this compact form removes one of the principle benefits of #algname, as the event graph must be replayed in order to determine the current document text. To improve load time, the current text content can be cached and stored alongside the event graph on disk. Alternately, the transformed operation positions can also be stored in the file. In our testing, this resulted in a tiny increase in file size while improving load performance by an order of magnitude.
 
-In contrast, Yjs only stores the text of the final, merged document. This results in a smaller file size, at the cost of making it impossible to reconstruct earlier document states.
+In contrast, Yjs only stores the resulting document text, and any data needed to merge changes.
+Yjs does not store deleted characters or the _happened before_ relationship between events.
+// (Ie, Yjs does not store the edges in the event graph.)
 @chart-dt-vs-yjs compares Yjs to the equivalent event graph encoding in which we only store the final document text and operation metadata.
-Our encoding is smaller than Yjs on all traces. The overhead of storing the event graph is between 20% and 3$times$ the final plain text file size.
+Our encoding is smaller than Yjs on the sequential and async traces, but larger for the concurrent traces, where the edges in the event graph take a nontrivial amount of space.
+The overhead of storing the event graph is between 20% and 3$times$ the final plain text file size.
 // Using this scheme, #algname can still merge editing events and load the document text directly from disk.
 
 #figure(
