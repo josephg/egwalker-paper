@@ -850,7 +850,7 @@ We see that the optimisation is effective for S1, S2, S3, and A1, whereas for C1
   placement: top,
 ) <speed-ff>
 
-Automerge's merge times on traces C1 and C2 are outliers. This appears to be a bug, which we have reported.
+// Automerge's merge times on traces C1 and C2 are outliers. This appears to be a bug, which we have reported.
 
 When merging an event graph with very high concurrency (like A2), the performance of #algname is highly dependent on the order in which events are traversed.
 A poorly chosen traversal order can make this trace as much as 8$times$ slower to merge. Our topological sort algorithm (@graph-walk) tries to avoid such pathological cases.
@@ -868,9 +868,9 @@ Note that peak memory usage would be lower when replaying a subset of an event g
 
 // (seph): The peak memory usage could be reduced a lot if I first divide up the graph into chunks by the critical versions. Right now, the implementation makes a "merge plan" for the whole thing (which is stored in memory) then processes the entire plan. The plan itself uses up a lot of memory. A better approach would chunk it in sections separated by critical versions. That would dramatically reduce peak memory usage!
 
-Yjs has 2--3$times$ greater memory use than our reference CRDT on most traces, and Automerge an order of magnitude greater.
-Automerge's very high memory use on C1 and C2 is probably a bug.
-The computer we used for benchmarking had enough RAM to prevent swapping in all cases.
+Yjs has up to a 3$times$ greater memory use than our reference CRDT, and Automerge an order of magnitude greater.
+// Automerge's very high memory use on C1 and C2 is probably a bug.
+// The computer we used for benchmarking had enough RAM to prevent swapping in all cases.
 
 OT has the same memory use as #algname in the steady state, but significantly higher peak memory use on the C1, C2, and A2 traces (6.8~GiB for A2).
 The reason is that our OT implementation memoizes intermediate transformed operations to improve performance.
