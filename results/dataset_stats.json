@@ -186,13 +186,13 @@
     "final_document_size": 170307
   },
   "S3": {
-    "file_size": 682717,
-    "smol_size": 178153,
-    "uncompressed_size": 1286536,
-    "uncompressed_smol_size": 220652,
+    "file_size": 729169,
+    "smol_size": 204046,
+    "uncompressed_size": 1376673,
+    "uncompressed_smol_size": 267744,
     "op_stats": {
       "entry_byte_size": 64,
-      "len": 70080,
+      "len": 75607,
       "capacity": 131072
     },
     "graph_stats": {
@@ -205,15 +205,15 @@
       "len": 1,
       "capacity": 4
     },
-    "num_insert_keystrokes": 1151946,
-    "num_delete_keystrokes": 1065556,
-    "total_keystrokes": 2217502,
-    "ins_content_len_utf8": 1152326,
-    "final_doc_len_chars": 86390,
-    "final_doc_len_utf8": 86442,
+    "num_insert_keystrokes": 1230871,
+    "num_delete_keystrokes": 1108600,
+    "total_keystrokes": 2339471,
+    "ins_content_len_utf8": 1231252,
+    "final_doc_len_chars": 122271,
+    "final_doc_len_utf8": 122323,
     "concurrency_estimate": 0.0,
     "graph_rle_size": 1,
     "num_agents": 1,
-    "final_document_size": 86390
+    "final_document_size": 122271
   }
 }

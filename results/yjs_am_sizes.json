@@ -1,30 +1,30 @@
 {
   "S1": {
-    "yjs": 479716,
-    "automergeUncompressed": 877891
+    "yjs": 479708,
+    "automergeUncompressed": 877895
   },
   "S2": {
-    "yjs": 405648,
-    "automergeUncompressed": 1172911
+    "yjs": 405640,
+    "automergeUncompressed": 1172915
   },
   "S3": {
-    "yjs": 255584,
-    "automergeUncompressed": 1776312
+    "yjs": 317745,
+    "automergeUncompressed": 1905262
   },
   "C1": {
-    "yjs": 2366731,
-    "automergeUncompressed": 3156582
+    "yjs": 845328,
+    "automergeUncompressed": 1575493
   },
   "C2": {
-    "yjs": 2754319,
-    "automergeUncompressed": 3838675
+    "yjs": 725734,
+    "automergeUncompressed": 1733113
   },
   "A1": {
-    "yjs": 380835,
-    "automergeUncompressed": 1323415
+    "yjs": 308418,
+    "automergeUncompressed": 1445627
   },
   "A2": {
-    "yjs": 675478,
-    "automergeUncompressed": 1140281
+    "yjs": 506207,
+    "automergeUncompressed": 1113502
   }
 }
