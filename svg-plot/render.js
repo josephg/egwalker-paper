@@ -237,7 +237,7 @@ const plotTimes = () => {
       //   strokeWidth: 1,
       //   inset: 2,
       // }),
-      Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5, inset: -7}),
+      Plot.ruleX([1000/60], {stroke: '#800000', strokeOpacity: 0.5, inset: -4}),
       Plot.barX(data, {
         y: 'dataset',
         fy: 'type',
@@ -431,7 +431,7 @@ const plotMemusage = () => {
       label: 'RAM used, log scale. (Less is better)',
       fontSize: "20px",
       grid: true,
-      domain: [baseline, 100e9],
+      domain: [baseline, 20e9],
       // type: 'linear',
       // nice: true,
       type: 'log',
@@ -820,7 +820,7 @@ const plotSizeBig = () => {
   ]
 
   // console.log(data)
-  return plotSize(algnames, data, totals, 4.3e6)
+  return plotSize(algnames, data, totals, 2e6)
 }
 
 const plotSizeSmol = () => {
@@ -873,7 +873,7 @@ const plotSizeSmol = () => {
 
 
   // console.log(data)
-  return plotSize(algnames, data, totals, 3e6, {
+  return plotSize(algnames, data, totals, 1.3e6, {
     marginLeft: 120,
     height: 230,
   })
