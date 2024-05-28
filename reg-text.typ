@@ -981,7 +981,7 @@ This breakthrough makes it possible for decentralised, local-first software @Kle
 #if not anonymous [
   #heading(numbering: none, [Acknowledgements])
 
-  This work was made possible by the generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have been possible without financial support and the endless conversations we have shared about collaborative editing.
+  This work was made possible by the generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have happened without help. Thankyou for the endless conversations we have shared about collaborative editing.
   Martin Kleppmann gratefully acknowledges his crowdfunding supporters including Mintter and SoftwareMill.
   Thank you to Matthew Weidner and Joe Hellerstein for feedback on a draft of this paper.
 ]
