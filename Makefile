@@ -53,6 +53,7 @@ ALL_BENCHES = $(DT_BENCHES) $(DT_CRDT_BENCHES) $(YRS_BENCHES) $(AM_BENCHES) $(OT
 
 ALL_RESULTS = \
 	results/automerge_memusage.json \
+	results/yrs_memusage.json \
 	results/dtcrdt_memusage.json \
 	results/dt_memusage.json \
 	results/ot_memusage.json \

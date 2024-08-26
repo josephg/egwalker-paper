@@ -16,59 +16,154 @@ A rough breakdown of the files and folders:
 
 This repository contains everything you need to fully reproduce all results in the paper.
 
-### Step 0: Prerequisites
+### Short version:
 
-**OS:** We have run all our benchmarks on linux, but the following steps should work on other broadly supported operating systems (like macos).
+Install rust and nodejs.
+
+Using make:
+
+```
+make clean
+make
+```
+
+Using shell scripts:
+
+```
+./step1-prepare.sh
+./step2-bench.sh
+
+node collect.js
+
+```
+
+Run `make clean` then `make`. Then go out and enjoy your life. The full benchmark suite takes about 15 hours to run.
+
+You can use `git diff` on `results/timings.json` to see how your data compares to ours.
+
+
+### Step 0: Prerequisites
 
 **Tools:** You will need the following tools installed on your computer:
 
 - *Rust compiler & toolchain*: Any "recent" version of rust should work. The published version of the paper used rust 1.78. The easiest way to install rust is via [rustup](https://rustup.rs/).
-- *NodeJS*: Nodejs is only used for scripting - like extracting benchmarking results into 'clean' JSON files and generating the charts used in the paper.
+- *NodeJS*: *(optional)* Nodejs is only used for scripting - like extracting benchmarking results into 'clean' JSON files and generating the charts used in the paper.
 
-To get started, you'll need a recent version of nodejs and rust installed on your system. We used node v21 and rust 1.78. You will also need at least 44GB of RAM to run the automerge C2 benchmark.
+We used rust 1.78 and nodejs v21 when generating the results in the current version of the paper.
 
 This process has only been tested on linux, but it *should* work on other broadly supported platforms (like macos) too.
 
-Then run:
+
+
+
+### Step 1: Preparing the data (OPTIONAL)
+
+The 7 raw editing traces are checked into the repository at `datasets/raw`. These files are stored in the diamond types packed binary format.
+
+Before the benchmarks can be run, we do the following preprocessing steps on these files:
+
+1. The traces are "duplicated" to make them all about the same size. (For example, `datasets/raw/friendsforever.dt` is duplicated 25 times and repacked as `datasets/C1.dt`).
+2. The datasets are exported as JSON
+3. The JSON traces are converted to "native" Yjs and Automerge formats.
+
+Conversion is slow, and **this step is optional**. For convenience, the converted files are already checked into git in the datasets directory.
+
+The first 2 steps make use of a CLI tool in `tools/diamond-types/crates/dt-cli`. The final step uses `tools/crdt-converter`. Both tools are built automatically.
+
+You can re-run step 1 as follows:
 
 ```
-$ make clean
-$ make
+rm datasets/*
+./step1-prepare.sh
 ```
 
-It takes about 24 hours to run all of the benchmarks. Almost all of this time is taken up by:
+Output: `datasets/*.am, *.yjs, *.json`
 
-- automerge/C1 (3hrs for 100 samples)
-- automerge/C2 (11.5hrs for 100 samples)
-- OT/A2 (10 hours for 10 samples).
 
-The results we used to generate the paper are stored as a set of JSON files in `results/`. `make clean` will remove all current benchmark results.
+### Step 2: Benchmarking
 
-On MacOS, you may need to install gnumake and then invoke the makefile with `gmake` instead. YMMV.
+There's a series of benchmarks to run. For each algorithm, for each editing trace, we do the following tests:
 
-The makefile also contains the commands to re-convert the datasets in datasets/raw to JSON, Yjs and Automerge formats. This conversion has already been done (and the results are checked in to this repository). But if you want to regenerate them for any reason, you can delete datasets/* and run `make` again.
+- Measure memory usage
+- Measure time taken to merge in the editing trace (as if from a remote peer)
+
+Algorithms:
+
+- DT (our optimised reference egwalker implementation)
+- DT-CRDT (our reference CRDT implementation)
+- Automerge
+- Yjs
+- Yrs (Yjs rust port)
+- OT (our reference OT implementation)
+
+**Note:** Our OT implementation takes 1 hour to replay the A2 editing trace.
+
+We consider the core benchmark in the paper to be the "remote time" - which is the amount of time (& memory usage) taken when merging all remote edits over the network.
+
+We do this test for automerge, yjs (/ yrs), diamond-types (our optimized eg-walker implementation), dtcrdt (our reference CRDT implementation) and our reference OT implementation.
+
+Each speed benchmark also has a corresponding memory usage benchmark, initiated with a different command.
+
+Measure memory usage (time estimate: 1h10min):
+
+```
+./step2a-memusage.sh
+```
+
+Benchmark remote merging across all algorithms (time estimate: **12 hours**):
+
+```
+./step2b-benchmarks.sh
+```
+
+Output: Lots of files in `results/`. Criterion benchmarks are stored in directories like `target/criterion/automerge/remote/A1/`
+
+
+### Step 3: Collation
+
+Most of the benchmarks are done using [Criterion.rs](https://github.com/bheisler/criterion.rs). Criterion results are stored in JSON files like `target/criterion/automerge/remote/A1/base/estimates.json`. (Criterion also records the time taken for every sample, and various other cool things! Take a look at `target/criterion/report/index.html` in your browser!)
+
+The next step is pulling that data out into simple, usable json file.
+
+Time taken: 1 second
+
+```
+node collect.js
+```
+
+This creates `results/timings.json`, which is used for many of the charts. It also emits `results/yjs_am_sizes.json` containing the file sizes for the yjs & automerge binary formats.
+
+Our experimental results are checked in to git. If you're trying to reproduce our experimental results, you can run `git diff results/timings.json` to see how your remote merge times differed from ours.
+
+
+### Step 4: Generate charts (OPTIONAL)
+
+Our diagrams are generated by our `svg-plot` tool. You can regenerate them like this:
+
+```
+cd svg-plot
+npm i # only needed once to install dependencies
+
+node render.js
+```
+
+This tool outputs a set of SVGs in `diagrams/*.svg`
+
+### Step 5: Generate the paper (OPTIONAL)
+
+Our paper is written using [typst](https://typst.app) (a modern replacement for LaTeX). You can install typst using `cargo install typst-cli` then generate the paper with this command
+
+```
+typst compile reg-text.typ
+```
 
 ---
 
 The paper text is copyright of the authors. All rights reserved unless otherwise indicated.
 
-The raw editing traces are available at [josephg/editing-traces](https://github.com/josephg/editing-traces). They are mostly licensed under various creative commons licenses. See that repository for details.
+Most of the raw editing traces are also available at [josephg/editing-traces](https://github.com/josephg/editing-traces). See that repository for details & licensing information.
 
 All source code (Code in `tools/` folder) is provided herein is licensed under the ISC license:
-
----
-
-### Tools directory
-
-The `tools` directory contains the source code used for benchmarking:
-
-- `tools/diamond-types`: Snapshot of [diamond types](https://github.com/josephg/diamond-types), which contains our optimised implementation of the algorithm. This mirror of the codebase includes hooks for benchmarking that we use to generate the datasets in this paper. Diamond types also contains CLI tools needed to extract traces from a git repository, and query and extract raw data from .dt data files.
-- `tools/diamond-types/crates/paper-stats`: Child crate which analyses some internal stats of DT, used in the paper.
-- `tools/bench-yjs`: Memory and CPU time benchmark for yjs
-- `tools/crdt-converter`: Converter tool to convert editing traces (in .json format) to yjs and automerge formats. (Conversion uses the Yrs fork of yjs)
-- `tools/ot-bench`: Reference implementation of operational transform, and benchmark thereof. This implementation uses memoization to avoid excessive transform calls - which improves performance at a cost of memory usage.
-- `tools/paper-benchmarks`: Benchmarks for various CRDT implementations. The only benchmark result used from this is the benchmarks for automerge - both CPU time and memory benchmarks. This repository also contains benchmarks for some other CRDTs - including Cola, Yrs and JSONJoy. These CRDTs were not included in the final report to save space.
-
 
 ISC License
 
