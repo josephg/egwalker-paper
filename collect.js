@@ -25,6 +25,7 @@ const tests = [
 
   // 'automerge/local',
   'automerge/remote',
+  'yrs/remote',
   // 'cola/local',
   // 'cola-nocursor/local',
 

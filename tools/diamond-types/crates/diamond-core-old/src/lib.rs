@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 
-pub mod alloc;
+// pub mod alloc;
 
 pub type AgentId = u16;
 // pub type ClientSeq = u32;

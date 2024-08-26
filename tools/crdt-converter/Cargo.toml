@@ -15,7 +15,7 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 #diamond-types-crdt = { path = "../diamond-types/crates/diamond-types-crdt" }
 diamond-types-crdt = { path = "../diamond-types/crates/diamond-types-crdt" }
 rand = "0.8.5"
-yrs = "0.18.3"
+yrs = "0.20.0"
 argh = "0.1.12"
 
 [profile.release]
