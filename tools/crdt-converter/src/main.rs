@@ -148,16 +148,22 @@ fn to_yjs_agent(agent: usize) -> ClientID {
     agent as ClientID
 }
 
+fn yrs_opts(agent: Option<usize>) -> Options {
+    let mut opts = Options::default();
+    opts.client_id = to_yjs_agent(agent.unwrap_or(0xffff)); // Make it deterministic.
+    opts.guid = Uuid::from("DET_PLACEHOLDER"); // This is a bit dirty, but seems fine?
+
+    // This also isn't quite right. We're actually using unicode offsets, so this will corrupt
+    // if any characters are outside the unicode BMP.
+    opts.offset_kind = OffsetKind::Utf16;
+
+    opts
+}
+
 type YrsCRDT = (yrs::Doc, TextRef);
 impl TextCRDT for YrsCRDT {
     fn new() -> Self {
-        let mut opts = Options::default();
-        opts.client_id = to_yjs_agent(0xffff); // Make it deterministic.
-        opts.guid = Uuid::from("DET_PLACEHOLDER"); // This is a bit dirty, but seems fine?
-
-        // This also isn't quite right. We're actually using unicode offsets, so this will corrupt
-        // if any characters are outside the unicode BMP.
-        opts.offset_kind = OffsetKind::Utf16;
+        let opts = yrs_opts(None);
         let doc = yrs::Doc::with_options(opts);
         let r = doc.get_or_insert_text("text");
         (doc, r)
@@ -217,8 +223,7 @@ impl TextCRDT for YrsCRDT {
 
         let update = self.0.transact().encode_state_as_update_v2(&StateVector::default());
 
-        let mut opts = self.0.options().clone();
-        opts.client_id = to_yjs_agent(agent_hint);
+        let opts = yrs_opts(Some(agent_hint));
 
         let doc2 = yrs::Doc::with_options(opts);
         doc2.transact_mut().apply_update(Update::decode_v2(&update).unwrap());
@@ -230,7 +235,7 @@ impl TextCRDT for YrsCRDT {
     fn set_agent(&mut self, agent: usize) {
         // Since there's no way to do this using the yjs API directly, I'll fork the document. Bleh.
         let client_id = to_yjs_agent(agent);
-        if self.0.options().client_id != client_id {
+        if self.0.client_id() != client_id {
             let result = self.fork(agent);
             self.0 = result.0;
             self.1 = result.1;
