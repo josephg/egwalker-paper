@@ -522,7 +522,7 @@ fn gen_main() -> Result<(), Box<dyn Error>> {
 // }
 
 fn run_automerge(filename: &Path) {
-    println!("Processing {}... to automerge", filename.to_string_lossy());
+    println!("Converting {} to automerge", filename.to_string_lossy());
     // let history = load_history(&format!("{filename}.json"));
     let history = load_history(filename);
     let (mut doc, text_id) = process::<AutomergeCRDT>(&history);
@@ -566,7 +566,7 @@ fn run_dt(filename: &Path) {
 }
 
 fn run_yrs(filename: &Path) {
-    println!("Processing {} to Yrs...", filename.to_string_lossy());
+    println!("Converting {} to Yrs", filename.to_string_lossy());
     let history = load_history(filename);
     let (doc, text_ref) = process::<YrsCRDT>(&history);
 
