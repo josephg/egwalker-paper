@@ -1,4 +1,4 @@
-.phony: all cargo_magic clean all_datasets am_datasets yjs_datasets
+.phony: all cargo_magic clean all_datasets am_datasets yjs_datasets yrs_benches
 all: reg-text.pdf
 # all: $(ALL_JSON) $(DIAGRAMS)
 
@@ -20,6 +20,7 @@ DATASET = S1 S2 S3 C1 C2 A1 A2
 ALL_DT = $(patsubst %,datasets/%.dt,$(DATASET))
 ALL_JSON = $(patsubst %,datasets/%.json,$(DATASET))
 ALL_YJS = $(patsubst %,datasets/%.yjs,$(DATASET))
+# ALL_YRS = $(patsubst %,datasets/%.yjs,$(DATASET))
 ALL_AM = $(patsubst %,datasets/%.am,$(DATASET))
 
 yjs_datasets: $(ALL_YJS)
@@ -37,10 +38,15 @@ DT_CRDT_BENCHES = \
 AM_BENCHES = \
 	$(patsubst %,target/criterion/automerge/remote/%/base/estimates.json,$(DATASET))
 
+YRS_BENCHES = \
+	$(patsubst %,target/criterion/yrs/remote/%/base/estimates.json,$(DATASET))
+
 OT_BENCHES = \
 	$(patsubst %,target/criterion/ot/%/base/estimates.json,$(DATASET))
 
-ALL_BENCHES = $(DT_BENCHES) $(DT_CRDT_BENCHES) $(AM_BENCHES) $(OT_BENCHES)
+yrs_benches: $(YRS_BENCHES)
+
+ALL_BENCHES = $(DT_BENCHES) $(DT_CRDT_BENCHES) $(YRS_BENCHES) $(AM_BENCHES) $(OT_BENCHES)
 
 # Benchmarks must be run 1 at a time.
 .NOTPARALLEL: $(ALL_BENCHES)
@@ -152,12 +158,15 @@ target/criterion/dt-crdt/%/base/estimates.json: $(DTCRDT_BENCH_TOOL) $(ALL_DT)
 
 
 # Memory usage for automerge
-AM_MEMUSAGE_TOOL = tools/paper-benchmarks/target/memusage/paper-benchmarks
-$(AM_MEMUSAGE_TOOL): cargo_magic
+AM_YRS_MEMUSAGE_TOOL = tools/paper-benchmarks/target/memusage/paper-benchmarks
+$(AM_YRS_MEMUSAGE_TOOL): cargo_magic
 	cd tools/paper-benchmarks && cargo build --profile memusage --features memusage
 
-results/automerge_memusage.json: $(AM_MEMUSAGE_TOOL) $(ALL_AM)
-	$<
+results/automerge_memusage.json: $(AM_YRS_MEMUSAGE_TOOL) $(ALL_AM)
+	$< -a
+
+results/yrs_memusage.json: $(AM_YRS_MEMUSAGE_TOOL) $(ALL_YJS)
+	$< -y
 
 # Benchmarks for automerge
 PAPER_BENCH_TOOL = tools/paper-benchmarks/target/release/paper-benchmarks
@@ -167,7 +176,12 @@ $(PAPER_BENCH_TOOL): cargo_magic
 target/criterion/automerge/%/base/estimates.json: $(PAPER_BENCH_TOOL) $(ALL_AM)
 	@echo "AM - Sleeping for 5 seconds to cool down CPU..."
 	@sleep 5
-	taskset 0x1 nice -10 $< --bench $*
+	taskset 0x1 nice -10 $< --bench automerge/$*
+
+target/criterion/yrs/%/base/estimates.json: $(PAPER_BENCH_TOOL) $(ALL_YJS)
+	@echo "YRS - Sleeping for 5 seconds to cool down CPU..."
+	@sleep 5
+	taskset 0x1 nice -10 $< --bench yrs/$*
 
 
 # Memory usage for OT

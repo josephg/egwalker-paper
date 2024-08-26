@@ -1,0 +1,30 @@
+{
+  "A1": {
+    "steady_state": 11067823,
+    "peak": 12816103
+  },
+  "A2": {
+    "steady_state": 8586505,
+    "peak": 10042129
+  },
+  "C1": {
+    "steady_state": 11609119,
+    "peak": 13748535
+  },
+  "C2": {
+    "steady_state": 7886243,
+    "peak": 9280299
+  },
+  "S1": {
+    "steady_state": 7656237,
+    "peak": 9363453
+  },
+  "S2": {
+    "steady_state": 9877017,
+    "peak": 11998145
+  },
+  "S3": {
+    "steady_state": 10428068,
+    "peak": 12508044
+  }
+}
