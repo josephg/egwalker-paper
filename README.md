@@ -70,7 +70,7 @@ Conversion is slow, and **this step is optional**. For convenience, the converte
 
 The first 2 steps make use of a CLI tool in `tools/diamond-types/crates/dt-cli`. The final step uses `tools/crdt-converter`. Both tools are built automatically.
 
-You can re-run step 1 as follows:
+You can re-run step 1 as follows (time taken: 1 hour or so):
 
 ```
 rm datasets/*
