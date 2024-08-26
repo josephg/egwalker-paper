@@ -15,6 +15,8 @@ use yrs::{Text, Transact};
 
 #[cfg(feature = "bench")]
 use crate::convert1::bench_automerge_remote;
+#[cfg(feature = "bench")]
+use crate::convert1::bench_yrs_remote;
 
 mod benchmarks;
 mod ff_bench;
@@ -35,6 +37,10 @@ fn stem() -> &'static str {
 
 pub fn am_filename_for(trace: &str) -> String {
     format!("{}/datasets/{trace}.am", stem())
+}
+
+pub fn yjs_filename_for(trace: &str) -> String {
+    format!("{}/datasets/{trace}.yjs", stem())
 }
 
 // $ cargo run --features memusage --release
@@ -65,7 +71,7 @@ fn measure_memory() {
     println!("JSON written to {filename}");
 }
 
-fn main() {
+fn bench_main() {
     // print_xf_sizes("friendsforever", 100);
     // print_xf_sizes("clownschool", 100);
     // print_xf_sizes("node_nodecc", 200);
@@ -83,7 +89,10 @@ fn main() {
         let mut c = Criterion::default()
             .configure_from_args();
 
+        // bench_cola_remote(&mut c);
         bench_automerge_remote(&mut c);
+
+        bench_yrs_remote(&mut c);
         // bench_ff(&mut c);
 
         // benchmarks::local_benchmarks(&mut c);
@@ -97,4 +106,13 @@ fn main() {
 pub fn linear_testing_data(name: &str) -> TestData {
     let filename = format!("../../editing-traces/sequential_traces/{}.json.gz", name);
     load_testing_data(&filename)
+}
+
+fn main() {
+    // convert_main()
+    bench_main()
+    // get_cola_stats()
+    //
+    // #[cfg(feature = "memusage")]
+    // convert1::get_cola_memusage();
 }

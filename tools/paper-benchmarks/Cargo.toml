@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-automerge = "0.5.9"
-yrs = "0.16.10"
-#cola = { version = "0.1.1", features = ["encode"] }
+automerge = "0.5.11"
+yrs = "0.20.0"
+#cola = { version = "0.4.5", features = ["encode", "serde"] }
+#cola = { path = "../../../../3rdparty/cola", features = ["encode", "serde", "stats"] }
 #cola-nocursor = { path = "../../../../3rdparty/cola", package = "cola" }
 criterion = { version = "0.5.1", optional = true }
 crdt-testdata = { path = "../diamond-types/crates/crdt-testdata" }

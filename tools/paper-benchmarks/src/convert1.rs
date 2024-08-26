@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -8,18 +9,20 @@ use std::io::BufReader;
 use std::ops::Range;
 use automerge::{ActorId, AutoCommit, Automerge, ObjType, ReadDoc};
 use automerge::transaction::Transactable;
+// use cola::Replica;
 #[cfg(feature = "bench")]
 use criterion::{BenchmarkId, Criterion};
 use diamond_types_crdt::list::ListCRDT;
+use jumprope::JumpRopeBuf;
 use rand::Rng;
 use rand::rngs::SmallRng;
 use serde::Deserialize;
-use serde::de::Unexpected::Option;
 use smallvec::SmallVec;
 use smartstring::alias::String as SmartString;
-use yrs::{GetString, OffsetKind, Options, ReadTxn, StateVector, Text, TextRef, Transact, Update};
+use yrs::{GetString, OffsetKind, Options, ReadTxn, StateVector, Text, TextRef, Transact, Update, Uuid};
+use yrs::block::ClientID;
 use yrs::updates::decoder::Decode;
-use crate::am_filename_for;
+use crate::{am_filename_for, yjs_filename_for};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,64 +51,124 @@ trait TextCRDT: Clone {
 
     fn splice(&mut self, range: Range<usize>, ins_content: &str);
 
-    fn merge_from(&mut self, other: &mut Self);
+    fn merge_from(&mut self, other: &Self);
 
     fn commit(&mut self) {}
-    fn fork(&mut self) -> Self;
+    fn fork(&mut self, actor_hint: usize) -> Self;
+
+    fn set_agent(&mut self, actor: usize);
+
     // fn local_del(&mut self, range: Range<usize>);
     //
     // fn local_ins(&mut self, pos: usize, content: &str);
+}
+
+fn am_agent_for_agentid(agent: usize) -> ActorId {
+    let bytes = agent.to_be_bytes();
+    ActorId::from(bytes)
 }
 
 type AutomergeCRDT = (AutoCommit, automerge::ObjId);
 impl TextCRDT for AutomergeCRDT {
     fn new() -> Self {
         let mut doc = AutoCommit::new();
+        doc.set_actor(ActorId::from(&[0xff])); // We'll make the root object with a dummy "root" ActorId
         let id = doc.put_object(automerge::ROOT, "text", ObjType::Text).unwrap();
         (doc, id)
     }
 
-    fn splice(&mut self, range: Range<usize>, ins_content: &str) {
+    fn splice(&mut self, mut range: Range<usize>, ins_content: &str) {
+        let len = self.0.text(&self.1).unwrap().chars().count();
+        // if range.start > len {
+        //     println!("Truncated {} -> {}", range.start, len);
+        // }
+        range.start = range.start.min(len);
+        range.end = range.end.min(len);
         self.0.splice_text(&self.1, range.start, range.len() as _, ins_content).unwrap();
     }
 
-    fn merge_from(&mut self, other: &mut Self) {
-        self.0.merge(&mut other.0).unwrap();
+    fn merge_from(&mut self, other: &Self) {
+        // Calling clone() here makes automerge much slower. The other option is to take &mut self
+        // - and that makes all the other code more awful.
+        //
+        // Conversion only happens once. Clone it is!
+        self.0.merge(&mut other.0.clone()).unwrap();
     }
 
     fn commit(&mut self) {
         self.0.commit();
     }
 
-    fn fork(&mut self) -> Self {
+    fn fork(&mut self, _agent_hint: usize) -> Self {
         (self.0.fork(), self.1.clone())
     }
+
+    fn set_agent(&mut self, agent: usize) {
+        self.0.set_actor(am_agent_for_agentid(agent));
+    }
+}
+
+
+fn to_yjs_agent(agent: usize) -> ClientID {
+    // Yjs's ClientID is a u64.
+    agent as ClientID
+}
+
+fn yrs_opts(agent: Option<usize>) -> Options {
+    let mut opts = Options::default();
+    opts.client_id = to_yjs_agent(agent.unwrap_or(0xffff)); // Make it deterministic.
+    opts.guid = Uuid::from("DET_PLACEHOLDER"); // This is a bit dirty, but seems fine?
+
+    // This also isn't quite right. We're actually using unicode offsets, so this will corrupt
+    // if any characters are outside the unicode BMP.
+    opts.offset_kind = OffsetKind::Utf16;
+
+    opts
 }
 
 type YrsCRDT = (yrs::Doc, TextRef);
 impl TextCRDT for YrsCRDT {
     fn new() -> Self {
-        let mut opts = Options::default();
-        opts.offset_kind = OffsetKind::Utf32;
+        let opts = yrs_opts(None);
         let doc = yrs::Doc::with_options(opts);
         let r = doc.get_or_insert_text("text");
         (doc, r)
     }
 
-    fn splice(&mut self, range: Range<usize>, ins_content: &str) {
+    fn splice(&mut self, mut range: Range<usize>, ins_content: &str) {
         let mut txn = self.0.transact_mut();
+
+        let len = self.1.get_string(&txn).chars().count();
+        if range.start > len { range.start = len; }
+        if range.end > len { range.end = len; }
+
         if !range.is_empty() {
             self.1.remove_range(&mut txn, range.start as u32, range.len() as u32);
         }
         if !ins_content.is_empty() {
-            self.1.insert(&mut txn, range.start as u32, ins_content);
+            let mut ok = true;
+            for c in ins_content.chars() {
+                if c.len_utf16() != 1 {
+                    println!("Non-UTF16 safe character found '{}' - replacing with underscore", c);
+                    ok = false;
+                }
+            }
+            if ok {
+                self.1.insert(&mut txn, range.start as u32, ins_content);
+            } else {
+                let replaced_content = ins_content.chars().map(|c| {
+                    if c.len_utf16() == 1 { c }
+                    else { '_' }
+                }).collect::<String>();
+                self.1.insert(&mut txn, range.start as u32, &replaced_content);
+            }
         }
         // self.1.inser
         txn.commit();
 
     }
 
-    fn merge_from(&mut self, other: &mut Self) {
+    fn merge_from(&mut self, other: &Self) {
         // let sv = self.0.transact().state_vector();
         // let update = other.0.transact().encode_state_as_update_v2(&StateVector::default());
         let sv = self.0.transact().state_vector();
@@ -116,7 +179,7 @@ impl TextCRDT for YrsCRDT {
         txn.commit();
     }
 
-    fn fork(&mut self) -> Self {
+    fn fork(&mut self, agent_hint: usize) -> Self {
 
         // Bleh I want to just call clone but then the client IDs match. And there's no way to
         // change the client ID once an object has been created.
@@ -124,16 +187,24 @@ impl TextCRDT for YrsCRDT {
         // dbg!(self.0.client_id(), r.0.client_id());
         // r
 
-        let mut opts = Options::default();
-        opts.offset_kind = OffsetKind::Utf32;
-        opts.guid = self.0.options().guid.clone();
-
-        let doc2 = yrs::Doc::with_options(opts);
         let update = self.0.transact().encode_state_as_update_v2(&StateVector::default());
+
+        let opts = yrs_opts(Some(agent_hint));
+        let doc2 = yrs::Doc::with_options(opts);
         doc2.transact_mut().apply_update(Update::decode_v2(&update).unwrap());
         let r = doc2.get_or_insert_text("text");
 
         (doc2, r)
+    }
+
+    fn set_agent(&mut self, agent: usize) {
+        // Since there's no way to do this using the yjs API directly, I'll fork the document. Bleh.
+        let client_id = to_yjs_agent(agent);
+        if self.0.client_id() != client_id {
+            let result = self.fork(agent);
+            self.0 = result.0;
+            self.1 = result.1;
+        }
     }
 }
 
@@ -164,24 +235,140 @@ impl TextCRDT for DTCRDT {
         }
     }
 
-    fn merge_from(&mut self, other: &mut Self) {
+    fn merge_from(&mut self, other: &Self) {
         other.0.replicate_into(&mut self.0);
     }
 
-    fn fork(&mut self) -> Self {
+    fn fork(&mut self, actor_hint: usize) -> Self {
         let mut new_doc = self.0.clone();
-        let agent = new_doc.get_or_create_agent_id(&random_str(10));
+        let agent = new_doc.get_or_create_agent_id(&format!("{:#010x}", actor_hint)); // 10 because the leading "0x" is counted.
         (new_doc, agent)
+    }
+
+    fn set_agent(&mut self, actor: usize) {
+        self.1 = self.0.get_or_create_agent_id(&format!("{:#010x}", actor)); // 10 because the leading "0x" is counted.
     }
 }
 
+
+// // Cola doesn't have any way to get all operations. This is very hacky, but we can work around
+// // that by keeping an in-order set of operations out of band and use that for merging &
+// // benchmarking.
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// enum ColaEdit {
+//     Insertion(cola::Insertion, SmartString),
+//     Deletion(cola::Deletion),
+// }
+
+// thread_local! {
+//     // Pair of (num allocations, total bytes allocated).
+//     static REPLICA_NUM: RefCell<usize> = RefCell::default();
+// }
+//
+// fn get_next_replica_num() -> usize {
+//     let next = REPLICA_NUM.take();
+//     REPLICA_NUM.set(next + 1);
+//     next
+// }
+
+// type ColaCRDT = (cola::Replica, Vec<ColaEdit>, usize);
+// impl TextCRDT for ColaCRDT {
+//     fn new() -> Self {
+//         (
+//             cola::Replica::new(1, 0),
+//             vec![],
+//             get_next_replica_num(),
+//         )
+//     }
+//
+//     fn splice(&mut self, range: Range<usize>, ins_content: &str) {
+//         // println!("R {} / {}: splice({}..{}, \"{}\");", self.0.id(), self.2, range.start, range.end, ins_content);
+//
+//         if !range.is_empty() {
+//             println!("r{}.deleted({}..{});", self.2, range.start, range.end);
+//             let del = self.0.deleted(range.clone());
+//             self.1.push(ColaEdit::Deletion(del));
+//         }
+//         if !ins_content.is_empty() {
+//             println!("r{}.inserted({}, {});", self.2, range.start, ins_content.chars().count());
+//             let ins = self.0.inserted(range.start, ins_content.chars().count());
+//             self.1.push(ColaEdit::Insertion(ins, ins_content.into()));
+//         }
+//     }
+//
+//     fn merge_from(&mut self, other: &Self) {
+//         // println!("merge {} / {} -> {} / {}", other.0.id(), other.2, self.0.id(), self.2);
+//         // dbg!(&self.1);
+//         // dbg!(&other.1);
+//         // Go through all the edits in the other doc, and merge them both into the local cola
+//         // replica and into the local vec.
+//
+//         for edit in other.1.iter() {
+//             let copy = match edit {
+//                 ColaEdit::Insertion(ins, _) => {
+//                     self.0.integrate_insertion(ins).is_some()
+//                 }
+//                 ColaEdit::Deletion(del) => {
+//                     !self.0.integrate_deletion(del).is_empty()
+//                 }
+//             };
+//
+//             // We should never have backlogged deletions. And this is important because the
+//             // integrate_* methods will return null if the operation was backlogged...
+//             assert_eq!(self.0.backlogged_deletions().count(), 0);
+//             assert_eq!(self.0.backlogged_insertions().count(), 0);
+//
+//             if copy {
+//                 // dbg!(edit);
+//
+//                 println!("r{}.integrate_({:?});", self.2, edit);
+//
+//                 self.1.push(edit.clone());
+//             }
+//         }
+//     }
+//
+//     fn fork(&mut self, actor_hint: usize) -> Self {
+//         let replica_id = actor_hint as u64 + 10;
+//         let r_n = get_next_replica_num();
+//
+//         // println!("R {}/{}: fork {} -> {}", self.0.id(), self.2, replica_id, r_n);
+//
+//         (
+//             if replica_id == self.0.id() {
+//                 println!("let mut r{} = r{}.clone();", r_n, self.2);
+//                 self.0.clone()
+//             } else {
+//                 println!("let mut r{} = r{}.fork({});", r_n, self.2, replica_id);
+//                 cola::Replica::fork(&self.0, actor_hint as u64 + 10)
+//             },
+//             self.1.clone(),
+//             r_n
+//         )
+//     }
+//
+//     fn set_agent(&mut self, actor: usize) {
+//         // println!("R {}/{}: set_agent {}", self.0.id(), self.2, actor + 10);
+//
+//         // gross.
+//         let old_replica_id = self.0.id();
+//         let new_replica_id = actor as u64 + 10;
+//         if old_replica_id != new_replica_id {
+//             println!("r{} = r{}.fork({});", self.2, self.2, new_replica_id);
+//             self.0 = self.0.fork(new_replica_id);
+//         }
+//     }
+// }
+
 fn load_history(name: &str) -> EditHistory {
-    let filename = format!("{name}.json");
+    let filename = format!("../../datasets/{name}.json");
+    // dbg!(&filename);
     let file = BufReader::new(File::open(filename).unwrap());
     serde_json::from_reader(file).unwrap()
 }
 
 fn process<C: TextCRDT>(history: &EditHistory) -> C {
+    // check_history(history);
     let doc = C::new();
 
     // There should be exactly one entry with no parents.
@@ -195,31 +382,56 @@ fn process<C: TextCRDT>(history: &EditHistory) -> C {
     let mut doc_at_idx: HashMap<usize, (C, usize)> = HashMap::new();
     doc_at_idx.insert(usize::MAX, (doc, num_roots));
 
-    fn take_doc<C: TextCRDT>(doc_at_idx: &mut HashMap<usize, (C, usize)>, idx: usize) -> C {
+
+    fn borrow_doc<C: TextCRDT>(doc_at_idx: &HashMap<usize, (C, usize)>, idx: usize) -> &C {
+        &doc_at_idx.get(&idx).unwrap().0
+    }
+
+    fn dec_rc<C: TextCRDT>(doc_at_idx: &mut HashMap<usize, (C, usize)>, idx: usize) {
+        let entry = doc_at_idx.get_mut(&idx).unwrap();
+        entry.1 -= 1;
+        if entry.1 == 0 {
+            doc_at_idx.remove(&idx).unwrap();
+        }
+    }
+
+    fn take_doc<C: TextCRDT>(doc_at_idx: &mut HashMap<usize, (C, usize)>, agent: usize, idx: usize) -> C {
         let (parent_doc, retains) = doc_at_idx.get_mut(&idx).unwrap();
         if *retains == 1 {
             // We'll just take the document.
-            doc_at_idx.remove(&idx).unwrap().0
+            let mut doc = doc_at_idx.remove(&idx).unwrap().0;
+            doc.set_agent(agent);
+            doc
         } else {
             // Fork it and take the fork.
+            assert!(*retains > 1);
             *retains -= 1;
-            parent_doc.fork()
+            // parent_doc.clone()
+            parent_doc.fork(agent)
         }
     }
 
     // doc_at_idx.insert(usize::MAX)
 
     // let mut root = Some(doc);
+    let len = history.txns.len();
+    // dbg!(len);
+    let dot_every = (len / 30) + 1;
+
     for (idx, entry) in history.txns.iter().enumerate() {
+        if idx % dot_every == 0 { eprint!("."); }
+
         // First we need to get the doc we're editing.
         let (&first_p, rest_p) = entry.parents.split_first().unwrap_or((&usize::MAX, &[]));
 
-        let mut doc = take_doc(&mut doc_at_idx, first_p);
+        let mut doc = take_doc(&mut doc_at_idx, entry.agent, first_p);
 
         // If there's any more parents, merge them together.
         for p in rest_p {
-            let mut doc2 = take_doc(&mut doc_at_idx, *p);
-            doc.merge_from(&mut doc2);
+            let doc2 = borrow_doc(&doc_at_idx, *p);
+            // let mut doc2 = take_doc(&mut doc_at_idx, None, *p);
+            doc.merge_from(doc2);
+            dec_rc(&mut doc_at_idx, *p);
         }
 
         // Gross - actor IDs are fixed 16 byte arrays.
@@ -248,6 +460,7 @@ fn process<C: TextCRDT>(history: &EditHistory) -> C {
         if entry.num_children > 0 {
             doc_at_idx.insert(idx, (doc, entry.num_children));
         } else {
+            // println!();
             return doc;
             // println!("done!");
             // let result = doc.text(text_id.clone()).unwrap();
@@ -302,6 +515,154 @@ pub fn bench_automerge_remote(c: &mut Criterion) {
         }
     }
 }
+
+
+#[cfg(feature = "bench")]
+pub fn bench_yrs_remote(c: &mut Criterion) {
+
+    for &name in DATASETS {
+        let mut group = c.benchmark_group("yrs");
+
+        // let name = "friendsforever";
+        let filename = yjs_filename_for(name);
+        let bytes = std::fs::read(&filename).unwrap();
+        group.bench_function(BenchmarkId::new("remote", name), |b| {
+            b.iter(|| {
+                let mut doc = yrs::Doc::new();
+                let update = yrs::Update::decode_v2(&bytes).unwrap();
+                {
+                    let mut txn = doc.transact_mut();
+                    txn.apply_update(update);
+                    txn.commit();
+                }
+
+                let text_ref = doc.get_or_insert_text("text");
+                let text = text_ref.get_string(&doc.transact());
+
+                black_box((doc, text));
+            })
+        });
+    }
+}
+
+
+// fn cola_edits_from_linear_history(history: &EditHistory) -> Vec<ColaEdit> {
+//     assert_eq!(history.num_agents, 1);
+//     let mut edits = vec![];
+//
+//     let mut replica = cola::Replica::new(1, 0);
+//     for (idx, e) in history.txns.iter().enumerate() {
+//         assert_eq!(e.agent, 0);
+//         if idx == 0 {
+//             assert!(e.parents.is_empty());
+//         } else {
+//             assert_eq!(e.parents.as_slice(), &[idx - 1]);
+//         }
+//
+//         for SimpleTextOp(pos, del_len, ins_str) in &e.patches {
+//             if *del_len > 0 {
+//                 let e = replica.deleted(*pos..*pos+*del_len);
+//                 edits.push(ColaEdit::Deletion(e));
+//             }
+//             if !ins_str.is_empty() {
+//                 let e = replica.inserted(*pos, ins_str.chars().count());
+//                 edits.push(ColaEdit::Insertion(e, ins_str.clone()));
+//             }
+//         }
+//     }
+//
+//     edits
+// }
+
+// #[cfg(feature = "bench")]
+// pub fn bench_cola_remote(c: &mut Criterion) {
+//
+//     for &name in &["S1", "S2", "S3"] {
+//         let history = load_history(name);
+//         let edits = cola_edits_from_linear_history(&history);
+//         let expected_end_len = history.end_content.chars().count();
+//
+//         let mut group = c.benchmark_group("cola");
+//         group.bench_function(BenchmarkId::new("remote", name), |b| {
+//             b.iter(|| {
+//                 let mut rope = JumpRopeBuf::new();
+//                 let mut replica = cola::Replica::new(1, 0);
+//                 for e in edits.iter() {
+//                     match e {
+//                         ColaEdit::Insertion(e, s) => {
+//                             if let Some(pos) = replica.integrate_insertion(e) {
+//                                 rope.insert(pos, &s);
+//                             }
+//                         }
+//                         ColaEdit::Deletion(e) => {
+//                             let deletes = replica.integrate_deletion(e);
+//                             for d in deletes {
+//                                 rope.remove(d);
+//                             }
+//                         }
+//                     }
+//                 }
+//                 assert_eq!(replica.len(), expected_end_len);
+//                 assert_eq!(replica.len(), rope.len_chars());
+//             });
+//         });
+//     }
+// }
+
+// pub fn get_cola_stats() {
+//
+//     // for &name in &["S1", "S2", "S3"] {
+//     for &name in &["S1"] {
+//         let history = load_history(name);
+//         let edits = cola_edits_from_linear_history(&history);
+//         let expected_end_len = history.end_content.chars().count();
+//
+//         // dbg!(edits.iter().take(10).collect::<Vec<_>>());
+//
+//         cola::take_stats(); // reset.
+//         let mut replica = cola::Replica::new(1, 0);
+//         // dbg!(edits.len());
+//         for e in edits.iter().take(10) {
+//             match e {
+//                 ColaEdit::Insertion(e, _) => { replica.integrate_insertion(e); }
+//                 ColaEdit::Deletion(e) => { replica.integrate_deletion(e); }
+//             }
+//         }
+//         // assert_eq!(replica.len(), expected_end_len);
+//
+//         let (hits, misses) = cola::take_stats();
+//         println!("Trace {name}: Hits: {hits} misses {misses} / total {}", hits + misses);
+//     }
+// }
+//
+//
+// #[cfg(feature = "memusage")]
+// pub fn get_cola_memusage() {
+//
+//     for &name in &["S1", "S2", "S3"] {
+//     // for &name in &["S1"] {
+//         let history = load_history(name);
+//         let edits = cola_edits_from_linear_history(&history);
+//         let expected_end_len = history.end_content.chars().count();
+//
+//         let (peak, steady_state, replica) = trace_alloc::measure_memusage(|| {
+//             let mut replica = cola::Replica::new(1, 0);
+//             // dbg!(edits.len());
+//             for e in edits.iter() {
+//                 match e {
+//                     ColaEdit::Insertion(e, _) => { replica.integrate_insertion(e); }
+//                     ColaEdit::Deletion(e) => { replica.integrate_deletion(e); }
+//                 }
+//             }
+//
+//             replica
+//         });
+//
+//         println!("{name}: peak memory: {peak} / steady state {steady_state}");
+//         assert_eq!(replica.len(), expected_end_len);
+//         black_box(replica);
+//     }
+// }
 
 // fn bench_main() {
 //     // benches();
@@ -363,19 +724,53 @@ fn convert_yjs(filename: &str) {
     println!("Saved to {out_filename}");
 }
 
+// fn convert_cola(filename: &str) {
+//     println!("Processing {filename}...");
+//     let history = load_history(filename);
+//     let (doc, text_ref, _) = process::<ColaCRDT>(&history);
+//
+//     // let content = text_ref.get_string(&doc.transact());
+//     // if content != history.end_content {
+//     //     std::fs::write("a", &history.end_content).unwrap();
+//     //     std::fs::write("b", &content).unwrap();
+//     //     panic!("Does not match! Written to a / b");
+//     // }
+//     // assert_eq!(content, history.end_content, "content does not match");
+//     //
+//     // let out_filename = format!("{filename}.yjs");
+//     // std::fs::write(&out_filename, doc.transact().encode_state_as_update_v2(&StateVector::default())).unwrap();
+//     // println!("Saved to {out_filename}");
+//
+//     // let encoded = doc.encode();
+//     // encoded.encode(&mut vec![]);
+//
+//     // doc.encode()
+//     // let json = serde_json::to_vec(&doc.encode()).unwrap();
+//     // println!("{}", json);
+// }
+
 pub fn convert_main() {
     // convert_yjs("automerge-paper");
     // convert_yjs("seph-blog1");
     // convert_yjs("friendsforever");
     // convert_yjs("clownschool");
-    convert_yjs("egwalker");
+    // convert_yjs("egwalker");
+
+
+    // convert_cola("S1");
+    // convert_cola("S2");
+    // convert_cola("S3");
+    // convert_cola("C1");
+    // convert_cola("C2");
+    // convert_cola("A1");
+    // convert_cola("A2");
 
 
     // run_automerge("automerge-paper");
     // run_automerge("seph-blog1");
     // run_automerge("friendsforever");
     // run_automerge("clownschool");
-    convert_automerge("egwalker");
+    // convert_automerge("egwalker");
 
     // convert_yjs("node_nodecc");
     // run_automerge("friendsforever");

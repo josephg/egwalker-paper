@@ -268,7 +268,7 @@ impl UpstreamTextCRDT for (yrs::Doc, TextRef) {
 //         black_box(local);
 //     }
 // }
-//
+
 // impl UpstreamTextCRDT for cola_nocursor::Replica {
 //     fn new() -> Self {
 //         cola_nocursor::Replica::new(1, 0)
