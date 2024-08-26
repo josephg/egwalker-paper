@@ -18,28 +18,26 @@ This repository contains everything you need to fully reproduce all results in t
 
 ### Short version:
 
-Install rust and nodejs.
+Install rust and nodejs. There are two options to run all our benchmarks.
 
-Using make:
+Option 1: Use make:
 
 ```
 make clean
 make
 ```
 
-Using shell scripts:
+Option 2: Use included shell scripts:
 
 ```
 ./step1-prepare.sh
 ./step2-bench.sh
-
 node collect.js
-
 ```
 
-Run `make clean` then `make`. Then go out and enjoy your life. The full benchmark suite takes about 15 hours to run.
+Note benchmarks take ~12 hours or so to run. (Almost all of this time is the OT/A2 benchmark - which takes about 1 hour per sample, and we collect 10 samples).
 
-You can use `git diff` on `results/timings.json` to see how your data compares to ours.
+You can use `git diff` on `results/timings.json` (and other files) to see how your experimental results compare to ours.
 
 
 ### Step 0: Prerequisites
@@ -47,7 +45,7 @@ You can use `git diff` on `results/timings.json` to see how your data compares t
 **Tools:** You will need the following tools installed on your computer:
 
 - *Rust compiler & toolchain*: Any "recent" version of rust should work. The published version of the paper used rust 1.78. The easiest way to install rust is via [rustup](https://rustup.rs/).
-- *NodeJS*: *(optional)* Nodejs is only used for scripting - like extracting benchmarking results into 'clean' JSON files and generating the charts used in the paper.
+- *NodeJS*: Nodejs is only used for scripting - like extracting benchmarking results into 'clean' JSON files and generating the charts used in the paper.
 
 We used rust 1.78 and nodejs v21 when generating the results in the current version of the paper.
 
