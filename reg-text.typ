@@ -1353,3 +1353,115 @@ We can now state our modified definition of the strong list specification:
   This completes the proof that #algname satisfies the strong list specification.
 ]
 ])
+
+
+= Artifact Appendix
+
+// This is based on this document:
+// https://sysartifacts.github.io/eurosys2025/appendix/EuroSys25_ArtifactAppendix_template.tex
+//
+// If we convert this to LaTeX, we should use that template as a guide.
+
+== Abstract
+
+In this paper we make a number of claims about performance. We claim that Eg-walker is competitive with existing collaborative editing systems, in file size, memory usage and CPU time needed to merge changes.
+
+As much as possible, we have included all the code and data needed to reproduce these claims yourself. We encourage anyone to reproduce our experimentals - either with your own implementations or ours.
+
+All data and code used during the creation of this research is publically available in the following Github repository:
+
+#link("https://github.com/josephg/reg-paper/")
+
+The artifacts repository contains the following items:
+
+- Raw editing traces, distributed in our own binary format and as JSON.
+- Source code for the following tools:
+  - Our optimised Eg-walker implementation, programmed in Rust.
+  - Our reference CRDT implementation.
+  - Our reference OT (Operational Transform) implementation.
+  - Tools to convert our editing traces to JSON, and to the Yjs and Automerge file formats.
+  - Benchmarking tools to reproduce all experimental data, including:
+    - Remote merge timings
+    - File sizes
+    - Memory usage
+- The tools we used to automatically generate all the figures in this paper.
+
+== Requirements
+
+=== How to access
+
+Clone our git repository here:
+
+#link("https://github.com/josephg/reg-paper/")
+
+The README file in this repository contains detailed instructions to configure & run our code locally.
+
+=== Hardware dependencies
+
+To run our experiments, you need the following:
+
+- A computer running Linux. Our software should work on a number of other systems including Windows and MacOS, but we have not tested on other platforms.
+- At least 8GB of RAM, but 16GB is recommended. This is mainly required for the `OT/A2` benchmark, which at peak uses approximately 7GB of RAM.
+- Plenty of disk space. The rust compiler produces a lot of temporary files - 44GB of them on our system.
+
+=== Software dependencies
+
+You will need a recent compiler & runtime for the Rust programming language. (We have tested with rust 1.78. Any version at least as recent as that should work.)
+
+You also need NodeJS installed. This is used for benchmarking Yjs, and generating our charts.
+
+=== Benchmarks
+
+All other required data and code is included in the linked repository.
+
+
+== Set-up
+
+Please follow the README file in the referenced repository for detailed set-up instructions.
+
+== Evaluation workflow
+
+=== Major Claims
+
+Eg-walker can merge concurrent editing traces in a similar amount of time, memory and file size as industry leading collaborative text algorithms. It can do that without needing any memory overhead while a document is open.
+
+Our performance claims are demonstrated experimentally by comparing our optimised implementation with that of other industry-leading implementations (Yjs and Automerge). We do this comparison using a variety of different editing traces - in sequential, concurrent and asynchronous environments.
+
+Eg-walker has no additional memory or computation overhead when merging purely sequential editing traces.
+
+Eg-walker does not need to load the event graph to merge changes. This is a direct result of the algorithm, but unfortunately it is not demonstrated experimentally. Our implementation currently does not currently support lazy-loading of the event graph.
+
+=== Experiments
+
+Our artifacts contain several experiments you can run yourself. This includes:
+
+- File size measurements (Eg-walker vs Yjs and Automerge).
+- Memory usage during merging. We have benchmarks comparing Eg-walker, Yjs, Automerge, our own reference CRDT implementation and a reference Operational Transform implementation. These benchmarks take about 1.5 hours to run.
+- Time taken to merge our editing traces. Again, comparing Eg-walker, Yjs, Automerge, reference CRDT and reference OT implementation on all 7 of our editing traces. These benchmarks take about 12 hours to run.
+
+Please see the README file in the linked repository for the editing traces and instructions on how to run these experiments yourself.
+
+
+== Notes on reusability
+
+As part of this work, we have created several reusable editing traces falling under 3 categories: Sequential traces, concurrent traces and asynchronous traces (extracted from git repositories).
+
+These editing traces are in the datasets/ directory in the linked repository in JSON format for easy importing into other systems.
+
+These files contain lists of editing transactions. Each transaction contains a non-empty set of *patches* (edits to the document) made by some user agent at some point in time. (Ie, after some other set of transactions have been merged). The file format is described in the #link("https://github.com/josephg/editing-traces/tree/master/concurrent_traces", [`josephg/editing-traces` repository on Github]).
+
+If you want to benchmark a CRDT using these editing traces, you need to convert them to your CRDT's local format. We do this by simulating (in memory) a set of collaborating peers. The peers fork and merge their changes. See `tools/crdt-converter` for code to perform this process using Automerge and Yjs (Yrs). We believe this algorithm could be adapted to support most existing CRDT formats and systems.
+
+
+== General Notes
+
+Its not obvious - but the performance of collaborative text editing systems varies by many orders of magnitude depending on how the implementation has been optimised. For example, early CRDTs were widely thought to be impractical in real systems because they were so slow and memory-inefficient, taking gigabytes of RAM and hard disk space to process editing traces smaller than the ones we present in this paper. And yet, the CRDTs we benchmark here - like Yjs and Automerge - can process many large documents almost instantly. These improvements have come largely through clever uses of data structures and algorithms.
+
+This fact does not seem to be widely known or discussed in academic circles.
+
+This causes many problems:
+
+- It is very difficult to properly compare algorithms implemented by different developers, as the implementation quality can and will often dominate performance differences that are due to the underlying collaborative algorithms being used.
+- The set of optimisations necessary to achieve state of the art performance in collaborative editing are not widely known or published. This makes it very hard for anyone to demonstrably improve on the state of the art.
+
+We recommend treating any and all performance comparisons between different implementations with some skepticism. Including our own. Any benchmark only really proves a lower bound on performance.
