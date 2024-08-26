@@ -1357,6 +1357,8 @@ We can now state our modified definition of the strong list specification:
 
 = Artifact Appendix
 
+(Note: This whole document is currently typeset with Typst. We intend to convert the whole thing to LaTeX before publication to match the publication guidelines. Apologies for this not yet matching the LaTeX template).
+
 // This is based on this document:
 // https://sysartifacts.github.io/eurosys2025/appendix/EuroSys25_ArtifactAppendix_template.tex
 //
