@@ -87,7 +87,7 @@ impl DTRange {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=usize> {
+    pub fn iter(&self) -> Range<usize> {
         Range::<usize>::from(self)
     }
 
