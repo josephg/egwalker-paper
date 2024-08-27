@@ -27,8 +27,9 @@ use diamond_types::causalgraph::agent_assignment::AgentAssignment;
 use diamond_types::causalgraph::agent_assignment::remote_ids::RemoteVersionSpan;
 use diamond_types::list::ListOpLog;
 use diamond_types::list::operation::{ListOpKind, TextOperation};
+use diamond_types::list::operation::ListOpKind::Ins;
 use diamond_types::rle::{KVPair, RleSpanHelpers, RleVec};
-use rle::{AppendRle, MergableSpan, MergeableIterator, RleRun, SplitableSpan};
+use rle::{AppendRle, MergableSpan, RleRun, SplitableSpan};
 use rle::take_max_iter::TakeMaxFns;
 
 // Note this discards the fwd/backwards direction of the changes. This shouldn't matter in
@@ -42,13 +43,18 @@ pub struct SimpleTextOp {
 
 impl MergableSpan for SimpleTextOp {
     fn can_append(&self, other: &Self) -> bool {
+        debug_assert!((self.del_len == 0) != self.ins_content.is_empty());
+        debug_assert!((other.del_len == 0) != other.ins_content.is_empty());
+
         // Don't concatenate inserts and deletes.
+        if (self.del_len == 0) != (other.del_len == 0) { return false; }
+
         if self.del_len > 0 {
+            // This will allow concatenating deletes forward but not backwards.
             self.pos == other.pos
-                && other.ins_content.is_empty()
         } else {
+            // Concatenate the inserts
             self.pos + self.ins_content.chars().count() == other.pos
-                && other.del_len == 0
         }
     }
 
@@ -426,7 +432,30 @@ pub fn export_trace_to_json(oplog: &ListOpLog, timestamp_filename: Option<OsStri
         // }
         let agent = base + slot;
 
-        let patches: SmallVec<[SimpleTextOp; 2]> = entry.ops.into_iter().map(|op| op.into()).merge_spans().collect();
+        // NOTE: This loses some information. When a series of backspace events happen, this
+        // discards the order of the deletes.
+        // let patches: SmallVec<[SimpleTextOp; 2]> = entry.ops
+        //     .into_iter()
+        //     .map(|op| op.into())
+        //     .merge_spans()
+        //     .collect();
+
+        // Expando backspaces. This keeps the trace accurate.
+        let mut patches: SmallVec<[SimpleTextOp; 2]> = smallvec![];
+        for op in entry.ops {
+            if op.kind == Ins || op.loc.fwd {
+                patches.push(op.into());
+            } else {
+                // Reverse delete. Shatter it.
+                for pos in op.loc.span.iter().rev() {
+                    patches.push_rle(SimpleTextOp {
+                        pos,
+                        del_len: 1,
+                        ins_content: SmartString::new(),
+                    });
+                }
+            }
+        }
 
         // if patches.iter().map(|p| p.ins_content.len() + p.del_len).sum::<usize>() > 1 {
         //     dbg!(&patches);
