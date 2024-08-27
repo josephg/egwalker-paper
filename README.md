@@ -60,7 +60,7 @@ This process has only been tested on linux, but it *should* work on other broadl
 
 
 
-### Step 1: Preparing the data (OPTIONAL) (1 human minute + 1 compute-hour)
+### Step 1: Preparing the data (OPTIONAL) (1 human minute + 4 compute-hour)
 
 The 7 raw editing traces are checked into the repository at `datasets/raw`. These files are stored in the diamond types packed binary format.
 
@@ -74,7 +74,7 @@ Conversion is slow, and **this step is optional**. For convenience, the converte
 
 The first 2 steps make use of a CLI tool in `tools/diamond-types/crates/dt-cli`. The final step uses `tools/crdt-converter`. Both tools are built automatically.
 
-You can re-run step 1 as follows (time taken: 1 hour or so):
+You can re-run step 1 as follows (time taken: 4 hours or so):
 
 ```
 rm datasets/*
@@ -86,6 +86,14 @@ Output: `datasets/*.am, *.yjs, *.json`
 These files *should* be byte-for-byte identical with the files distributed via this git repository. Ie, after regenerated these files, `git status` should report no changes.
 
 The size of the files produced during this step are measured to produce *Figure 11* and *Figure 12* on page 12 in the paper.
+
+This process takes an unreasonably long time to run! Sorry! We just didn't optimize this process much, since you only need to do this once. You can also run these scripts in parallel using make. For example:
+
+```
+make -j16 all_datasets
+```
+
+(The `all_datasets` make rule corresponds to this conversion step.)
 
 
 ### Step 2: Benchmarking (2 human minutes + 12 computer hours)
