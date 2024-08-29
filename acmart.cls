@@ -2009,12 +2009,6 @@
      \if@ACM@engage
         \ClassInfo{\@classname}{Using CC license with ACM Enage
           material}%
-      \else
-      \ClassWarning{\@classname}{%
-        Sorry, Creative Commons licenses are\MessageBreak
-        currently not used with ACM publications\MessageBreak
-        typeset by the authors}{Please use nonacm
-           option or ACM Engage class to enable CC licenses}%
       \fi
   \fi}
 \def\@copyrightpermission{%
