@@ -987,7 +987,7 @@ This breakthrough makes it possible for decentralised, local-first software @Kle
 ]
 
 #show bibliography: set text(8pt)
-#bibliography(("works.yml", "works.bib"),
+#bibliography("works.bib",
   title: "References",
   style: "association-for-computing-machinery"
 )

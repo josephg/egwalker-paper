@@ -1,5 +1,6 @@
 \documentclass[sigplan,10pt]{acmart}
 
+\usepackage{tikz}
 \usepackage{xspace}
 \newcommand{\algname}{Eg-walker\xspace}
 
@@ -91,27 +92,27 @@ User 1 inserts a second letter ``l'' at index 3, while concurrently user 2 inser
 When user 2 receives the operation $\mathit{Insert}(3, \text{``l''})$ it can apply it to obtain ``Hello!'', but when user 1 receives $\mathit{Insert}(4, \text{``!''})$ it cannot apply that operation as-is, since that would result in the state ``Hell!o'', which would be inconsistent with the other user's state and the intended insertion position.
 Due to the concurrent insertion at an earlier index, user 1 must insert the exclamation mark at index 5.
 
-% #figure(
-%   fletcher.diagram({
-%     let (left1, right1, left2, right2, left3, right3) = ((0,2), (2,2), (0,1), (2,1), (0,0), (2,0))
-%     node((0,2.4), "User 1:")
-%     node((2,2.4), "User 2:")
-%     node(left1, \texttt{Helo})
-%     node(left2, \texttt{Hello})
-%     node(left3, \texttt{Hello!})
-%     node(right1, \texttt{Helo})
-%     node(right2, \texttt{Helo!})
-%     node(right3, \texttt{Hello!})
-%     edge(left1, left2, $\mathit{Insert}(3, \text{``l''})$, "->", label-side: right)
-%     edge(right1, right2, $\mathit{Insert}(4, \text{``!''})$, "->", label-side: left)
-%     edge(left2, left3, $\mathit{Insert}(5, \text{``!''})$, "->", label-side: right)
-%     edge(right2, right3, $\mathit{Insert}(3, \text{``l''})$, "->", label-side: left)
-%     edge((0.1,1.5), (1.9,0.5), "->", "dashed")
-%     edge((1.9,1.5), (0.1,0.5), "->", "dashed")
-%   }),
-%   placement: top,
-%   caption: [Two concurrent insertions into a text document.],
-% ) <two-inserts>
+\begin{figure}
+  \centering
+  \begin{tikzpicture}
+    \node at (0,2.9) {User 1:};
+    \node at (3,2.9) {User 2:};
+    \node (left1) at (0,2.4) {\texttt{Helo}};
+    \node (left2) at (0,1.2) {\texttt{Hello}};
+    \node (left3) at (0,0.0) {\texttt{Hello!}};
+    \node (right1) at (3,2.4) {\texttt{Helo}};
+    \node (right2) at (3,1.2) {\texttt{Helo!}};
+    \node (right3) at (3,0.0) {\texttt{Hello!}};
+    \draw [->] (left1) -- node [left] {$\mathit{Insert}(3, \text{``l''})$} (left2);
+    \draw [->] (right1) -- node [right] {$\mathit{Insert}(4, \text{``!''})$} (right2);
+    \draw [->] (left2) -- node [left] {$\mathit{Insert}(5, \text{``!''})$} (left3);
+    \draw [->] (right2) -- node [right] {$\mathit{Insert}(3, \text{``l''})$} (right3);
+    \draw [->,dashed] (0.1,1.8) -- (2.9,0.6);
+    \draw [->,dashed] (2.9,1.8) -- (0.1,0.6);
+  \end{tikzpicture}
+  \caption{Two concurrent insertions into a text document.}
+  \label{two-inserts}
+\end{figure}
 
 One way of solving this problem is to use \emph{Operational Transformation} (OT): when user 1 receives $\mathit{Insert}(4, \text{``!''})$ that operation is transformed with regard to the concurrent insertion at index 3, which increments the index at which the exclamation mark is inserted.
 OT is an old and widely-used technique: it was introduced in 1989 \cite{Ellis1989}, and the OT algorithm Jupiter \cite{Nichols1995} forms the basis of real-time collaboration in Google Docs \cite{DayRichter2010}.
@@ -195,24 +196,23 @@ If any parent events are missing, the replica waits for them to arrive before ad
 Two replicas can merge their event graphs by taking the union of their sets of events.
 Events in the graph are immutable; they always represents the operation as originally generated, and not as a result of any transformation.
 
-% #figure(
-%   fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
-%     let (char1, char2, char3, char4, char5, char6) = ((0,2), (0,1.5), (0,1), (0,0.5), (-0.5,0), (0.5,0))
-%     node(char1, $e_1: \mathit{Insert}(0, \text{``H''})$)
-%     node(char2, $e_2: \mathit{Insert}(1, \text{``e''})$)
-%     node(char3, $e_3: \mathit{Insert}(2, \text{``l''})$)
-%     node(char4, $e_4: \mathit{Insert}(3, \text{``o''})$)
-%     node(char5, $e_5: \mathit{Insert}(3, \text{``l''})$)
-%     node(char6, $e_6: \mathit{Insert}(4, \text{``!''})$)
-%     edge(char1, char2, "-|>")
-%     edge(char2, char3, "-|>")
-%     edge(char3, char4, "-|>")
-%     edge(char4, char5, "-|>")
-%     edge(char4, char6, "-|>")
-%   }),
-%   placement: top,
-%   caption: [The event graph corresponding to \autoref{two-inserts}.],
-% ) <graph-example>
+\begin{figure}
+  \begin{tikzpicture}[every node/.style={inner ysep=1pt}]
+    \node (char1) at (0,2.8) {$e_1: \mathit{Insert}(0, \text{``H''})$};
+    \node (char2) at (0,2.1) {$e_2: \mathit{Insert}(1, \text{``e''})$};
+    \node (char3) at (0,1.4) {$e_3: \mathit{Insert}(2, \text{``l''})$};
+    \node (char4) at (0,0.7) {$e_4: \mathit{Insert}(3, \text{``o''})$};
+    \node (char5) at (-1.5,0) {$e_5: \mathit{Insert}(3, \text{``l''})$};
+    \node (char6) at (1.5,0) {$e_6: \mathit{Insert}(4, \text{``!''})$};
+    \draw [->] (char1) -- (char2);
+    \draw [->] (char2) -- (char3);
+    \draw [->] (char3) -- (char4);
+    \draw [->] (char4) -- (char5);
+    \draw [->] (char4) -- (char6);
+  \end{tikzpicture}
+  \caption{The event graph corresponding to \autoref{two-inserts}.}
+  \label{graph-example}
+\end{figure}
 
 For example, \autoref{graph-example} shows the event graph corresponding to \autoref{two-inserts}.
 The events $e_5$ and $e_6$ are concurrent, and the frontier of this graph is the set of events ${e_5, e_6}$.
@@ -303,75 +303,66 @@ While OT transforms one operation with respect to one other, \algname uses the i
 
 In graphs with concurrent operations there are multiple possible sort orders. \algname guarantees that the final document state is the same, regardless which of these orders is chosen. However, the choice of sort order may affect the performance of the algorithm, as discussed in \autoref{complexity}.
 
-% #figure(
-%   fletcher.diagram(node-inset: 2pt, node-stroke: black, node-fill: black, {
-%     let (a1, a2, a3, a4, a5, a6) = ((0,2), (0,1.5), (0,1), (0,0.5), (0,0), (0,-0.5))
-%     let (b1, b2, b3, b4) = ((1,1.5), (1,1), (1,0.5), (1,0))
-%     let (c1, c2, c3) = ((-1,1), (-1,0.5), (-1,0))
-%     let (x1, x2, x3, x4, x5, x6, x7) = ((4,2), (4,1.5), (4,1), (4,0.5), (4,0), (4,-0.5), (4,-1))
-%     let (x8, x9, x10, x11, x12, x13) = ((5,2), (5,1.5), (5,1), (5,0.5), (5,0), (5,-0.5))
-%     node(a1, text(0.1em, $a$))
-%     node(a2, text(0.1em, $a$))
-%     node(a3, text(0.1em, $a$))
-%     node(a4, text(0.1em, $a$))
-%     node(a5, text(0.1em, $a$))
-%     node(a6, text(0.1em, $a$))
-%     node(b1, text(0.1em, $a$))
-%     node(b2, text(0.1em, $a$))
-%     node(b3, text(0.1em, $a$))
-%     node(b4, text(0.1em, $a$))
-%     node(c1, text(0.1em, $a$))
-%     node(c2, text(0.1em, $a$))
-%     node(c3, text(0.1em, $a$))
-%     node(x1, text(0.1em, $a$))
-%     node(x2, text(0.1em, $a$))
-%     node(x3, text(0.1em, $a$))
-%     node(x4, text(0.1em, $a$))
-%     node(x5, text(0.1em, $a$))
-%     node(x6, text(0.1em, $a$))
-%     node(x7, text(0.1em, $a$))
-%     node(x8, text(0.1em, $a$))
-%     node(x9, text(0.1em, $a$))
-%     node(x10, text(0.1em, $a$))
-%     node(x11, text(0.1em, $a$))
-%     node(x12, text(0.1em, $a$))
-%     node(x13, text(0.1em, $a$))
-%     edge(a1, a2, $e_\mathrm{A1}$, "-|>", label-pos: 0)
-%     edge(a2, a3, $e_\mathrm{A2}$, "-|>", label-pos: 0, label-side: left)
-%     edge(a3, a4, $e_\mathrm{A3}$, "-|>", label-pos: 0)
-%     edge(a4, a5, $e_\mathrm{A4}$, "-|>", label-pos: 0)
-%     edge(a5, a6, $e_\mathrm{A5}$, "-|>", label-pos: 0)
-%     edge(a5, (0,-0.55), $e_\mathrm{A6}$, label-pos: 1, label-side: left)
-%     edge(b1, b2, $e_\mathrm{B1}$, "-|>", label-pos: 0, label-side: left)
-%     edge(b2, b3, $e_\mathrm{B2}$, "-|>", label-pos: 0, label-side: left)
-%     edge(b3, b4, $e_\mathrm{B3}$, "-|>", label-pos: 0, label-side: left)
-%     edge(b3, (1,-0.05), $e_\mathrm{B4}$, label-pos: 1, label-side: left)
-%     edge(c1, c2, $e_\mathrm{C1}$, "-|>", label-pos: 0)
-%     edge(c2, c3, $e_\mathrm{C2}$, "-|>", label-pos: 0)
-%     edge(c2, (-1,-0.05), $e_\mathrm{C3}$, label-pos: 1)
-%     edge(a1, b1, "-|>", bend: +20deg)
-%     edge(a3, b3, "-|>")
-%     edge(b2, a5, "-|>")
-%     edge(a2, c1, "-|>", bend: -20deg)
-%     edge(c3, a6, "-|>")
-%     edge(x1, x2, $e_\mathrm{A1}$, "-|>", label-pos: 0)
-%     edge(x2, x3, $e_\mathrm{A2}$, "-|>", label-pos: 0)
-%     edge(x3, x4, $e_\mathrm{A3}$, "-|>", label-pos: 0)
-%     edge(x4, x5, $e_\mathrm{A4}$, "-|>", label-pos: 0)
-%     edge(x5, x6, $e_\mathrm{B1}$, "-|>", label-pos: 0)
-%     edge(x6, x7, $e_\mathrm{B2}$, "-|>", label-pos: 0)
-%     edge(x6, (4,-1.05), $e_\mathrm{B3}$, label-pos: 1)
-%     edge(x7, x8, "-|>")
-%     edge(x8, x9, $e_\mathrm{B4}$, "-|>", label-pos: 0, label-side: left)
-%     edge(x9, x10, $e_\mathrm{C1}$, "-|>", label-pos: 0, label-side: left)
-%     edge(x10, x11, $e_\mathrm{C2}$, "-|>", label-pos: 0, label-side: left)
-%     edge(x11, x12, $e_\mathrm{C3}$, "-|>", label-pos: 0, label-side: left)
-%     edge(x12, x13, $e_\mathrm{A5}$, "-|>", label-pos: 0, label-side: left)
-%     edge(x12, (5,-0.55), $e_\mathrm{A6}$, label-pos: 1, label-side: left)
-%   }),
-%   placement: top,
-%   caption: [An event graph (left) and one possible topologically sorted order of that graph (right).],
-% ) <topological-sort>
+\begin{figure}
+  \begin{tikzpicture}
+    \tikzstyle{op} = [shape=circle,draw,fill,inner sep=1.5pt]
+    \node [op] (a1) at (0,2) [label={left:$e_\mathrm{A1}$}] {};
+    \node [op] (a2) at (0,1.5) [label={right:$e_\mathrm{A2}$}] {};
+    \node [op] (a3) at (0,1) [label={left:$e_\mathrm{A3}$}] {};
+    \node [op] (a4) at (0,0.5) [label={left:$e_\mathrm{A4}$}] {};
+    \node [op] (a5) at (0,0) [label={left:$e_\mathrm{A5}$}] {};
+    \node [op] (a6) at (0,-0.5) [label={right:$e_\mathrm{A6}$}] {};
+    \node [op] (b1) at (1,1.5) [label={right:$e_\mathrm{B1}$}] {};
+    \node [op] (b2) at (1,1) [label={right:$e_\mathrm{B2}$}] {};
+    \node [op] (b3) at (1,0.5) [label={right:$e_\mathrm{B3}$}] {};
+    \node [op] (b4) at (1,0) [label={right:$e_\mathrm{B4}$}] {};
+    \node [op] (c1) at (-1,1) [label={left:$e_\mathrm{C1}$}] {};
+    \node [op] (c2) at (-1,0.5) [label={left:$e_\mathrm{C2}$}] {};
+    \node [op] (c3) at (-1,0) [label={left:$e_\mathrm{C3}$}] {};
+    \node [op] (x1) at (4,2) [label={left:$e_\mathrm{A1}$}] {};
+    \node [op] (x2) at (4,1.5) [label={left:$e_\mathrm{A2}$}] {};
+    \node [op] (x3) at (4,1) [label={left:$e_\mathrm{A3}$}] {};
+    \node [op] (x4) at (4,0.5) [label={left:$e_\mathrm{A4}$}] {};
+    \node [op] (x5) at (4,0) [label={left:$e_\mathrm{B1}$}] {};
+    \node [op] (x6) at (4,-0.5) [label={left:$e_\mathrm{B2}$}] {};
+    \node [op] (x7) at (4,-1) [label={left:$e_\mathrm{B3}$}] {};
+    \node [op] (x8) at (5,2) [label={right:$e_\mathrm{B4}$}] {};
+    \node [op] (x9) at (5,1.5) [label={right:$e_\mathrm{C1}$}] {};
+    \node [op] (x10) at (5,1) [label={right:$e_\mathrm{C2}$}] {};
+    \node [op] (x11) at (5,0.5) [label={right:$e_\mathrm{C3}$}] {};
+    \node [op] (x12) at (5,0) [label={right:$e_\mathrm{A5}$}] {};
+    \node [op] (x13) at (5,-0.5) [label={right:$e_\mathrm{A6}$}] {};
+    \draw [->] (a1) -- (a2);
+    \draw [->] (a2) -- (a3);
+    \draw [->] (a3) -- (a4);
+    \draw [->] (a4) -- (a5);
+    \draw [->] (a5) -- (a6);
+    \draw [->] (b1) -- (b2);
+    \draw [->] (b2) -- (b3);
+    \draw [->] (b3) -- (b4);
+    \draw [->] (c1) -- (c2);
+    \draw [->] (c2) -- (c3);
+    \draw [->] (a1) -- (b1);
+    \draw [->] (a3) -- (b3);
+    \draw [->] (b2) -- (a5);
+    \draw [->] (a2) -- (c1);
+    \draw [->] (c3) -- (a6);
+    \draw [->] (x1) -- (x2);
+    \draw [->] (x2) -- (x3);
+    \draw [->] (x3) -- (x4);
+    \draw [->] (x4) -- (x5);
+    \draw [->] (x5) -- (x6);
+    \draw [->] (x6) -- (x7);
+    \draw [->] (x7) -- (x8);
+    \draw [->] (x8) -- (x9);
+    \draw [->] (x9) -- (x10);
+    \draw [->] (x10) -- (x11);
+    \draw [->] (x11) -- (x12);
+    \draw [->] (x12) -- (x13);
+\end{tikzpicture}
+  \caption{An event graph (left) and one possible topologically sorted order of that graph (right).}
+  \label{topological-sort}
+\end{figure}
 
 For example, the graph in \autoref{graph-example} has two possible sort orders; \algname either first inserts ``l'' at index 3 and then ``!'' at index 5 (like User 1 in \autoref{two-inserts}), or it first inserts ``!'' at index 4 followed by ``l'' at index 3 (like User 2 in \autoref{two-inserts}). The final document state is ``Hello!'' either way.
 
