@@ -1,6 +1,7 @@
 \documentclass[sigplan,10pt]{acmart}
 
 \usepackage{tikz}
+\usetikzlibrary {arrows.meta}
 \usepackage{xspace}
 \newcommand{\algname}{Eg-walker\xspace}
 
@@ -359,7 +360,7 @@ In graphs with concurrent operations there are multiple possible sort orders. \a
     \draw [->] (x10) -- (x11);
     \draw [->] (x11) -- (x12);
     \draw [->] (x12) -- (x13);
-\end{tikzpicture}
+  \end{tikzpicture}
   \caption{An event graph (left) and one possible topologically sorted order of that graph (right).}
   \label{topological-sort}
 \end{figure}
@@ -426,29 +427,28 @@ The internal state can be updated with three methods, each of which takes an eve
 \item $\mathsf{advance}(e)$ updates the prepare version to add $e$, assuming that the prepare version previously did not include $e$, but the effect version did.
 \end{itemize}
 
-% #figure(
-%   fletcher.diagram(node-inset: 6pt, node-defocus: 0, {
-%     let (e1, e2, e3, e4, e5, e6, e7, e8) = ((0.5,2.5), (0.5,2), (0,1.5), (0,1), (1,1.5), (1,1), (1,0.5), (0.5,0))
-%     node(e1, $e_1: \mathit{Insert}(0, \text{``h''})$)
-%     node(e2, $e_2: \mathit{Insert}(1, \text{``i''})$)
-%     node(e3, $e_3: \mathit{Insert}(0, \text{``H''})$)
-%     node(e4, $e_4: \mathit{Delete}(1)$)
-%     node(e5, $e_5: \mathit{Delete}(1)$)
-%     node(e6, $e_6: \mathit{Insert}(1, \text{``e''})$)
-%     node(e7, $e_7: \mathit{Insert}(2, \text{``y''})$)
-%     node(e8, $e_8: \mathit{Insert}(3, \text{``!''})$)
-%     edge(e1, e2, "-|>")
-%     edge(e2, e3, "-|>")
-%     edge(e3, e4, "-|>")
-%     edge(e2, e5, "-|>")
-%     edge(e5, e6, "-|>")
-%     edge(e6, e7, "-|>")
-%     edge(e7, e8, "-|>")
-%     edge(e4, e8, "-|>")
-%   }),
-%   placement: top,
-%   caption: [An event graph. Starting with document ``hi'', one user changes ``hi'' to ``hey'', while concurrently another user capitalises the ``H''. After merging to the state ``Hey'', one of them appends an exclamation mark to produce ``Hey!''.],
-% ) <graph-hi-hey>
+\begin{figure}
+  \begin{tikzpicture}[every node/.style={inner ysep=1pt}]
+    \node (e1) at (2,3.5) {$e_1: \mathit{Insert}(0, \text{``h''})$};
+    \node (e2) at (2,2.8) {$e_2: \mathit{Insert}(1, \text{``i''})$};
+    \node (e3) at (0,2.1) {$e_3: \mathit{Insert}(0, \text{``H''})$};
+    \node (e4) at (0,1.4) {$e_4: \mathit{Delete}(1)$};
+    \node (e5) at (4,2.1) {$e_5: \mathit{Delete}(1)$};
+    \node (e6) at (4,1.4) {$e_6: \mathit{Insert}(1, \text{``e''})$};
+    \node (e7) at (4,0.7) {$e_7: \mathit{Insert}(2, \text{``y''})$};
+    \node (e8) at (2,0.0) {$e_8: \mathit{Insert}(3, \text{``!''})$};
+    \draw [->] (e1) -- (e2);
+    \draw [->] (e2) -- (e3);
+    \draw [->] (e3) -- (e4);
+    \draw [->] (e2) -- (e5);
+    \draw [->] (e5) -- (e6);
+    \draw [->] (e6) -- (e7);
+    \draw [->] (e7) -- (e8);
+    \draw [->] (e4) -- (e8);
+  \end{tikzpicture}
+  \caption{An event graph. Starting with document ``hi'', one user changes ``hi'' to ``hey'', while concurrently another user capitalises the ``H''. After merging to the state ``Hey'', one of them appends an exclamation mark to produce ``Hey!''.}
+  \label{graph-hi-hey}
+\end{figure}
 
 The effect version only moves forwards in time (through $\mathsf{apply}$), whereas the prepare version can move both forwards and backwards.
 Consider the example in \autoref{graph-hi-hey}, and assume that the events $e_1 \dots e_8$ are traversed in order of their subscript.
@@ -502,57 +502,54 @@ The rules for updating $s_p$ and $s_e$ are:
 \item If $\mathsf{retreat}(e_d)$ is called with a deletion event $e_d$, we must have $s_p = \texttt{Del}\; n$ in the affected record, and we update it to $\texttt{Del} (n-1)$ if $n>1$, or to $\texttt{Ins}$ if $n=1$. Calling $\mathsf{advance}(e_d)$ performs the opposite.
 \end{itemize}
 
-% #figure(
-%   fletcher.diagram(spacing: (4mm, 4mm), node-stroke: 0.5pt, node-inset: 5mm,
-%   {
-%     let (nyi, ins, del1, del2, deln) = ((0, 0), (1, 0), (2, 0), (3, 0), (4, 0))
-%     node(nyi, \texttt{NIY})
-%     node(ins, \texttt{Ins})
-%     node(del1, \texttt{Del 1})
-%     node(del2, \texttt{Del 2})
-%     node(deln, $dots.c$, shape: "rect")
-
-%     node((-0.5, 0.8), [$\mathsf{advance}:$], stroke: 0pt)
-%     node((0.5, 0.8), [$\mathit{Insert}$], stroke: 0pt)
-%     node((1.5, 0.8), [$\mathit{Delete}$], stroke: 0pt)
-%     node((2.5, 0.8), [$\mathit{Delete}$], stroke: 0pt)
-%     node((3.5, 0.8), [$\mathit{Delete}$], stroke: 0pt)
-%     edge(nyi, ins, bend: 50deg, "-|>")
-%     edge(ins, del1, bend: 50deg, "-|>")
-%     edge(del1, del2, bend: 50deg, "-|>")
-%     edge(del2, deln, bend: 50deg, "--|>")
-
-%     node((-0.5, -0.8), [$\mathsf{retreat}:$], stroke: 0pt)
-%     node((0.5, -0.8), [$\mathit{Insert}$], stroke: 0pt)
-%     node((1.5, -0.8), [$\mathit{Delete}$], stroke: 0pt)
-%     node((2.5, -0.8), [$\mathit{Delete}$], stroke: 0pt)
-%     node((3.5, -0.8), [$\mathit{Delete}$], stroke: 0pt)
-%     edge(ins, nyi, bend: 50deg, "-|>")
-%     edge(del1, ins, bend: 50deg, "-|>")
-%     edge(del2, del1, bend: 50deg, "-|>")
-%     edge(deln, del2, bend: 50deg, "--|>")
-%   }),
-%   placement: top,
-%   caption: [State machine for internal state variable $s_p$.]
-% ) <spv-state>
+\begin{figure}
+  \begin{tikzpicture}
+    \tikzstyle{state} = [draw,align=center,text width=0.9cm,text height=8pt,text depth=1pt]
+    \node [state] (nyi) at (0, 0) {\texttt{NIY}};
+    \node [state] (ins) at (1.5, 0) {\texttt{Ins}};
+    \node [state] (del1) at (3, 0) {\texttt{Del 1}};
+    \node [state] (del2) at (4.5, 0) {\texttt{Del 2}};
+    \node [state] (deln) at (6, 0) {$\cdots$};
+    \draw [->] (nyi) to [out=45,in=135] node [above,label={left:$\mathsf{advance}$:}] {$\mathit{Insert}$} (ins);
+    \draw [->] (ins) to [out=45,in=135] node [above] {$\mathit{Delete}$} (del1);
+    \draw [->] (del1) to [out=45,in=135] node [above] {$\mathit{Delete}$} (del2);
+    \draw [->,dashed] (del2) to [out=45,in=135] node [above] {$\mathit{Delete}$} (deln);
+    \draw [->] (ins) to [out=225,in=315] node [below,label={left:$\mathsf{retreat}$:}] {$\mathit{Insert}$} (nyi);
+    \draw [->] (del1) to [out=225,in=315] node [below] {$\mathit{Delete}$} (ins);
+    \draw [->] (del2) to [out=225,in=315] node [below] {$\mathit{Delete}$} (del1);
+    \draw [->,dashed] (deln) to [out=225,in=315] node [below] {$\mathit{Delete}$} (del2);
+  \end{tikzpicture}
+  \caption{State machine for internal state variable $s_p$.}
+  \label{spv-state}
+\end{figure}
 
 As a result, $s_p$ and $s_e$ are \texttt{Ins} if the character is visible (inserted but not deleted) in the prepare and effect version respectively; $s_p = \texttt{Del}\; n$ indicates that the character has been deleted by $n$ concurrent delete events in the prepare version; and $s_p = \texttt{NotInsertedYet}$ indicates that the insertion of the character has been retreated in the prepare version.
 $s_e$ does not count the number of deletions and does not have a $\texttt{NotInsertedYet}$ state since we never remove the effect of an operation from the effect version.
 
-% #figure(
-%   fletcher.diagram(node-stroke: 0.5pt, node-inset: 5pt, spacing: 0pt,
-%     node((0,0), text(0.8em, [#v(5pt)$text("“H”")\ \mathit{id}: 3\ s_p: \texttt{Ins}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     node((1,0), text(0.8em, [#v(5pt)$text("“h”")\ \mathit{id}: 1\ s_p: \texttt{Del 1}\ s_e: \texttt{Del}$]), shape: "rect"),
-%     node((2,0), text(0.8em, [#v(5pt)$text("“i”")\ \mathit{id}: 2\ s_p: \texttt{Ins}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     node((3,0), box(width: 14mm, height: 0mm), stroke: 0pt),
-%     node((4,0), text(0.8em, [#v(5pt)$text("“H”")\ \mathit{id}: 3\ s_p: \texttt{NIY}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     node((5,0), text(0.8em, [#v(5pt)$text("“h”")\ \mathit{id}: 1\ s_p: \texttt{Ins}\ s_e: \texttt{Del}$]), shape: "rect"),
-%     node((6,0), text(0.8em, [#v(5pt)$text("“i”")\ \mathit{id}: 2\ s_p: \texttt{Ins}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     edge((2.6,0), (3.4,0), text(0.7em, $\mathsf{retreat}(e_4)\ \mathsf{retreat}(e_3)$), marks: "=>", thickness: 0.8pt, label-sep: 0.5em)
-%   ),
-%   placement: top,
-%   caption: [Left: the internal state after applying $e_1 ... e_4$ from \autoref{graph-hi-hey}. Right: after $\mathsf{retreat}(e_4)$ and $\mathsf{retreat}(e_3)$, the prepare state is updated to mark ``H'' as \texttt{NotInsertedYet}, and the deletion of ``h'' is undone. The effect state is unchanged.]
-% ) <crdt-state-1>
+\begin{figure}
+  \begin{tikzpicture}[font=\footnotesize]
+    \tikzstyle{box}=[rectangle,draw,matrix,text height=6pt,text depth=2pt,nodes=right,inner xsep=2pt,inner ysep=1pt,column sep=0]
+    \matrix [box] (left) at (0,0) {
+      \node {``H''}; & \node (top1) {``h''}; & \node (top2) {``i''}; \\
+      \node {$\mathit{id}: 3$}; & \node {$\mathit{id}: 1$}; & \node {$\mathit{id}: 2$}; \\
+      \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Del 1}$}; & \node {$s_p: \texttt{Ins}$}; \\
+      \node {$s_e: \texttt{Ins}$}; & \node (bot1) {$s_e: \texttt{Del}$}; & \node (bot2) {$s_e: \texttt{Ins}$}; \\
+    };
+    \matrix [box] (right) at (5,0) {
+      \node {``H''}; & \node (top3) {``h''}; & \node (top4) {``i''}; \\
+      \node {$\mathit{id}: 3$}; & \node {$\mathit{id}: 1$}; & \node {$\mathit{id}: 2$}; \\
+      \node {$s_p: \texttt{NYI}$}; & \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Ins}$}; \\
+      \node {$s_e: \texttt{Ins}$}; & \node (bot3) {$s_e: \texttt{Del}$}; & \node (bot4) {$s_e: \texttt{Ins}$}; \\
+    };
+    \draw (top1.north west) -- (bot1.south west);
+    \draw (top2.north west) -- (bot2.south west);
+    \draw (top3.north west) -- (bot3.south west);
+    \draw (top4.north west) -- (bot4.south west);
+    \draw [double,-Implies,line width=1pt] ([xshift=3pt]left.east) -- node [above,align=center] {$\mathsf{retreat}(e_4)$\\$\mathsf{retreat}(e_3)$} ([xshift=-3pt]right.west);
+  \end{tikzpicture}
+  \caption{Left: the internal state after applying $e_1 ... e_4$ from \autoref{graph-hi-hey}. Right: after $\mathsf{retreat}(e_4)$ and $\mathsf{retreat}(e_3)$, the prepare state is updated to mark ``H'' as \texttt{NotInsertedYet}, and the deletion of ``h'' is undone. The effect state is unchanged.}
+  \label{crdt-state-1}
+\end{figure}
 
 For example, \autoref{crdt-state-1} shows the state after applying $e_1 \dots e_4$ from \autoref{graph-hi-hey}, and how that state is updated by retreating $e_4$ and $e_3$ before $e_5$ is applied.
 In the effect state, the lowercase ``h'' is marked as deleted, while the uppercase ``H'' and the ``i'' are visible.
