@@ -683,6 +683,8 @@ impl<'a> TransformedOpsIterRaw<'a> {
                       ops: &'a RleVec<KVPair<ListOpMetrics>>,
                       from_frontier: &[LV], merge_frontier: &[LV]) -> Self {
         let (plan, _common) = subgraph.make_m1_plan(Some(ops), from_frontier, merge_frontier, true);
+        // println!("{:?} -> {:?}: plan {}", from_frontier, merge_frontier, plan.0.len());
+        // dbg!(&plan);
         Self::from_plan(aa, op_ctx, ops, plan)
     }
 

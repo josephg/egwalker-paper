@@ -191,6 +191,8 @@ impl ListBranch {
     }
 
     pub fn merge(&mut self, oplog: &ListOpLog, merge_frontier: &[LV]) {
+        if oplog.cg.graph.frontier_contains_frontier(self.version.as_ref(), merge_frontier) { return; }
+
         // let mut iter = oplog.get_xf_operations_full_raw(self.version.as_ref(), merge_frontier).merge_spans();
         let mut iter = oplog.get_xf_operations_full_raw(self.version.as_ref(), merge_frontier);
         // println!("merge '{}' at {:?} + {:?}", self.content.to_string(), self.version, merge_frontier);

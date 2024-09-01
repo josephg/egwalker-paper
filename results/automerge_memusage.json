@@ -8,23 +8,23 @@
     "peak": 310137658
   },
   "C1": {
-    "steady_state": 462239557,
-    "peak": 500887321
+    "steady_state": 462251692,
+    "peak": 500877582
   },
   "C2": {
-    "steady_state": 510894946,
-    "peak": 614739636
+    "steady_state": 510891008,
+    "peak": 614736247
   },
   "S1": {
-    "steady_state": 293523461,
-    "peak": 317459712
+    "steady_state": 293516696,
+    "peak": 317460368
   },
   "S2": {
-    "steady_state": 425988257,
-    "peak": 567135990
+    "steady_state": 425984003,
+    "peak": 567137480
   },
   "S3": {
-    "steady_state": 847954622,
-    "peak": 1086441664
+    "steady_state": 847948886,
+    "peak": 1086445760
   }
 }
