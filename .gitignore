@@ -5,4 +5,12 @@ target
 .idea
 paper_data_anon.zip
 video-assets
-
+comment.cut
+eg-walker.aux
+eg-walker.bbl
+eg-walker.blg
+eg-walker.fdb_latexmk
+eg-walker.fls
+eg-walker.log
+eg-walker.out
+eg-walker.synctex.gz
