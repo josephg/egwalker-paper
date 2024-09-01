@@ -555,18 +555,24 @@ For example, \autoref{crdt-state-1} shows the state after applying $e_1 \dots e_
 In the effect state, the lowercase ``h'' is marked as deleted, while the uppercase ``H'' and the ``i'' are visible.
 In the prepare state, by retreating $e_4$ and $e_3$ the ``H'' is marked as \texttt{NotInsertedYet}, and the deletion of ``h'' is undone ($s_p = \texttt{Ins}$).
 
-% #figure(
-%   fletcher.diagram(node-stroke: 0.5pt, node-inset: 5pt, spacing: 0pt,
-%     node((0,0), text(0.8em, [#v(5pt)$text("“H”")\ \mathit{id}: 3\ s_p: \texttt{Ins}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     node((1,0), text(0.8em, [#v(5pt)$text("“h”")\ \mathit{id}: 1\ s_p: \texttt{Del 1}\ s_e: \texttt{Del}$]), shape: "rect"),
-%     node((2,0), text(0.8em, [#v(5pt)$text("“e”")\ \mathit{id}: 6\ s_p: \texttt{Ins}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     node((3,0), text(0.8em, [#v(3.5pt)$text("“y”")\ \mathit{id}: 7\ s_p: \texttt{Ins}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     node((4,0), text(0.8em, [#v(5pt)$text("“!”")\ \mathit{id}: 8\ s_p: \texttt{Ins}\ s_e: \texttt{Ins}$]), shape: "rect"),
-%     node((5,0), text(0.8em, [#v(5pt)$text("“i”")\ \mathit{id}: 2\ s_p: \texttt{Del 1}\ s_e: \texttt{Del}$]), shape: "rect")
-%   ),
-%   placement: top,
-%   caption: [The internal \algname state after replaying all of the events in \autoref{graph-hi-hey}.]
-% ) <crdt-state-2>
+\begin{figure}
+  \begin{tikzpicture}[font=\footnotesize]
+    \tikzstyle{box}=[rectangle,draw,matrix,text height=6pt,text depth=2pt,nodes=right,inner xsep=2pt,inner ysep=1pt,column sep=0]
+    \matrix [box] at (0,0) {
+      \node {``H''}; & \node (top1) {``h''}; & \node (top2) {``e''}; & \node (top3) {``y''}; & \node (top4) {``!''}; & \node (top5) {``i''}; \\
+      \node {$\mathit{id}: 3$}; & \node {$\mathit{id}: 1$}; & \node {$\mathit{id}: 6$}; & \node {$\mathit{id}: 7$}; & \node {$\mathit{id}: 8$}; & \node {$\mathit{id}: 2$}; \\
+      \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Del 1}$}; & \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Del 1}$}; \\
+      \node {$s_e: \texttt{Ins}$}; & \node (bot1) {$s_e: \texttt{Del}$}; & \node (bot2) {$s_e: \texttt{Ins}$}; & \node (bot3) {$s_e: \texttt{Ins}$}; & \node (bot4) {$s_e: \texttt{Ins}$}; & \node (bot5) {$s_e: \texttt{Del}$}; \\
+    };
+    \draw (top1.north west) -- (bot1.south west);
+    \draw (top2.north west) -- (bot2.south west);
+    \draw (top3.north west) -- (bot3.south west);
+    \draw (top4.north west) -- (bot4.south west);
+    \draw (top5.north west) -- (bot5.south west);
+  \end{tikzpicture}
+  \caption{The internal \algname state after replaying all of the events in \autoref{graph-hi-hey}.}
+  \label{crdt-state-2}
+\end{figure}
 
 \autoref{crdt-state-2} shows the state after replaying all of the events in \autoref{graph-hi-hey}: ``i'' is also deleted, the characters ``e'' and ``y'' are inserted immediately after the ``h'', $e_3$ and $e_4$ are advanced again, and finally ``!'' is inserted after the ``y''.
 The figures include the character for the sake of readability, but \algname actually does not store text content in its internal state.
@@ -783,14 +789,11 @@ Document edits by the local user or applying non-concurrent remote events do not
 
 % For completeness, we also measured the time taken to process local editing events. However, all of the systems we tested can process events many orders of magnitude much faster than any human's typing speed. We have not shown this data as at that speed, the differences between systems are irrelevant.
 
-% #figure(
-%   text(8pt, image("diagrams/timings.svg")),
-%   caption: [
-%     The CPU time taken by each algorithm to merge all events in each trace (as received from a remote replica), or to reload the resulting document from disk. The CRDT implementations (Ref CRDT, Automerge and Yjs) take the same amount of time to merge changes as they do to subsequently load the document. The red line at 16 ms indicates the time budget available to an application that wants to show the results of an operation by the next frame, assuming a display with a 60 Hz refresh rate.
-%   ],
-%   kind: image,
-%   placement: top,
-% ) <chart-remote>
+\begin{figure}
+  \includegraphics[width=\linewidth]{diagrams/timings.pdf}
+  \caption{The CPU time taken by each algorithm to merge all events in each trace (as received from a remote replica), or to reload the resulting document from disk. The CRDT implementations (Ref CRDT, Automerge and Yjs) take the same amount of time to merge changes as they do to subsequently load the document. The red line at 16 ms indicates the time budget available to an application that wants to show the results of an operation by the next frame, assuming a display with a 60 Hz refresh rate.}
+  \label{chart-remote}
+\end{figure}
 
 We can see in \autoref{chart-remote} that \algname and OT are very fast to merge the sequential traces (S1, S2, S3), since they simply apply the operations with no transformation.
 However, OT performance degrades dramatically on the asynchronous traces (6 seconds for A1, and 1 hour for A2) due to the quadratic complexity of the algorithm, whereas \algname remains fast (160,000$\times$ faster in the case of A2).
@@ -805,14 +808,11 @@ To quantify this effect, we compare \algname's performance with a version of the
 \autoref{speed-ff} shows the time taken to replay all our traces with this optimisation enabled and disabled.
 We see that the optimisation is effective for S1, S2, S3, and A1, whereas for C1, C2, and A2 it makes little difference (A2 contains no critical versions).
 
-% #figure(
-%   text(8pt, image("diagrams/ff.svg")),
-%   caption: [
-%     Time taken for \algname to merge all events in a trace, with and without the optimisations from \autoref{clearing}.
-%   ],
-%   kind: image,
-%   placement: top,
-% ) <speed-ff>
+\begin{figure}
+  \includegraphics[width=\linewidth]{diagrams/ff.pdf}
+  \caption{Time taken for \algname to merge all events in a trace, with and without the optimisations from \autoref{clearing}.}
+  \label{speed-ff}
+\end{figure}
 
 % Automerge's merge times on traces C1 and C2 are outliers. This appears to be a bug, which we have reported.
 
@@ -840,15 +840,11 @@ OT has the same memory use as \algname in the steady state, but significantly hi
 The reason is that our OT implementation memoizes intermediate transformed operations to improve performance.
 This memory use could be reduced at the cost of increased merge times.
 
-% #figure(
-%   text(7pt, image("diagrams/memusage.svg")),
-%   caption: [
-%     RAM used while merging an editing trace received from another replica. \algname and OT only retain the current document text in the steady state, but need additional RAM at peak while merging concurrent changes.
-%   ],
-%   kind: image,
-%   placement: top,
-% ) <chart-memusage>
-
+\begin{figure}
+  \includegraphics[width=\linewidth]{diagrams/memusage.pdf}
+  \caption{RAM used while merging an editing trace received from another replica. \algname and OT only retain the current document text in the steady state, but need additional RAM at peak while merging concurrent changes.}
+  \label{chart-memusage}
+\end{figure}
 
 \subsection{Storage size}
 
@@ -871,21 +867,17 @@ Our encoding is smaller than Yjs on the sequential and async traces, but larger 
 The overhead of storing the event graph is between 20\% and 3$\times$ the final plain text file size.
 % Using this scheme, \algname can still merge editing events and load the document text directly from disk.
 
-% #figure(
-%   text(8pt, image("diagrams/filesize_full.svg")),
-%   caption: [
-%     File size storing edit traces using \algname's event graph encoding (with and without final document caching) compared to Automerge. The lightly shaded region in each bar shows the concatenated length of all stored text. This acts as lower bound on the file size.
-%   ],
-%   kind: image,
-%   placement: top,
-% ) <chart-dt-vs-automerge>
+\begin{figure}
+  \includegraphics[width=\linewidth]{diagrams/filesize_full.pdf}
+  \caption{File size storing edit traces using \algname's event graph encoding (with and without final document caching) compared to Automerge. The lightly shaded region in each bar shows the concatenated length of all stored text. This acts as lower bound on the file size.}
+  \label{chart-dt-vs-automerge}
+\end{figure}
 
-% #figure(
-%   text(8pt, image("diagrams/filesize_smol.svg")),
-%   caption: [File size storing edit traces in which deleted text content has been omitted, as is the case with Yjs. The lightly shaded region in each bar is the size of the final document, which is a lower bound on the file size.],
-%   kind: image,
-%   placement: top,
-% ) <chart-dt-vs-yjs>
+\begin{figure}
+  \includegraphics[width=\linewidth]{diagrams/filesize_smol.pdf}
+  \caption{File size storing edit traces in which deleted text content has been omitted, as is the case with Yjs. The lightly shaded region in each bar is the size of the final document, which is a lower bound on the file size.}
+  \label{chart-dt-vs-yjs}
+\end{figure}
 
 
 \section{Related Work}\label{related-work}
