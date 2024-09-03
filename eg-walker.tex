@@ -943,52 +943,37 @@ This breakthrough makes it possible for decentralised, local-first software \cit
 
 \newpage
 \appendix
-\section{Artifact Appendix}
-
-% This is based on this document:
-% https://sysartifacts.github.io/eurosys2025/appendix/EuroSys25_ArtifactAppendix_template.tex
-%
-% If we convert this to LaTeX, we should use that template as a guide.
-
+\section{Artifact Appendix} 
 \subsection{Abstract}
 
-In this paper we make a number of claims about performance. We claim that Eg-walker is competitive with existing collaborative editing systems, in file size, memory usage and CPU time needed to merge changes.
-
-As much as possible, we have included all the code and data needed to reproduce these claims yourself. We encourage anyone to reproduce our experimentals - either with your own implementations or ours.
-
-All data and code used during the creation of this research is publically available in the following Github repository:
-
-\url{https://github.com/josephg/reg-paper/}
-
-The artifacts repository contains the following items:
-
+Our artifact is an implementation of the Eg-walker algorithm, together with the datasets and benchmarking tools required to run the experiments described in the paper.
+Specifically, it contains the following items:
 \begin{itemize}
-    \item Raw editing traces, distributed in our own binary format and as JSON.
+    \item Editing traces of text documents that we use for benchmarking (see \autoref{traces-appendix} and \autoref{traces-table}), in our own binary format and as JSON
     \item Source code for the following tools:
         \begin{itemize}
-            \item Our optimised Eg-walker implementation, programmed in Rust.
-            \item Our reference CRDT implementation.
-            \item Our reference OT (Operational Transform) implementation.
-            \item Tools to convert our editing traces to JSON, and to the Yjs and Automerge file formats.
-            \item Benchmarking tools to reproduce all experimental data, including:
-                \begin{itemize}
-                    \item Remote merge timings
-                    \item File sizes
-                    \item Memory usage
-                \end{itemize}
+            \item Our optimised Eg-walker implementation, written in Rust
+            \item Our reference CRDT implementation
+            \item Our reference OT implementation
+            \item Tools to convert our editing traces to JSON, and to the Yjs and Automerge file formats
+            \item Benchmarking tools to reproduce all experiments
         \end{itemize}
-\item The tools we used to automatically generate all the figures in this paper.
+    \item The tools to generate the figures in this paper
 \end{itemize}
 
-\subsection{Requirements}
+\subsection{Description \& Requirements}
+
+%\textit{[Mandatory] This section should list all the information necessary to recreate the same experimental setup you have used to run your artifact. This includes at least a persistent link to a publicly accessible archival repository where all the artifact's main components (software, data-sets, documentation, etc.) can be accessed and, where this apply, the minimal hardware and software requirements to run your artifact. It is also very good practice to list and describe in this section benchmarks where those are part of, or simply have been used to produce results with, your artifact.}
 
 \subsubsection{How to access}
 
-Clone our git repository here:
+All code and data of the artifact is publicly available in the following GitHub repository:
 
 \url{https://github.com/josephg/reg-paper/}
 
-The README file in this repository contains detailed instructions to configure \& run our code locally.
+\textit{Note for artifact evaluation:} please use the head of the master branch, \texttt{df91322b} at the time of writing. Once artifact evaluation is complete we will upload a snapshot to Zenodo and include the final commit hash in the artifact appendix. % TODO: update this for camera-ready
+
+% The README file in this repository contains detailed instructions to configure \& run our code locally.
 
 \subsubsection{Hardware dependencies}
 
@@ -997,74 +982,145 @@ To run our experiments, you need the following:
 \begin{itemize}
     \item A computer running Linux. Our software should work on a number of other systems including Windows and MacOS, but we have not tested on other platforms.
     \item At least 8GB of RAM, but 16GB is recommended. This is mainly required for the \texttt{OT/A2} benchmark, which at peak uses approximately 7GB of RAM.
-    \item Plenty of disk space. The rust compiler produces a lot of temporary files - 44GB of them on our system.
+    \item Plenty of disk space. The Rust compiler produces a lot of temporary files~-- 44GB on our system.
 \end{itemize}
 
 \subsubsection{Software dependencies}
 
-You will need a recent compiler \& runtime for the Rust programming language. (We have tested with rust 1.78. Any version at least as recent as that should work.)
+You need a recent compiler and runtime for the Rust programming language. We have tested with Rust 1.78; newer versions should also work.
 
-You also need NodeJS installed. This is used for benchmarking Yjs, and generating our charts.
+You also need NodeJS installed in order to generate the charts showing our results. We used version 21.
+
+Other software dependencies are managed through Cargo and npm respectively, and they are automatically installed as part of the build process.
 
 \subsubsection{Benchmarks}
 
-All other required data and code is included in the linked repository.
-
+The datasets used by our benchmarks are included in the \texttt{datasets/} folder of our artifact repository, and the code to run the benchmarks is in the \texttt{tools/} folder.
+Each of these folders contains a \texttt{README.md} file that documents its contents in more detail.
 
 \subsection{Set-up}
 
-Please follow the README file in the referenced repository for detailed set-up instructions.
+Install Rust (the easiest way is via rustup) and NodeJS.
 
 \subsection{Evaluation workflow}
 
+Please see the \texttt{README.md} file in the artifact repository for a detailed description of the process.
+
 \subsubsection{Major Claims}
 
-Eg-walker can merge concurrent editing traces in a similar amount of time, memory and file size as industry leading collaborative text algorithms. It can do that without needing any memory overhead while a document is open.
+% Eg-walker can merge concurrent editing traces in a similar amount of time, memory and file size as industry leading collaborative text algorithms. It can do that without needing any memory overhead while a document is open.
 
-Our performance claims are demonstrated experimentally by comparing our optimised implementation with that of other industry-leading implementations (Yjs and Automerge). We do this comparison using a variety of different editing traces - in sequential, concurrent and asynchronous environments.
+% Our performance claims are demonstrated experimentally by comparing our optimised implementation with that of other industry-leading implementations (Yjs and Automerge). We do this comparison using a variety of different editing traces - in sequential, concurrent and asynchronous environments.
 
-Eg-walker has no additional memory or computation overhead when merging purely sequential editing traces.
+% Eg-walker has no additional memory or computation overhead when merging purely sequential editing traces.
 
-Eg-walker does not need to load the event graph to merge changes. This is a direct result of the algorithm, but unfortunately it is not demonstrated experimentally. Our implementation currently does not currently support lazy-loading of the event graph.
+% Eg-walker does not need to load the event graph to merge changes. This is a direct result of the algorithm, but unfortunately it is not demonstrated experimentally. Our implementation currently does not currently support lazy-loading of the event graph.
 
-\subsubsection{Experiments}
+\begin{description}
+    \item[C1.] Eg-walker is competitive with existing state-of-the-art collaborative editing systems in terms of file size, memory usage, and CPU time taken to merge changes.
+    That is, on all our benchmarks, Eg-walker has at most $\approx 2\times$ the cost of the other systems we test, and in some cases dramatically lower cost.
+    Experiments E1, E2, E3 and Figures~\ref{chart-remote}--\ref{chart-dt-vs-yjs} support this claim.
+    \item[C2.] On editing traces with long-running branches, the merge performance of Eg-walker is several orders of magnitude faster than OT, and slightly faster than the best CRDT implementations.
+    This claim is supported by Experiment E3 and the data in \autoref{chart-remote}.
+    \item[C3.] On sequential editing traces, Eg-walker is as fast as OT, and about an order of magnitude faster than our reference CRDT (which in turn is the fastest among the CRDTs we tested).
+    This is supported by Experiment E3 and the data in \autoref{chart-remote}.
+    This is in large part due to the optimisations in \autoref{clearing}, as shown in \autoref{speed-ff}.
+    \item[C4.] The time to load a document from disk (to view and edit) with Eg-walker is the same as with OT, which is several orders of magnitude faster than all CRDTs we tested.
+    Experiment E3 and \autoref{chart-remote} also show this.
+    \item[C5.] The steady-state memory consumption of Eg-walker is at least an order of magnitude lower than that of CRDTs, and the same as OT.
+    The peak memory consumption of Eg-walker during merging is similar to the steady state of CRDTs, and lower than OT.
+    This claim is supported by Experiment E2 and the data in \autoref{chart-memusage}.
+\end{description}
 
-Our artifacts contain several experiments you can run yourself. This includes:
+\subsubsection{Experiment E1: File sizes (4 compute-hours)}
 
+Converts the raw editing traces in the \verb|datasets/raw| directory into the Yjs, Automerge, and Eg-walker file formats (\verb|datasets/*.{yjs,am,dt}|).
+Some of the traces are repeated several times so that they have a similar size (see \autoref{traces-appendix}).
+The sizes of the resulting files are reported in \autoref{chart-dt-vs-automerge} and \autoref{chart-dt-vs-yjs}.
+The files also form an input to the subsequent experiments.
+The output files are included with the artifact so that the later experiments can be run without having to run this one.
+
+To run this experiment:
+\begin{verbatim}
+  rm datasets/*
+  ./step1-prepare.sh
+\end{verbatim}
+The resulting files should be byte-for-byte identical to those in the artifact.
+This experiment is slow because we have not made much effort to optimise it.
+
+To generate the figures:
+\begin{verbatim}
+  node collect.js
+  cd svg-plot
+  npm i # only needed once to install dependencies
+  node render.js
+\end{verbatim}
+which writes \autoref{chart-dt-vs-automerge} to \verb|diagrams/filesize_full.svg| and \autoref{chart-dt-vs-yjs} to \verb|diagrams/filesize_smol.svg|.
+
+\subsubsection{Experiment E2: Memory use (1 compute-hour)}
+
+This experiment measures memory use~-- both the peak memory use while replaying each editing trace, and the ``steady state'' memory use once the replay is complete (keeping in memory the structures that are needed to display and edit a document, but freeing the structures that are needed only for replay and merging concurrent edits).
+We test with the following algorithms:
 \begin{itemize}
-\item File size measurements (Eg-walker vs Yjs and Automerge).
-\item Memory usage during merging. We have benchmarks comparing Eg-walker, Yjs, Automerge, our own reference CRDT implementation and a reference Operational Transform implementation. These benchmarks take about 1.5 hours to run.
-\item Time taken to merge our editing traces. Again, comparing Eg-walker, Yjs, Automerge, reference CRDT and reference OT implementation on all 7 of our editing traces. These benchmarks take about 12 hours to run.
+  \item Diamond-types (DT): our optimised Eg-walker implementation
+  \item DT-CRDT: our reference CRDT implementation
+  \item Automerge~\cite{automerge}
+  \item Yjs~\cite{yjs}
+  \item Yrs, the port of Yjs to Rust by the original authors~\cite{yrs}
+  \item OT: our reference OT implementation
 \end{itemize}
 
-Please see the README file in the linked repository for the editing traces and instructions on how to run these experiments yourself.
+To run this experiment:
+\begin{verbatim}
+  ./step2a-memusage.sh
+\end{verbatim}
+Then use \verb|collect.js| and \verb|render.js| like in E1 to generate \autoref{chart-memusage} (\verb|diagrams/memusage.svg|).
+The data appears in \verb|results/*_memusage.json|.
 
+Note: Our OT implementation takes 1 hour to replay the A2 editing trace.
 
-\subsection{Notes on reusability}
+\subsubsection{Experiment E3: Merge time (12 compute-hours)}
 
-As part of this work, we have created several reusable editing traces falling under 3 categories: Sequential traces, concurrent traces and asynchronous traces (extracted from git repositories).
+This experiment measures the CPU time taken to merge in the entire editing trace, as if it had been received from a remote peer.
+The benchmarks cover the same algorithms as Experiment E2.
+To run this experiment:
+\begin{verbatim}
+  ./step2b-benchmarks.sh
+\end{verbatim}
+Then use \verb|collect.js| and \verb|render.js| like in E1 to generate the charts for \autoref{chart-remote} (\verb|diagrams/timings.svg|) and \autoref{speed-ff} (\verb|diagrams/ff.svg|).
+The script writes summary data to \verb|results/timings.json|.
 
-These editing traces are in the datasets/ directory in the linked repository in JSON format for easy importing into other systems.
+\subsection{Notes on Reusability}
 
-These files contain lists of editing transactions. Each transaction contains a non-empty set of \emph{patches} (edits to the document) made by some user agent at some point in time. (Ie, after some other set of transactions have been merged). The file format is described in the \href{https://github.com/josephg/editing-traces/tree/master/concurrent_traces}{\texttt{josephg/editing-traces} repository on Github}).
+While our artifact contains a snapshot of our Eg-walker implementation at the time of this paper was written, the ongoing development of the implementation is part of the Diamond Types project in the following repository:
 
-If you want to benchmark a CRDT using these editing traces, you need to convert them to your CRDT's local format. We do this by simulating (in memory) a set of collaborating peers. The peers fork and merge their changes. See \texttt{tools/crdt-converter} for code to perform this process using Automerge and Yjs (Yrs). We believe this algorithm could be adapted to support most existing CRDT formats and systems.
+\url{https://github.com/josephg/diamond-types}
 
+Diamond Types is freely available under the ISC license.
+
+As part of this work, we have also created several editing traces of real text documents, as described in \autoref{traces-appendix}.
+The intention is that these traces can be used in future research for benchmarking collaborative text editing systems.
+The \verb|datasets/| directory of the artifact contains those traces in JSON format.
+Additional traces that we may collect in the future will be added to the following repository:
+
+\url{https://github.com/josephg/editing-traces}
+
+That repository also contains documentation of the JSON-based file format that we use to encode the editing traces.
+
+If you want to benchmark a CRDT using these editing traces, you need to convert them to your CRDT's local format. We do this by simulating (in memory) a set of collaborating peers. The peers fork and merge their changes. The \texttt{tools/crdt-converter} directory of our artifact contains code to perform this process using Automerge and Yjs (Yrs). We believe this algorithm could be adapted to support most existing CRDT formats and systems.
 
 \subsection{General Notes}
 
-Its not obvious - but the performance of collaborative text editing systems varies by many orders of magnitude depending on how the implementation has been optimised. For example, early CRDTs were widely thought to be impractical in real systems because they were so slow and memory-inefficient, taking gigabytes of RAM and hard disk space to process editing traces smaller than the ones we present in this paper. And yet, the CRDTs we benchmark here - like Yjs and Automerge - can process many large documents almost instantly. These improvements have come largely through clever uses of data structures and algorithms.
+The performance of collaborative editing systems varies by orders of magnitude depending on how the implementation has been optimised. For example, early CRDTs were widely thought to be impractical in real systems because they were so slow and memory-inefficient, taking gigabytes of RAM and hard disk space to process editing traces smaller than the ones we present in this paper. And yet, the CRDTs we benchmark here, like Yjs and Automerge, can process large documents with very reasonable computational resources.
 
-This fact does not seem to be widely known or discussed in academic circles.
+These improvements have come through a mixture of improved data structures and algorithms, and improved implementation techniques such as reduced memory allocation and better memory layout.
+Unfortunately, the techniques that these implementations use to achieve their performance are not well documented in either the academic literature or the documentation of those projects.
+It is difficult to determine which combination of factors is responsible for a performance improvement.
 
-This causes many problems:
+As a result, it is difficult to fairly compare algorithms that are implemented by different developers and use different implementation techniques.
+We have attempted to address this issue by writing our own reference CRDT and OT implementations that use a similar implementation style to our optimised Eg-walker implementation, enabling as much as possible an apples-for-apples comparison.
+We hope that future research will be able to develop more rigorous approaches to evaluating collaborative editing systems.
 
-\begin{itemize}
-    \item It is very difficult to properly compare algorithms implemented by different developers, as the implementation quality can and will often dominate performance differences that are due to the underlying collaborative algorithms being used.
-    \item The set of optimisations necessary to achieve state of the art performance in collaborative editing are not widely known or published. This makes it very hard for anyone to demonstrably improve on the state of the art.
-\end{itemize}
-
-We recommend treating any and all performance comparisons between different implementations with some skepticism. Including our own. Any benchmark only really proves a lower bound on performance.
 
 \begin{table*}
   \caption{The text editing traces used in our evaluation.
