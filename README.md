@@ -60,7 +60,13 @@ We used rust 1.80 and nodejs v21 when generating the results in the current vers
 
 This process has only been tested on linux, but it *should* work on other broadly supported platforms (like macos) too.
 
+Our results are checked in to the repository. You can safely remove them before re-running the experiments, then use `git diff` to compare your results with ours.
 
+We recommend removing our results if you would like to regenerate all our benchmarking results:
+
+```
+rm -f results/*
+```
 
 
 ### Step 1: Preparing the data (OPTIONAL) (1 human minute + 4 compute-hour)
