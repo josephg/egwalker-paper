@@ -4,7 +4,9 @@ set -o xtrace
 
 # Yjs memory usage
 (
-  cd tools/bench-yjs && node --expose-gc bench-memusage.js
+  cd tools/bench-yjs
+  npm i
+  node --expose-gc bench-memusage.js
 )
 
 # Memory usage tool to measure Automerge & Yrs
