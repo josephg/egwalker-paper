@@ -30,8 +30,10 @@ make
 Option 2: Use included shell scripts:
 
 ```
+./step0-clean.sh
 ./step1-prepare.sh
-./step2-bench.sh
+./step2a-memusage.sh
+./step2b-benchmarks.sh
 node collect.js
 ```
 
@@ -52,8 +54,9 @@ You can use `git diff` on `results/timings.json` (and other files) to see how yo
 
 - *Rust compiler & toolchain*: Any "recent" version of rust should work. The published version of the paper used rust 1.78. The easiest way to install rust is via [rustup](https://rustup.rs/).
 - *NodeJS*: Nodejs is only used for scripting - like extracting benchmarking results into 'clean' JSON files and generating the charts used in the paper.
+- *(Optional)*: GNU Make 4.3. We have alternative shell scripts if you don't have make available, but its less convenient.
 
-We used rust 1.78 and nodejs v21 when generating the results in the current version of the paper.
+We used rust 1.80 and nodejs v21 when generating the results in the current version of the paper.
 
 This process has only been tested on linux, but it *should* work on other broadly supported platforms (like macos) too.
 
