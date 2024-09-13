@@ -2,8 +2,13 @@
 
 \usepackage{tikz}
 \usetikzlibrary {arrows.meta}
+
 \usepackage{xspace}
 \newcommand{\algname}{Eg-walker\xspace}
+
+% Use finalizecache option and call with `-shell-escape` command line option to update pseudocode
+% Use frozencache option to use the preprocessed syntax-highlighted files
+\usepackage[frozencache]{minted}
 
 \setcopyright{cc}
 \copyrightyear{2024}
@@ -18,6 +23,7 @@
 \def\sectionautorefname{Section}%
 \def\subsectionautorefname{Section}%
 \def\subsubsectionautorefname{Section}%
+\def\listingautorefname{Listing}%
 
 \title[Collaborative Text Editing with Eg-walker: Better, Faster, Smaller]{Collaborative Text Editing with Eg-walker:\\ Better, Faster, Smaller}
 \author{Joseph Gentle}
@@ -577,7 +583,7 @@ In the prepare state, by retreating $e_4$ and $e_3$ the ``H'' is marked as \text
 \autoref{crdt-state-2} shows the state after replaying all of the events in \autoref{graph-hi-hey}: ``i'' is also deleted, the characters ``e'' and ``y'' are inserted immediately after the ``h'', $e_3$ and $e_4$ are advanced again, and finally ``!'' is inserted after the ``y''.
 The figures include the character for the sake of readability, but \algname actually does not store text content in its internal state.
 
-\subsection{Mapping indexes to character IDs}
+\subsection{Mapping indexes to character IDs}\label{b-trees}
 
 In the event graph, insertion and deletion operations specify the index at which they apply.
 In order to update \algname's internal state, we need to map these indexes to the correct record in the sequence, based on the prepare state $s_p$.
@@ -1121,6 +1127,127 @@ As a result, it is difficult to fairly compare algorithms that are implemented b
 We have attempted to address this issue by writing our own reference CRDT and OT implementations that use a similar implementation style to our optimised Eg-walker implementation, enabling as much as possible an apples-for-apples comparison.
 We hope that future research will be able to develop more rigorous approaches to evaluating collaborative editing systems.
 
+\begin{listing*}
+\footnotesize
+\begin{minted}{rust}
+let events: EventStorage // Assumed to contain all events
+
+enum PREPARE_STATE {
+    NOT_YET_INSERTED = 0
+    INSERTED = 1
+    // Any state 2+ means the item has been concurrently deleted n-1 times.
+}
+
+// Each of these corresponds to a single inserted character.
+type AugmentedCRDTItem {
+    // The fields from the CRDT that determines insertion order
+    id, originLeft, originRight,
+
+    // State at effect version. Either inserted or inserted-and-subsequently-deleted.
+    ever_deleted: bool,
+
+    // State at prepare version (affected by retreat / advance)
+    prepare_state: uint,
+}
+
+fn space_in_prepare_state(item: AugmentedCRDTItem) {
+    if item.prepare_state == INSERTED { return 1 } else { return 0 }
+}
+
+fn space_in_effect_state(item: AugmentedCRDTItem) {
+    if !item.ever_deleted { return 1 } else { return 0 }
+}
+
+// We have an efficient algorithm for this in our code. See diff() in causal-graph.ts.
+fn diff(v1, v2) -> (only_in_v1, only_in_v2) {
+    // This function considers the transitive expansion of the versions v1 and v2.
+    // We return the set difference between the transitive expansions.
+    let all_events_v1 = {set of all events in v1 + all events which happened-before any event in v1}
+    let all_events_v2 = {set of all events in v2 + all events which happened-before any event in v2}
+
+    return (
+        set_subtract(all_events_v1 - all_events_v2),
+        set_subtract(all_events_v2 - all_events_v1)
+    )
+}
+\end{minted}
+\caption{Pseudocode for the \algname algorithm (continued in \autoref{pseudocode2}).}\label{pseudocode1}
+\end{listing*}
+
+\begin{listing*}
+\footnotesize
+\begin{minted}{rust}
+fn generateDocument(events) {
+    let cur_version = {} // Frontier version
+
+    // List of AugmentedCRDTItems. This could equally be an RGA tree or some other data structure.
+    let crdt = []
+
+    // Resulting document text
+    let resulting_doc = ""
+
+    // Some traversal obeying partial order relationship between events.
+    for e in events.iter_in_causal_order() {
+        // Step 1: Prepare
+        let (a, b) = diff(cur_version, e.parent_version)
+        for e in a {
+            // Retreat
+            let item = crdt.find_item_by_id(e.id)
+            item.prepare_state -= 1
+        }
+        for e in b {
+            // Advance
+            let item = crdt.find_item_by_id(e.id)
+            item.prepare_state += 1
+        }
+
+        // Step 2: Apply
+        if e.type == Insert {
+            // We find the insertion position in the crdt using the prepare_state variables.
+            let ins_pos = idx_of(crdt, e.pos, PREPARE_STATE)
+            // Then insert here using the underlying CRDT's rules.
+            let origin_left = prev_item(ins_pos).id or START
+            // Origin_right is the ID of the first item after ins_pos where prepare_state >= 1.
+            let origin_right = next_item(crdt, ins_pos, item => item.prepare_state >= INSERTED).id or END
+
+            // Use an existing CRDT to determine the order of concurrent insertions at the same position
+            crdt_integrate(crdt, {
+                id: e.id,
+                origin_left,
+                origin_right,
+                ever_deleted: false,
+                prepare_state: 1
+            })
+
+            let effect_pos = crdt[0..ins_pos].map(space_in_effect_state).sum()
+            resulting_doc.splice_in(effect_pos, e.contents)
+        } else {
+            // Delete
+            let idx = idx_of(crdt, e.pos, PREPARE_STATE)
+            // But this time skip any items which aren't in the inserted state.
+            while crdt[idx].prepare_state != INSERTED { idx += 1 }
+            // Mark as deleted.
+            crdt[idx].ever_deleted = true
+            crdt[idx].prepare_state += 1
+
+            let effect_pos = crdt[0..idx].map(space_in_effect_state).sum()
+            resulting_doc.delete_at(effect_pos)
+        }
+
+        cur_version = {e.id}
+    }
+
+    return resulting_doc
+}
+\end{minted}
+\caption{Continuation of the pseudocode in \autoref{pseudocode1}.}\label{pseudocode2}
+\end{listing*}
+
+\newpage
+\section{Algorithm Pseudocode}
+
+\autoref{pseudocode1} and \autoref{pseudocode2} provide simplified pseudocode for the core \algname algorithm as described in \autoref{graph-walk} and \ref{prepare-effect-versions}.
+For brevity, the pseudocode does not include the B-trees from \autoref{b-trees}, the state clearing optimisation from \autoref{clearing}, and the partial replay optimisation from \autoref{partial-replay}.
 
 \begin{table*}
   \caption{The text editing traces used in our evaluation.
@@ -1137,7 +1264,7 @@ We hope that future research will be able to develop more rigorous approaches to
   \input{results/dataset_stats.tex}%
 \end{table*}
 
-\newpage
+\clearpage
 \section{Editing Traces}\label{traces-appendix}
 
 \autoref{traces-table} gives an overview of the editing traces used in our evaluation (\autoref{benchmarking}).

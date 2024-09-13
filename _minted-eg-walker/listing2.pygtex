@@ -1,0 +1,64 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k}{fn} \PYG{n+nf}{generateDocument}\PYG{p}{(}\PYG{n}{events}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{cur\PYGZus{}version}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}\PYGZcb{}}\PYG{+w}{ }\PYG{c+c1}{// Frontier version}
+
+\PYG{+w}{    }\PYG{c+c1}{// List of AugmentedCRDTItems. This could equally be an RGA tree or some other data structure.}
+\PYG{+w}{    }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{crdt}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{[]}
+
+\PYG{+w}{    }\PYG{c+c1}{// Resulting document text}
+\PYG{+w}{    }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{resulting\PYGZus{}doc}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}\PYGZdq{}}
+
+\PYG{+w}{    }\PYG{c+c1}{// Some traversal obeying partial order relationship between events.}
+\PYG{+w}{    }\PYG{k}{for}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{k}{in}\PYG{+w}{ }\PYG{n}{events}\PYG{p}{.}\PYG{n}{iter\PYGZus{}in\PYGZus{}causal\PYGZus{}order}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{c+c1}{// Step 1: Prepare}
+\PYG{+w}{        }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{a}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{b}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{diff}\PYG{p}{(}\PYG{n}{cur\PYGZus{}version}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{e}\PYG{p}{.}\PYG{n}{parent\PYGZus{}version}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{k}{in}\PYG{+w}{ }\PYG{n}{a}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{c+c1}{// Retreat}
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{item}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{crdt}\PYG{p}{.}\PYG{n}{find\PYGZus{}item\PYGZus{}by\PYGZus{}id}\PYG{p}{(}\PYG{n}{e}\PYG{p}{.}\PYG{n}{id}\PYG{p}{)}
+\PYG{+w}{            }\PYG{n}{item}\PYG{p}{.}\PYG{n}{prepare\PYGZus{}state}\PYG{+w}{ }\PYG{o}{\PYGZhy{}=}\PYG{+w}{ }\PYG{l+m+mi}{1}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{k}{in}\PYG{+w}{ }\PYG{n}{b}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{c+c1}{// Advance}
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{item}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{crdt}\PYG{p}{.}\PYG{n}{find\PYGZus{}item\PYGZus{}by\PYGZus{}id}\PYG{p}{(}\PYG{n}{e}\PYG{p}{.}\PYG{n}{id}\PYG{p}{)}
+\PYG{+w}{            }\PYG{n}{item}\PYG{p}{.}\PYG{n}{prepare\PYGZus{}state}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{l+m+mi}{1}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{        }\PYG{c+c1}{// Step 2: Apply}
+\PYG{+w}{        }\PYG{k}{if}\PYG{+w}{ }\PYG{n}{e}\PYG{p}{.}\PYG{k}{type} \PYG{o}{==}\PYG{+w}{ }\PYG{n}{Insert}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{c+c1}{// We find the insertion position in the crdt using the prepare\PYGZus{}state variables.}
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{ins\PYGZus{}pos}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{idx\PYGZus{}of}\PYG{p}{(}\PYG{n}{crdt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{e}\PYG{p}{.}\PYG{n}{pos}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{PREPARE\PYGZus{}STATE}\PYG{p}{)}
+\PYG{+w}{            }\PYG{c+c1}{// Then insert here using the underlying CRDT\PYGZsq{}s rules.}
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{origin\PYGZus{}left}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{prev\PYGZus{}item}\PYG{p}{(}\PYG{n}{ins\PYGZus{}pos}\PYG{p}{).}\PYG{n}{id}\PYG{+w}{ }\PYG{n}{or}\PYG{+w}{ }\PYG{n}{START}
+\PYG{+w}{            }\PYG{c+c1}{// Origin\PYGZus{}right is the ID of the first item after ins\PYGZus{}pos where prepare\PYGZus{}state \PYGZgt{}= 1.}
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{origin\PYGZus{}right}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{next\PYGZus{}item}\PYG{p}{(}\PYG{n}{crdt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ins\PYGZus{}pos}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{item}\PYG{+w}{ }\PYG{o}{=\PYGZgt{}}\PYG{+w}{ }\PYG{n}{item}\PYG{p}{.}\PYG{n}{prepare\PYGZus{}state}\PYG{+w}{ }\PYG{o}{\PYGZgt{}=}\PYG{+w}{ }\PYG{n}{INSERTED}\PYG{p}{).}\PYG{n}{id}\PYG{+w}{ }\PYG{n}{or}\PYG{+w}{ }\PYG{n}{END}
+
+\PYG{+w}{            }\PYG{c+c1}{// Use an existing CRDT to determine the order of concurrent insertions at the same position}
+\PYG{+w}{            }\PYG{n}{crdt\PYGZus{}integrate}\PYG{p}{(}\PYG{n}{crdt}\PYG{p}{,}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{n}{id}: \PYG{n+nc}{e}\PYG{p}{.}\PYG{n}{id}\PYG{p}{,}
+\PYG{+w}{                }\PYG{n}{origin\PYGZus{}left}\PYG{p}{,}
+\PYG{+w}{                }\PYG{n}{origin\PYGZus{}right}\PYG{p}{,}
+\PYG{+w}{                }\PYG{n}{ever\PYGZus{}deleted}: \PYG{n+nc}{false}\PYG{p}{,}
+\PYG{+w}{                }\PYG{n}{prepare\PYGZus{}state}: \PYG{l+m+mi}{1}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{})}
+
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{effect\PYGZus{}pos}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{crdt}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{o}{..}\PYG{n}{ins\PYGZus{}pos}\PYG{p}{].}\PYG{n}{map}\PYG{p}{(}\PYG{n}{space\PYGZus{}in\PYGZus{}effect\PYGZus{}state}\PYG{p}{).}\PYG{n}{sum}\PYG{p}{()}
+\PYG{+w}{            }\PYG{n}{resulting\PYGZus{}doc}\PYG{p}{.}\PYG{n}{splice\PYGZus{}in}\PYG{p}{(}\PYG{n}{effect\PYGZus{}pos}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{e}\PYG{p}{.}\PYG{n}{contents}\PYG{p}{)}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{c+c1}{// Delete}
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{idx}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{idx\PYGZus{}of}\PYG{p}{(}\PYG{n}{crdt}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{e}\PYG{p}{.}\PYG{n}{pos}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{PREPARE\PYGZus{}STATE}\PYG{p}{)}
+\PYG{+w}{            }\PYG{c+c1}{// But this time skip any items which aren\PYGZsq{}t in the inserted state.}
+\PYG{+w}{            }\PYG{k}{while}\PYG{+w}{ }\PYG{n}{crdt}\PYG{p}{[}\PYG{n}{idx}\PYG{p}{].}\PYG{n}{prepare\PYGZus{}state}\PYG{+w}{ }\PYG{o}{!=}\PYG{+w}{ }\PYG{n}{INSERTED}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{n}{idx}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{            }\PYG{c+c1}{// Mark as deleted.}
+\PYG{+w}{            }\PYG{n}{crdt}\PYG{p}{[}\PYG{n}{idx}\PYG{p}{].}\PYG{n}{ever\PYGZus{}deleted}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{k+kc}{true}
+\PYG{+w}{            }\PYG{n}{crdt}\PYG{p}{[}\PYG{n}{idx}\PYG{p}{].}\PYG{n}{prepare\PYGZus{}state}\PYG{+w}{ }\PYG{o}{+=}\PYG{+w}{ }\PYG{l+m+mi}{1}
+
+\PYG{+w}{            }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{effect\PYGZus{}pos}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{crdt}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{o}{..}\PYG{n}{idx}\PYG{p}{].}\PYG{n}{map}\PYG{p}{(}\PYG{n}{space\PYGZus{}in\PYGZus{}effect\PYGZus{}state}\PYG{p}{).}\PYG{n}{sum}\PYG{p}{()}
+\PYG{+w}{            }\PYG{n}{resulting\PYGZus{}doc}\PYG{p}{.}\PYG{n}{delete\PYGZus{}at}\PYG{p}{(}\PYG{n}{effect\PYGZus{}pos}\PYG{p}{)}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{        }\PYG{n}{cur\PYGZus{}version}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{e}\PYG{p}{.}\PYG{n}{id}\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{resulting\PYGZus{}doc}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

@@ -1,0 +1,42 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{events}: \PYG{n+nc}{EventStorage}\PYG{+w}{ }\PYG{c+c1}{// Assumed to contain all events}
+
+\PYG{k}{enum} \PYG{n+nc}{PREPARE\PYGZus{}STATE}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{NOT\PYGZus{}YET\PYGZus{}INSERTED}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}
+\PYG{+w}{    }\PYG{n}{INSERTED}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}
+\PYG{+w}{    }\PYG{c+c1}{// Any state 2+ means the item has been concurrently deleted n\PYGZhy{}1 times.}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// Each of these corresponds to a single inserted character.}
+\PYG{k}{type} \PYG{n+nc}{AugmentedCRDTItem}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{c+c1}{// The fields from the CRDT that determines insertion order}
+\PYG{+w}{    }\PYG{n}{id}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{originLeft}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{originRight}\PYG{p}{,}
+
+\PYG{+w}{    }\PYG{c+c1}{// State at effect version. Either inserted or inserted\PYGZhy{}and\PYGZhy{}subsequently\PYGZhy{}deleted.}
+\PYG{+w}{    }\PYG{n}{ever\PYGZus{}deleted}: \PYG{k+kt}{bool}\PYG{p}{,}
+
+\PYG{+w}{    }\PYG{c+c1}{// State at prepare version (affected by retreat / advance)}
+\PYG{+w}{    }\PYG{n}{prepare\PYGZus{}state}: \PYG{n+nc}{uint}\PYG{p}{,}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{fn} \PYG{n+nf}{space\PYGZus{}in\PYGZus{}prepare\PYGZus{}state}\PYG{p}{(}\PYG{n}{item}: \PYG{n+nc}{AugmentedCRDTItem}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{n}{item}\PYG{p}{.}\PYG{n}{prepare\PYGZus{}state}\PYG{+w}{ }\PYG{o}{==}\PYG{+w}{ }\PYG{n}{INSERTED}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{k}{fn} \PYG{n+nf}{space\PYGZus{}in\PYGZus{}effect\PYGZus{}state}\PYG{p}{(}\PYG{n}{item}: \PYG{n+nc}{AugmentedCRDTItem}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{if}\PYG{+w}{ }\PYG{o}{!}\PYG{n}{item}\PYG{p}{.}\PYG{n}{ever\PYGZus{}deleted}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{k}{else}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{+w}{ }\PYG{k}{return}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{p}{\PYGZcb{}}
+\PYG{p}{\PYGZcb{}}
+
+\PYG{c+c1}{// We have an efficient algorithm for this in our code. See diff() in causal\PYGZhy{}graph.ts.}
+\PYG{k}{fn} \PYG{n+nf}{diff}\PYG{p}{(}\PYG{n}{v1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{v2}\PYG{p}{)}\PYG{+w}{ }\PYGZhy{}\PYGZgt{} \PYG{p}{(}\PYG{n}{only\PYGZus{}in\PYGZus{}v1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{only\PYGZus{}in\PYGZus{}v2}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{c+c1}{// This function considers the transitive expansion of the versions v1 and v2.}
+\PYG{+w}{    }\PYG{c+c1}{// We return the set difference between the transitive expansions.}
+\PYG{+w}{    }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{all\PYGZus{}events\PYGZus{}v1}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{set}\PYG{+w}{ }\PYG{n}{of}\PYG{+w}{ }\PYG{n}{all}\PYG{+w}{ }\PYG{n}{events}\PYG{+w}{ }\PYG{k}{in}\PYG{+w}{ }\PYG{n}{v1}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{all}\PYG{+w}{ }\PYG{n}{events}\PYG{+w}{ }\PYG{n}{which}\PYG{+w}{ }\PYG{n}{happened}\PYG{o}{\PYGZhy{}}\PYG{n}{before}\PYG{+w}{ }\PYG{n}{any}\PYG{+w}{ }\PYG{n}{event}\PYG{+w}{ }\PYG{k}{in}\PYG{+w}{ }\PYG{n}{v1}\PYG{p}{\PYGZcb{}}
+\PYG{+w}{    }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{all\PYGZus{}events\PYGZus{}v2}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}\PYG{n}{set}\PYG{+w}{ }\PYG{n}{of}\PYG{+w}{ }\PYG{n}{all}\PYG{+w}{ }\PYG{n}{events}\PYG{+w}{ }\PYG{k}{in}\PYG{+w}{ }\PYG{n}{v2}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{n}{all}\PYG{+w}{ }\PYG{n}{events}\PYG{+w}{ }\PYG{n}{which}\PYG{+w}{ }\PYG{n}{happened}\PYG{o}{\PYGZhy{}}\PYG{n}{before}\PYG{+w}{ }\PYG{n}{any}\PYG{+w}{ }\PYG{n}{event}\PYG{+w}{ }\PYG{k}{in}\PYG{+w}{ }\PYG{n}{v2}\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{    }\PYG{k}{return}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{        }\PYG{n}{set\PYGZus{}subtract}\PYG{p}{(}\PYG{n}{all\PYGZus{}events\PYGZus{}v1}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{all\PYGZus{}events\PYGZus{}v2}\PYG{p}{),}
+\PYG{+w}{        }\PYG{n}{set\PYGZus{}subtract}\PYG{p}{(}\PYG{n}{all\PYGZus{}events\PYGZus{}v2}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{all\PYGZus{}events\PYGZus{}v1}\PYG{p}{)}
+\PYG{+w}{    }\PYG{p}{)}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}
