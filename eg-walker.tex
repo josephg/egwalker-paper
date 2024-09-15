@@ -201,7 +201,7 @@ If the underlying broadcast protocol ensures that every non-crashed replica even
 
 \subsection{Event graphs}\label{event-graphs}
 
-We represent the editing history of a document as an \emph{event graph}: a directed acyclic graph (DAG) in which every node is an \emph{event} consisting of an operation (insert/delete a character), a unique ID, and a set of IDs of its \emph{parent nodes}.
+We represent the editing history of a document as an \emph{event graph}: a directed acyclic graph (DAG) in which every node is an \emph{event} consisting of an operation (insert/delete a character), a unique ID, and the set of IDs of its \emph{parent events}.
 When $a$ is a \emph{parent} of $b$, we also say $b$ is a \emph{child} of $a$, and the graph contains an edge from $a$ to $b$.
 We construct events such that the graph is transitively reduced (i.e., it contains no redundant edges).
 When there is a directed path from $a$ to $b$ we say that $a$ \emph{happened before} $b$, and write $a \rightarrow b$ as per Lamport \cite{Lamport1978}.
@@ -210,10 +210,11 @@ We say that events $a$ and $b$ are \emph{concurrent}, written $a \parallel b$, i
 
 The \emph{frontier} is the set of events with no children.
 Whenever a user performs an operation, a new event containing that operation is added to the graph, and the previous frontier in the replica's local copy of the graph becomes the new event's parents.
-The new event and its parent edges are then replicated over the network, and each replica adds them to its copy of the graph.
-If any parent events are missing, the replica waits for them to arrive before adding them to the graph; the result is a simple causal broadcast protocol \cite{Birman1991,Cachin2011}.
+The new event is then broadcast over the network, and each replica adds it to its copy of the graph.
+If any parents are missing (i.e., a parent ID in the event does not resolve to a known event), the replica waits for them to arrive before adding them to the graph; the result is a simple causal broadcast protocol \cite{Birman1991,Cachin2011}.
 Two replicas can merge their event graphs by taking the union of their sets of events.
 Events in the graph are immutable; they always represents the operation as originally generated, and not as a result of any transformation.
+The graph grows monotonically (we never remove events), and a new event is always a child of existing events (we never add a parent to an existing event).
 
 \begin{figure}
   \begin{tikzpicture}[every node/.style={inner ysep=1pt}]
@@ -420,7 +421,7 @@ Most of the time, the event graph can thus remain on disk without using any spac
 The event graph and internal state are only required when handling concurrency, and even then we only have to replay the portion of the graph since the last ancestor that the concurrent operations had in common.
 In portions of the event graph that have no concurrency (which, in many editing histories, is the vast majority of events), events do not need to be transformed at all.
 
-In contrast, existing CRDTs require every replica to persist the internal state (including the unique ID for each character) and send it over the network.
+In contrast, existing CRDTs require every replica to persist the internal state and send it over the network.
 They also require that state to be loaded into memory to generate and receive operations, even when there is no concurrency.
 This uses several times more memory and makes documents slow to load.
 
@@ -487,6 +488,7 @@ These events can be processed as follows:
 \item Before we can apply $e_5$ we must rewind the prepare version to be $\{e_2\}$, which is the parent of $e_5$. We can do this by calling $\mathsf{retreat}(e_4)$ and $\mathsf{retreat}(e_3)$.
 \item Now we can call $\mathsf{apply}(e_5)$, $\mathsf{apply}(e_6)$, and $\mathsf{apply}(e_7)$.
 \item The parents of $e_8$ are $\{e_4, e_7\}$; before we can apply $e_8$ we must therefore add $e_3$ and $e_4$ to the prepare state again by calling $\mathsf{advance}(e_3)$ and $\mathsf{advance}(e_4)$.
+    We do not retreat $e_{5\dots 7}$ because $e_3$ and $e_4$ have already been applied in Step 1; now we are \emph{advancing} $e_3$ and $e_4$, which does not require retreating concurrent events.
 \item Finally, we can call $\mathsf{apply}(e_8)$.
 \end{enumerate}
 
