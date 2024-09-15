@@ -216,7 +216,7 @@ Events in the graph are immutable; they always represents the operation as origi
 \end{figure}
 
 For example, \autoref{graph-example} shows the event graph corresponding to \autoref{two-inserts}.
-The events $e_5$ and $e_6$ are concurrent, and the frontier of this graph is the set of events ${e_5, e_6}$.
+The events $e_5$ and $e_6$ are concurrent, and the frontier of this graph is the set of events $\{e_5, e_6\}$.
 
 The event graph for a substantial document, such as a research paper, may contain hundreds of thousands of events.
 It can nevertheless be stored in a very compact form by exploiting the typical editing patterns of humans writing text: characters tend to be inserted or deleted in consecutive runs.
