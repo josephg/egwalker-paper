@@ -432,6 +432,7 @@ However, OT algorithms are very slow to merge long-running branches (see \autore
 \subsection{Walking the event graph}\label{graph-walk}
 
 For the sake of clarity we first explain a simplified version of \algname that replays the entire event graph without discarding its internal state along the way. This approach incurs some CRDT overhead even for non-concurrent operations.
+We give pseudocode for this simplified algorithm in \ifincludeappendix\autoref{pseudocode-appendix}\else the extended version of this paper \cite{extended-version}\fi.
 In \autoref{partial-replay} we show how the algorithm can be optimised to replay only a part of the event graph.
 
 First, we topologically sort the event graph in a way that keeps events on the same branch consecutive as much as possible: for example, in \autoref{topological-sort} we first visit $e_\mathrm{A1} \dots e_\mathrm{A4}$, then $e_\mathrm{B1} \dots e_\mathrm{B4}$. We avoid alternating between branches, such as $e_\mathrm{A1}, e_\mathrm{B1}, e_\mathrm{A2}, e_\mathrm{B2} \dots$, even though that would also be a valid topological sort.
@@ -482,7 +483,7 @@ Consider the example in \autoref{graph-hi-hey}, and assume that the events $e_1 
 These events can be processed as follows:
 
 \begin{enumerate}
-\item Start in the empty state, and then call $\mathsf{apply}(e_1)$, $\mathsf{apply}(e_2)$, $\mathsf{apply}(e_3)$, and $\mathsf{apply}(e_4)$. This is valid because each event's parent version is the set of all events processed so far.
+\item Start in the empty state, then call $\mathsf{apply}(e_1)$, $\mathsf{apply}(e_2)$, $\mathsf{apply}(e_3)$, and $\mathsf{apply}(e_4)$. This is valid because each event's parent version is the previously applied event.
 \item Before we can apply $e_5$ we must rewind the prepare version to be $\{e_2\}$, which is the parent of $e_5$. We can do this by calling $\mathsf{retreat}(e_4)$ and $\mathsf{retreat}(e_3)$.
 \item Now we can call $\mathsf{apply}(e_5)$, $\mathsf{apply}(e_6)$, and $\mathsf{apply}(e_7)$.
 \item The parents of $e_8$ are $\{e_4, e_7\}$; before we can apply $e_8$ we must therefore add $e_3$ and $e_4$ to the prepare state again by calling $\mathsf{advance}(e_3)$ and $\mathsf{advance}(e_4)$.
@@ -578,7 +579,7 @@ $s_e$ does not count the number of deletions and does not have a $\texttt{NotIns
   \label{crdt-state-1}
 \end{figure}
 
-For example, \autoref{crdt-state-1} shows the state after applying $e_1 \dots e_4$ from \autoref{graph-hi-hey}, and how that state is updated by retreating $e_4$ and $e_3$ before $e_5$ is applied.
+For example, \autoref{crdt-state-1} shows the internal state after applying $e_1 \dots e_4$ from \autoref{graph-hi-hey}, and how that state is updated by retreating $e_4$ and $e_3$ before $e_5$ is applied.
 In the effect state, the lowercase ``h'' is marked as deleted, while the uppercase ``H'' and the ``i'' are visible.
 In the prepare state, by retreating $e_4$ and $e_3$ the ``H'' is marked as \texttt{NotInsertedYet}, and the deletion of ``h'' is undone ($s_p = \texttt{Ins}$).
 
@@ -636,7 +637,7 @@ While advancing/retreating we cannot look up a target record by its index. Inste
 \end{itemize}
 
 On every $\mathsf{apply}(e)$, after updating the sequence as above, we update this mapping.
-When we subsequently call $\mathsf{retreat}(e)$ or $\mathsf{advance}(e)$, that event $e$ must have already been applied, and hence $e.\mathit{id}$ must appear in this mapping.
+When we later call $\mathsf{retreat}(e)$ or $\mathsf{advance}(e)$, that event $e$ must have already been applied, and hence $e.\mathit{id}$ must appear in this mapping.
 This map allows us to advance or retreat in logarithmic time.
 
 \subsection{Clearing the internal state}\label{clearing}
@@ -715,7 +716,7 @@ The upper bound on the number of entries in each tree (including placeholders) i
 Since the trees are balanced, the cost of each traversal is $O(\log(k+m))$.
 Overall, the cost of merging branches with $k$ and $m$ events is therefore $O((k+m) \log(k+m))$.
 
-We can also give an upper bound on the complexity of replaying an event graph with $n$ events.
+We can also give an upper bound on the complexity of replaying an arbitrary event graph with $n$ events.
 Each event is applied exactly once, and before each event we retreat or advance each prior event at most once, at $O(\log n)$ cost.
 The worst-case complexity of the algorithm is therefore $O(n^2 \log n)$, but this case is unlikely to occur in practice.
 
@@ -726,12 +727,12 @@ To store the event graph compactly on disk, we developed a compression technique
 
 We first topologically sort the events in the graph. Different replicas may sort the graph differently, but locally to one replica we can identify an event by its index in this sorted order.
 Then we store different properties of events in separate byte sequences called \emph{columns}, which are then combined into one file with a simple header.
-Each column stores some different fields of the event data. The columns are:
+Each column stores different fields of the event data. The columns are:
 
 \begin{itemize}
 \item \emph{Event type, start position, and run length.} For example, ``the first 23 events are insertions at consecutive indexes starting from index 0, the next 10 events are deletions at consecutive indexes starting from index 7,'' and so on. We encode this using a variable-length binary encoding of integers, which represents small numbers in one byte, larger numbers in two bytes, etc.
 \item \emph{Inserted content.} An insertion event contains exactly one character (a Unicode scalar value), and a deletion does not. We concatenate the UTF-8 encoding of the characters for insertion events in the same order as they appear in the first column, and LZ4-compress.
-\item \emph{Parents.} By default we assume that every event has exactly one parent, namely its predecessor in the topological sort. Any events for which this is not true are listed explicitly, for example: ``the first event has zero parents; the 153rd event has two parents, namely events numbers 31 and 152;'' and so on.
+\item \emph{Parents.} By default we assume that every event has exactly one parent, namely its predecessor in the topological sort. Any events for which this is not true are listed explicitly, for example: ``the first event has zero parents; the 153rd event has two parents, namely events 31 and 152;'' and so on.
 \item \emph{Event IDs.} Each event is uniquely identified by a pair of a replica ID and a per-replica sequence number. This column stores runs of event IDs, for example: ``the first 1085 events are from replica $A$, starting with sequence number 0; the next 595 events are from replica $B$, starting with sequence number 0;'' and so on.
 % - \emph{Cached transform positions (optional).} We can optionally store the transformed positions of each event. This allows the document state to be recomputed much faster in many cases. And because of the similarity between transformed positions and original positions, this data adds a very small amount of file overhead in practice.
 \end{itemize}
@@ -1266,7 +1267,7 @@ fn generateDocument(events) {
 \end{listing*}
 
 \newpage
-\section{Algorithm Pseudocode}
+\section{Algorithm Pseudocode}\label{pseudocode-appendix}
 
 \autoref{pseudocode1} and \autoref{pseudocode2} provide simplified pseudocode for the core \algname algorithm as described in \autoref{graph-walk} and \ref{prepare-effect-versions}.
 For brevity, the pseudocode does not include the B-trees from \autoref{b-trees}, the state clearing optimisation from \autoref{clearing}, and the partial replay optimisation from \autoref{partial-replay}.
