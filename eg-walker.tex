@@ -1,5 +1,8 @@
 \documentclass[sigplan,10pt]{acmart}
 
+\newif\ifincludeappendix
+\includeappendixtrue % \includeappendixtrue or \includeappendixfalse to enable/disable appendix
+
 \usepackage{tikz}
 \usetikzlibrary {arrows.meta}
 
@@ -174,7 +177,7 @@ This paper makes the following contributions:
 \item We introduce \algname, a hybrid CRDT/OT algorithm for text that is faster and has a vastly smaller memory footprint than existing CRDTs (\autoref{algorithm}).
 \item Since there is no established benchmark for collaborative text editing, we are also publishing a suite of editing traces of text files for benchmarking. They are derived from real documents and demonstrate various patterns of sequential and concurrent editing.
 \item In \autoref{benchmarking} we use those editing traces to evaluate the performance of our implementation of \algname, comparing it to selected CRDTs and an OT implementation. We measure CPU time to load a document, CPU time to merge edits from a remote replica, memory usage, and file size. \algname improves the state of the art by orders of magnitude in the best cases, and is only slightly slower in the worst cases.
-\item We prove the correctness of \algname in \autoref{proofs}.
+\item We prove the correctness of \algname in \ifincludeappendix\autoref{proofs}.\else the extended version of this paper~\cite{extended-version}.\fi
 \end{itemize}
 
 \section{Background}
@@ -739,7 +742,7 @@ When sending a subset of events over the network (e.g., a single event during re
 We created a TypeScript implementation of \algname optimised for simplicity and readability \cite{reference-reg}, and a production-ready Rust implementation optimised for performance \cite{dt}.
 The TypeScript version omits the run-length encoding of internal state, B-trees, and topological sorting heuristics.
 
-To evaluate the correctness of \algname we proved that the algorithm complies with Attiya et al.'s \emph{strong list specification} \cite{Attiya2016} (see \autoref{proofs}).
+To evaluate the correctness of \algname we proved that the algorithm complies with Attiya et al.'s \emph{strong list specification} \cite{Attiya2016} (see \ifincludeappendix\autoref{proofs}\else the extended version of this paper \cite{extended-version}\fi).
 We also performed randomised property testing on the implementations, including checking that our implementations converge to the same result.
 
 To evaluate its performance, we compare the Rust implementation of \algname with two popular CRDT libraries: Automerge v0.5.9 \cite{automerge} (Rust) and Yjs v13.6.10 \cite{yjs} (JavaScript).\footnote{We also tested Yrs \cite{yrs}, the Rust rewrite of Yjs by the original authors. It performed worse than Yjs, so we omitted it from our results.}
@@ -1136,6 +1139,7 @@ As a result, it is difficult to fairly compare algorithms that are implemented b
 We have attempted to address this issue by writing our own reference CRDT and OT implementations that use a similar implementation style to our optimised Eg-walker implementation, enabling as much as possible an apples-for-apples comparison.
 We hope that future research will be able to develop more rigorous approaches to evaluating collaborative editing systems.
 
+\ifincludeappendix
 \begin{listing*}
 \footnotesize
 \begin{minted}{rust}
@@ -1588,4 +1592,5 @@ We can now state our modified definition of the strong list specification:
   Thus, the transformed index of the insertion is also $i$, and therefore the new element is inserted at index $i$ of the document as required.
   This completes the proof that \algname satisfies the strong list specification.
 \end{proof}
+\fi % \ifincludeappendix
 \end{document}
