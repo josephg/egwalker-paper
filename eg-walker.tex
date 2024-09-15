@@ -994,7 +994,7 @@ By requiring no server, \algname makes it possible for decentralised, local-firs
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{works}
 
-\newpage
+\clearpage
 \appendix
 \section{Artifact Appendix} 
 \subsection{Abstract}
@@ -1176,7 +1176,15 @@ We hope that future research will be able to develop more rigorous approaches to
 
 \ifincludeappendix
 \begin{listing*}
+\section{Algorithm Pseudocode}\label{pseudocode-appendix}
+
+\begin{flushleft}
+\autoref{pseudocode1} and \autoref{pseudocode2} provide simplified pseudocode for the core \algname algorithm as described in \autoref{graph-walk} and \ref{prepare-effect-versions}.
+For brevity, the pseudocode does not include the B-trees from \autoref{b-trees}, the state clearing optimisation from \autoref{clearing}, and the partial replay optimisation from \autoref{partial-replay}.
+\end{flushleft}
+
 \footnotesize
+\vspace{5cm}
 \begin{minted}{rust}
 let events: EventStorage // Assumed to contain all events
 
@@ -1290,12 +1298,6 @@ fn generateDocument(events) {
 \end{minted}
 \caption{Continuation of the pseudocode in \autoref{pseudocode1}.}\label{pseudocode2}
 \end{listing*}
-
-\newpage
-\section{Algorithm Pseudocode}\label{pseudocode-appendix}
-
-\autoref{pseudocode1} and \autoref{pseudocode2} provide simplified pseudocode for the core \algname algorithm as described in \autoref{graph-walk} and \ref{prepare-effect-versions}.
-For brevity, the pseudocode does not include the B-trees from \autoref{b-trees}, the state clearing optimisation from \autoref{clearing}, and the partial replay optimisation from \autoref{partial-replay}.
 
 \clearpage
 \section{Proof of Correctness}\label{proofs}
