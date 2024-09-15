@@ -494,11 +494,11 @@ In complex event graphs such as the one in \autoref{topological-sort} the same e
 In general, before applying the next event $e$ in topologically sorted order, compute $G_\mathrm{old} = \mathsf{Events}(V_p)$ where $V_p$ is the current prepare version, and $G_\mathrm{new} = \mathsf{Events}(e.\mathit{parents})$.
 We then call $\mathsf{retreat}$ on each event in $G_\mathrm{old} - G_\mathrm{new}$ (in reverse topological sort order), and call $\mathsf{advance}$ on each event in $G_\mathrm{new} - G_\mathrm{old}$ (in topological sort order) before calling $\mathsf{apply}(e)$.
 
-% The following algorithm efficiently computes the events to retreat and advance when moving the prepare version from $V_p$ to $V'_p$.
-% For each event in $V_p$ and $V'_p$ we insert the index of that event in the topological sort order into a priority queue, along with a tag indicating whether the event is in the old or the new prepare version.
-% We then repeatedly pop the event with the greatest index off the priority queue, and enqueue the indexes of its parents along with the same tag.
-% We stop the traversal when all entries in the priority queue are common ancestors of both $V_p$ and $V'_p$.
-% Any events that were traversed from only one of the versions need to be retreated or advanced respectively.
+The following algorithm efficiently computes the events to retreat and advance when moving the prepare version from $V_p$ to $V'_p$.
+For each event in $V_p$ and $V'_p$ we insert the index of that event in the topological sort order into a priority queue, along with a tag indicating whether the event is in the old or the new prepare version.
+We then repeatedly pop the event with the greatest index off the priority queue, and enqueue the indexes of its parents along with the same tag.
+We stop the traversal when all entries in the priority queue are common ancestors of both $V_p$ and $V'_p$.
+Any events that were traversed from only one of the versions need to be retreated or advanced respectively.
 
 \subsection{Representing prepare and effect versions}\label{prepare-effect-versions}
 
