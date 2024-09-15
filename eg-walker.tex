@@ -192,11 +192,11 @@ Each device on which a user edits a document is a \emph{replica}, and each repli
 When a user makes an insertion or deletion, that operation is immediately applied to the user's local replica, and then asynchronously sent over the network to any other replicas that have a copy of the same document.
 Users can also edit their local copy while offline; the corresponding operations are then enqueued and sent when the device is next online.
 
-Our algorithm makes no assumptions about the underlying network via which operations are replicated: any reliable broadcast protocol (which detects and retransmits lost messages) is sufficient.
+Our algorithm assumes a reliable broadcast protocol that detects and retransmits lost messages, but makes no other assumptions about the network.
 For example, a relay server could store and forward messages from one replica to the others, or replicas could use a peer-to-peer gossip protocol.
-We make no timing assumptions and can tolerate arbitrary network delay, but we assume replicas are non-Byzantine.
+We make no timing assumptions and tolerate arbitrary network delay, but we assume replicas are non-Byzantine.
 
-A key property that the collaboration algorithm must satisfy is \emph{convergence}: any two replicas that have seen the same set of operations must be in the same document state (i.e., a text consisting of the same sequence of characters), even if the operations arrived in a different order at each replica.
+Our algorithm ensures \emph{convergence}: any two replicas that have seen the same operations have the same document state (i.e., a text consisting of the same sequence of characters), even if the operations arrived in a different order at each replica.
 If the underlying broadcast protocol ensures that every non-crashed replica eventually receives every operation, the algorithm achieves \emph{strong eventual consistency} \cite{Shapiro2011}.
 
 \subsection{Event graphs}\label{event-graphs}
@@ -269,7 +269,7 @@ For all valid event graphs $G$, $\mathsf{Events}(\mathsf{Version}(G)) = G$.
 
 The set of parents of an event in the graph is the version of the document in which that operation must be interpreted.
 The version can hence be seen as a \emph{logical clock}, describing the point in time at which a replica knows about the exact set of events in $G$.
-Even if the event graph is large, in practice a version rarely consists of more than two events.
+Even if the event graph is large and there are many collaborators, a version rarely consists of more than two events in practice: a version with $n$ events occurs only if $n$ mutually concurrent events are merged with no new operations being generated in the intervening time.
 
 \subsection{Replaying editing history}\label{replay}
 
@@ -947,11 +947,11 @@ The underlying event graph is not specific to the \algname algorithm, so we expe
 The core idea of \algname is not specific to plain text; we believe it can be extended to other file types such as rich text, graphics, or spreadsheets.
 
 Until now, many applications have been implemented using centralised server-based OT to avoid the overheads of CRDTs.
-\algname is the first CRDT to surpass OT's performance, and it requires no server.
-This breakthrough makes it possible for decentralised, local-first software \cite{Kleppmann2019localfirst} to become competitive with traditional cloud software.
+\algname is the first CRDT to match OT's memory use and performance on sequential editing histories (which are common in practice), while avoiding the quadratic merge complexity that makes OT impractical for long-running branches.
+By requiring no server, \algname makes it possible for decentralised, local-first software \cite{Kleppmann2019localfirst} to become competitive with traditional cloud software.
 
 \begin{acks}
-  This work was made possible by the generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have happened without help. Thankyou for the endless conversations we have shared about collaborative editing.
+  This work was made possible by generous support from Michael Toomim, the Braid community and the Invisible College. None of this would have happened without their help. Thank you for the endless conversations we have shared about collaborative editing.
   Martin Kleppmann gratefully acknowledges his crowdfunding supporters including Mintter and SoftwareMill.
   Thank you to Matthew Weidner and Joe Hellerstein for feedback on a draft of this paper.
 \end{acks}
