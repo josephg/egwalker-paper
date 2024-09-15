@@ -747,6 +747,21 @@ Replicas can optionally also store a copy of the final document state reflecting
 We send the same data format over the network when replicating the entire event graph.
 When sending a subset of events over the network (e.g., a single event during real-time collaboration), references to parent events outside of that subset need to be encoded using event IDs of the form $(\mathit{replicaID}, \mathit{seqNo})$, but otherwise the encoding is similar.
 
+\begin{table*}
+  \caption{The text editing traces used in our evaluation.
+    \emph{Repeats}: Number of times the original trace was repeated to normalise its length relative to the other traces.
+    \emph{Events}: total number of editing events, in thousands, including repeats. Each inserted or deleted character counts as one event.
+    \emph{Average concurrency}: mean number of concurrent branches per event in the trace.
+    \emph{Graph runs}: number of sequential runs of events (linear event sequences without branching/merging).
+    \emph{Authors}: number of users who added at least one event.
+    \emph{Chars remaining}: percentage of inserted characters that remain in the document (i.e., are never deleted) after all events have been merged.
+    \emph{Final size}: Resulting document size in kilobytes after all events have been merged.
+  }
+  \label{traces-table}
+  \footnotesize
+  \input{results/dataset_stats.tex}%
+\end{table*}
+
 \section{Evaluation}\label{benchmarking}
 
 % Hints for writing systems papers https://irenezhang.net/blog/2021/06/05/hints.html
@@ -758,7 +773,32 @@ The TypeScript version omits the run-length encoding of internal state, B-trees,
 To evaluate the correctness of \algname we proved that the algorithm complies with Attiya et al.'s \emph{strong list specification} \cite{Attiya2016} (see \ifincludeappendix\autoref{proofs}\else the extended version of this paper \cite{extended-version}\fi).
 We also performed randomised property testing on the implementations, including checking that our implementations converge to the same result.
 
-To evaluate its performance, we compare the Rust implementation of \algname with two popular CRDT libraries: Automerge v0.5.9 \cite{automerge} (Rust) and Yjs v13.6.10 \cite{yjs} (JavaScript).\footnote{We also tested Yrs \cite{yrs}, the Rust rewrite of Yjs by the original authors. It performed worse than Yjs, so we omitted it from our results.}
+\subsection{Editing traces}\label{editing-traces}
+
+As there is no established benchmark for collaborative text editing, we collected a set of editing traces from real documents and made them freely available \cite{editing-traces}.
+Statistics for these traces are given in \autoref{traces-table}.
+The traces represent the editing history of the following documents:
+
+\begin{description}
+    \item[Sequential Traces:] These traces have no concurrency. Trace S1 is the LaTeX source of a journal paper \cite{Kleppmann2017,automerge-perf}, S2 is an 8,800-word blog post \cite{crdts-go-brrr}, and S3 is the text of this paper that you are currently reading.
+        S2 has one author; S1 and S3 have two authors who took turns.
+    \item[Concurrent Traces:] Trace C1 is two users collaboratively writing a reflection on TV series they have just watched. C2 is two users collaboratively reflecting on going to clown school together. We added 1~sec (C1) or 0.5~sec (C2) artificial latency between the users to increase the incidence of concurrent operations.
+    \item[Asynchronous Traces:] We reconstructed the editing trace of some files in Git repositories. The event graph mirrors the branching/merging of Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations necessary to perform each commit's diff. Trace A1 is \texttt{src/node.cc} from the Git repository for Node.js \cite{node-src-nodecc}, and A2 is \texttt{Makefile} from the Git repository for Git itself \cite{git-makefile}.
+\end{description}
+
+We recorded the sequential and concurrent traces ourselves, collaborating with friends or colleagues, using an instrumented text editor that recorded keystroke-granularity editing events.
+All contributors to the traces have given their consent for their recorded keystroke data to be made publicly available and to be used for benchmarking purposes.
+The asynchronous traces are derived from public data on GitHub.
+
+The recorded editing traces originally varied a great deal in length.
+To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters, equivalent to about 100 printed pages (with the exception of S3, which is approximately twice this size).
+We did this by duplicating the shorter event graphs multiple times in our data files, without introducing any concurrency (that is, all events from one run of the trace happen either before or after all events from another run).
+We repeat the original S1 and S2 traces 3 times, the original C1 and C2 traces 25 times, and the original A2 trace twice.
+The statistics given in \autoref{traces-table} are after duplication.
+
+\subsection{Experimental approach}
+
+To evaluate the performance of \algname, we compare our Rust implementation with two popular CRDT libraries: Automerge v0.5.9 \cite{automerge} (Rust) and Yjs v13.6.10 \cite{yjs} (JavaScript).\footnote{We also tested Yrs \cite{yrs}, the Rust rewrite of Yjs by the original authors. It performed worse than Yjs, so we omitted it from our results.}
 We only test their collaborative text datatypes, and not the other features they support.
 However, the performance of these libraries varies widely.
 In an effort to distinguish between implementation differences and algorithmic differences, we have also implemented our own performance-optimised reference CRDT library.
@@ -780,24 +820,6 @@ The standard deviation for all benchmark results was less than 1.2\% of the mean
 \item[Memory usage:] The RAM used while a document is loaded and while merging remote updates.
 \item[Storage size:] The number of bytes needed to persistently store a document or replicate it over the network.
 \end{description}
-
-\subsection{Editing traces}
-
-As there is no established benchmark for collaborative text editing, we collected a set of editing traces from real documents.
-We have made these traces freely available on GitHub \cite{editing-traces}.
-
-For this evaluation we use seven traces, which fall into three categories:
-
-\begin{description}
-\item[Sequential Traces] (S1, S2, S3): One author, or multiple authors taking turns (no concurrency).
-\item[Concurrent Traces] (C1, C2): Multiple users concurrently editing the same document with $\approx$1 second latency. Many short-lived branches with frequent merges.
-\item[Asynchronous Traces] (A1, A2): Event graphs derived from branching/merging Git commit histories. Multiple long-running branches and infrequent merges.
-\end{description}
-
-We recorded the sequential and concurrent traces with keystroke granularity using an instrumented text editor.
-To make the traces easier to compare, we normalised them so that each trace contains $\approx$500k inserted characters (about 100 printed pages).
-We extended shorter traces to this length by repeating them several times.
-See \autoref{traces-appendix} for details.
 
 \subsection{Time taken to load and merge changes}
 
@@ -980,7 +1002,7 @@ By requiring no server, \algname makes it possible for decentralised, local-firs
 Our artifact is an implementation of the Eg-walker algorithm, together with the datasets and benchmarking tools required to run the experiments described in the paper.
 Specifically, it contains the following items:
 \begin{itemize}
-    \item Editing traces of text documents that we use for benchmarking (see \autoref{traces-appendix} and \autoref{traces-table}), in our own binary format and as JSON
+    \item Editing traces of text documents that we use for benchmarking (see \autoref{traces-table}), in our own binary format and as JSON
     \item Source code for the following tools:
         \begin{itemize}
             \item Our optimised Eg-walker implementation, written in Rust
@@ -1066,7 +1088,7 @@ Please see the \texttt{README.md} file in the artifact repository for a detailed
 \subsubsection{Experiment E1: File sizes (4 compute-hours)}
 
 Converts the raw editing traces in the \verb|datasets/raw| directory into the Yjs, Automerge, and Eg-walker file formats (\verb|datasets/*.{yjs,am,dt}|).
-Some of the traces are repeated several times so that they have a similar size (see \autoref{traces-appendix}).
+Some of the traces are repeated several times so that they have a similar size (see \autoref{editing-traces}).
 The sizes of the resulting files are reported in \autoref{chart-dt-vs-automerge} and \autoref{chart-dt-vs-yjs}.
 The files also form an input to the subsequent experiments.
 The output files are included with the artifact so that the later experiments can be run without having to run this one.
@@ -1129,7 +1151,7 @@ While our artifact contains a snapshot of our Eg-walker implementation at the ti
 
 Diamond Types is freely available under the ISC license.
 
-As part of this work, we have also created several editing traces of real text documents, as described in \autoref{traces-appendix}.
+As part of this work, we have also created several editing traces of real text documents, as described in \autoref{editing-traces}.
 The intention is that these traces can be used in future research for benchmarking collaborative text editing systems.
 The \verb|datasets/| directory of the artifact contains those traces in JSON format.
 Additional traces that we may collect in the future will be added to the following repository:
@@ -1275,44 +1297,7 @@ fn generateDocument(events) {
 \autoref{pseudocode1} and \autoref{pseudocode2} provide simplified pseudocode for the core \algname algorithm as described in \autoref{graph-walk} and \ref{prepare-effect-versions}.
 For brevity, the pseudocode does not include the B-trees from \autoref{b-trees}, the state clearing optimisation from \autoref{clearing}, and the partial replay optimisation from \autoref{partial-replay}.
 
-\begin{table*}
-  \caption{The text editing traces used in our evaluation.
-    \emph{Repeats}: Number of times the original trace was repeated to normalise its length relative to the other traces.
-    \emph{Events}: total number of editing events, in thousands, including repeats. Each inserted or deleted character counts as one event.
-    \emph{Average concurrency}: mean number of concurrent branches per event in the trace.
-    \emph{Graph runs}: number of sequential runs of events (linear event sequences without branching/merging).
-    \emph{Authors}: number of users who added at least one event.
-    \emph{Chars remaining}: percentage of inserted characters that remain in the document (i.e., are never deleted) after all events have been merged.
-    \emph{Final size}: Resulting document size in kilobytes after all events have been merged.
-  }
-  \label{traces-table}
-  \footnotesize
-  \input{results/dataset_stats.tex}%
-\end{table*}
-
 \clearpage
-\section{Editing Traces}\label{traces-appendix}
-
-\autoref{traces-table} gives an overview of the editing traces used in our evaluation (\autoref{benchmarking}).
-All traces are freely available for benchmarking collaborative text editing algorithms on GitHub \cite{editing-traces}.
-The traces represent the editing history of the following documents:
-
-\begin{description}
-    \item[Sequential Traces:] These traces have no concurrency. They were recorded using an instrumented text editor that recorded keystroke-granularity editing events. Trace S1 is the LaTeX source of a journal paper \cite{Kleppmann2017,automerge-perf} written by two authors who took turns. S2 is the text of an 8,800-word, single-author blog post \cite{crdts-go-brrr}. S3 is the Typst source of this paper that you are currently reading.
-    \item[Concurrent Traces:] Trace C1 is two users in the same document, writing a reflection on an episode of a TV series they have just watched. C2 is two users collaboratively reflecting on going to clown school together. We recorded these real-time collaborations with keystroke granularity, and we added 1~sec (C1) or 0.5~sec (C2) artificial latency between the collaborating users to increase the incidence of concurrent operations.
-    \item[Asynchronous Traces:] We reconstructed the editing trace of some files in Git repositories. The event graph mirrors the branching/merging of Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations necessary to perform each commit's diff. Trace A1 is \texttt{src/node.cc} from the Git repository for Node.js \cite{node-src-nodecc}, and A2 is \texttt{Makefile} from the Git repository for Git itself \cite{git-makefile}.
-\end{description}
-
-We recorded the sequential and concurrent traces ourselves, collaborating with friends or colleagues.
-All contributors to the traces have given their consent for their recorded keystroke data to be made publicly available and to be used for benchmarking purposes.
-The asynchronous traces are derived from public data on GitHub.
-
-The recorded editing traces originally varied a great deal in length.
-To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters (with the exception of S3, which is approximately twice this size).
-We did this by duplicating the shorter event graphs multiple times in our data files, without introducing any concurrency (that is, all events from one run of the trace happen either before or after all events from another run).
-We repeat the original S1 and S2 traces 3 times, the original C1 and C2 traces 25 times, and the original A2 trace twice.
-The statistics given in \autoref{traces-table} are after duplication.
-
 \section{Proof of Correctness}\label{proofs}
 
 We now demonstrate that \algname is a correct collaborative text algorithm by showing that it satisfies the \emph{strong list specification} proposed by Attiya et al. \cite{Attiya2016}, a formal specification of collaborative text editing.
