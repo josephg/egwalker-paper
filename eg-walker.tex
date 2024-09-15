@@ -2,6 +2,7 @@
 
 \newif\ifincludeappendix
 \includeappendixtrue % \includeappendixtrue or \includeappendixfalse to enable/disable appendix
+\ifincludeappendix\settopmatter{printfolios=true}\fi % conference version has no page numbers, extended version does
 
 \usepackage{tikz}
 \usetikzlibrary {arrows.meta}
