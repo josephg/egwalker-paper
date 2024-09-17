@@ -749,13 +749,13 @@ When sending a subset of events over the network (e.g., a single event during re
 
 \begin{table*}
   \caption{The text editing traces used in our evaluation.
-    \emph{Repeats}: Number of times the original trace was repeated to normalise its length relative to the other traces.
+    \emph{Repeats}: number of times the original trace was repeated to normalise its length relative to the other traces.
     \emph{Events}: total number of editing events, in thousands, including repeats. Each inserted or deleted character counts as one event.
     \emph{Average concurrency}: mean number of concurrent branches per event in the trace.
     \emph{Graph runs}: number of sequential runs of events (linear event sequences without branching/merging).
     \emph{Authors}: number of users who added at least one event.
     \emph{Chars remaining}: percentage of inserted characters that remain in the document (i.e., are never deleted) after all events have been merged.
-    \emph{Final size}: Resulting document size in kilobytes after all events have been merged.
+    \emph{Final size}: resulting document size in kilobytes after all events have been merged.
   }
   \label{traces-table}
   \footnotesize
@@ -786,15 +786,19 @@ The traces represent the editing history of the following documents:
     \item[Asynchronous Traces:] We reconstructed the editing trace of some files in Git repositories. The event graph mirrors the branching/merging of Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations necessary to perform each commit's diff. Trace A1 is \texttt{src/node.cc} from the Git repository for Node.js \cite{node-src-nodecc}, and A2 is \texttt{Makefile} from the Git repository for Git itself \cite{git-makefile}.
 \end{description}
 
+Even though the sequential traces do not excercise the merging algorithm, they are important to include in the benchmark.
+Anecodotal evidence suggests that the majority of documents in practice are sequentially edited~-- that is, they either have a single author, or multiple authors who take turns to write.
+The concurrent traces have many short-lived branches (see the \emph{graph runs} column in \autoref{traces-table}).
+The asynchronous traces have a small number of long-running branches, which occur in the context of offline working or editors that support explicit branching and merging~\cite{Upwelling,Patchwork}.
+
 We recorded the sequential and concurrent traces ourselves, collaborating with friends or colleagues, using an instrumented text editor that recorded keystroke-granularity editing events.
 All contributors to the traces have given their consent for their recorded keystroke data to be made publicly available and to be used for benchmarking purposes.
 The asynchronous traces are derived from public data on GitHub.
 
 The recorded editing traces originally varied a great deal in length.
-To allow easier comparison of measurements between traces, we have attempted to roughly standardise the sizes of all editing traces to contain approximately 500k inserted characters, equivalent to about 100 printed pages (with the exception of S3, which is approximately twice this size).
-We did this by duplicating the shorter event graphs multiple times in our data files, without introducing any concurrency (that is, all events from one run of the trace happen either before or after all events from another run).
-We repeat the original S1 and S2 traces 3 times, the original C1 and C2 traces 25 times, and the original A2 trace twice.
-The statistics given in \autoref{traces-table} are after duplication.
+To allow easier comparison of measurements between traces, we have normalised the length of the traces to contain approximately 500k inserted characters (except for S3, which is approximately twice this size).
+We did this by repeating the original S1 and S2 traces 3 times, the original C1 and C2 traces 25 times, and the original A2 trace twice.
+The statistics given in \autoref{traces-table} are after repetition.
 
 \subsection{Experimental approach}
 
@@ -806,7 +810,7 @@ This library shares most of its code with our Rust \algname implementation, enab
 Our reference CRDT outperforms both Yjs and Automerge.
 
 We have also implemented a simple OT library using the TTF algorithm \cite{Oster2006TTF}.
-(We do not use the server-based Jupiter algorithm \cite{Nichols1995} or the popular OT library ShareDB \cite{sharedb} because they do not support the branching and merging patterns that occur in some of our dataset.)
+We do not use the server-based Jupiter algorithm \cite{Nichols1995} or the popular OT library ShareDB \cite{sharedb} because they do not support the branching and merging patterns that occur in our asynchronous traces.
 % This OT library batch transforms operations in a given event graph. Intermediate transformed operations are memoized and reused during the graph traversal - which dramatically improves performance but also increases memory usage. This library has not been optimised as thoroughly as the other code.
 
 We compare these implementations along 3 dimensions:\footnote{Experimental setup: We ran the benchmarks on a Ryzen 7950x CPU running Linux 6.5.0-28 and 64GB of RAM.
@@ -818,8 +822,15 @@ The standard deviation for all benchmark results was less than 1.2\% of the mean
 \begin{description}
 \item[Speed:] The CPU time to load a document into memory, and to merge a set of updates from a remote replica.
 \item[Memory usage:] The RAM used while a document is loaded and while merging remote updates.
-\item[Storage size:] The number of bytes needed to persistently store a document or replicate it over the network.
+\item[Storage size:] The number of bytes needed to persistently store a document or send it over the network.
 \end{description}
+
+By design, our experiments do not run over a network, but focus on single-node CPU and memory use (along with storage size, which is also a measure of network bandwidth used).
+We made this choice because memory use and loading time are the biggest challenges with CRDTs, and CPU time on long-running branches is the biggest challenge with OT.
+We delegate replication to the reliable broadcast protocol, which is beyond the scope of this paper.
+Moreover, the results in a distributed setup would depend highly on the online/offline pattern we assume; running on a single node allows us to more directly compare the algorithms.
+
+% Reasons for replaying full trace: independent of whether and when users are online (how would a sequential trace be chunked?), gives us a single number per algorithm per trace, upper bound on merge time, accurate measure of time to load from disk and of reconstructing a historical version of a document. 
 
 \subsection{Time taken to load and merge changes}
 
@@ -828,13 +839,17 @@ The slowest operations in many collaborative editors are:
 \item merging a large set of edits from a remote replica into the local state (e.g. reconnecting after working offline);
 \item loading a document from disk into memory so that it can be displayed and edited.
 \end{itemize}
+
 To simulate a worst-case merge, we start with an empty document and then merge an entire editing trace into it.
 In the case of \algname this means replaying the full trace.
 \autoref{chart-remote} shows the merge time for each implementation.
+Such a large merge occurs in practice when a node has been offline for a long time and needs to catch up on most of the editing history, or when replaying a subset of the editing history in order to reconstruct a historical version of the document (for history visualisation).
+Moreover, in the CRDT implementations we tested, loading a document from disk takes the same CPU time as merging all of the events.
+Smaller merges, which occur during online collaboration, are faster.
 % For the CRDT implementations, all events were preprocessed into the appropriate CRDT message format. The time taken to do this is not included in our measurements.
 
-After completing this merge, we saved the resulting local replica state to disk and measured the CPU time to load it back into memory.
-In the CRDT implementations we tested, loading a document from disk is equivalent to merging the remote events, so we do not show CRDT loading times separately in \autoref{chart-remote}.
+After merging the entire trace, we save the resulting local replica state to disk and measure the CPU time to load it back into memory.
+Since loading and merging take the same time in the CRDTs we tested, we do not show their loading times separately in \autoref{chart-remote}.
 In these algorithms, the CRDT metadata needs to be in memory for the user to be able to edit the document, or to apply any updates received from other replicas (even when there is no concurrency).
 In contrast, OT and \algname can load documents orders of magnitude faster than CRDTs by caching the final document state on disk, and loading just this data (essentially a plain text file).
 \algname and OT only need to load the event graph when merging concurrent changes or to reconstruct old document versions.
@@ -857,8 +872,7 @@ Both are significantly faster than the state-of-the-art Yjs and Automerge CRDT l
 On the sequential traces \algname outperforms our reference CRDT by a factor of 7--10$\times$, and on trace A1 (which contains large sequential sections) \algname is 5$\times$ faster.
 Comparing to Yjs or Automerge, this speedup is greater still.
 This is due to \algname's ability to clear its internal state and skip all of the internal state manipulation on critical versions (\autoref{clearing}).
-To quantify this effect, we compare \algname's performance with a version of the algorithm that has these optimisations disabled.
-\autoref{speed-ff} shows the time taken to replay all our traces with this optimisation enabled and disabled.
+To quantify this effect, \autoref{speed-ff} compares the time taken to replay all our traces with this optimisation enabled and disabled.
 We see that the optimisation is effective for S1, S2, S3, and A1, whereas for C1, C2, and A2 it makes little difference (A2 contains no critical versions).
 
 \begin{figure}
@@ -875,23 +889,21 @@ A poorly chosen traversal order can make this trace as much as 8$\times$ slower 
 \subsection{RAM usage}
 
 \autoref{chart-memusage} shows the memory footprint (retained heap size) of each algorithm.
-The memory used by \algname and OT is split into peak usage (during the merge process) and the ``steady state'' memory usage, after temporary data such as \algname's internal state is discarded and the event graph is written out to disk.
+For \algname and OT it shows both peak usage (while replaying the entire editing trace) and ``steady state'' memory usage (after temporary data and \algname's internal state are discarded and the event graph is written out to disk).
 For the CRDTs the figure shows steady state memory usage; peak usage is up to 25\% higher.
 
 \algname's peak memory use is similar to our reference CRDT's steady state: slightly lower on the sequential traces, and approximately double for the concurrent traces.
 However, the steady-state memory use of \algname is 1--2 orders of magnitude lower than the best CRDT.
 This is a significant result, since the steady state is what matters during normal operation while a document is being edited.
-Note that peak memory usage would be lower when replaying a subset of an event graph, which is the common case.
+Memory usage reaches this peak only when replaying the entire trace; it is lower when merging a small branch.
+Yjs has up to a 3$\times$ greater memory use than our reference CRDT, and Automerge an order of magnitude greater.
 
 % (seph): The peak memory usage could be reduced a lot if I first divide up the graph into chunks by the critical versions. Right now, the implementation makes a ``merge plan'' for the whole thing (which is stored in memory) then processes the entire plan. The plan itself uses up a lot of memory. A better approach would chunk it in sections separated by critical versions. That would dramatically reduce peak memory usage!
-
-Yjs has up to a 3$\times$ greater memory use than our reference CRDT, and Automerge an order of magnitude greater.
-% Automerge's very high memory use on C1 and C2 is probably a bug.
-% The computer we used for benchmarking had enough RAM to prevent swapping in all cases.
 
 OT has the same memory use as \algname in the steady state, but significantly higher peak memory use on the C1, C2, and A2 traces (6.8~GiB for A2).
 The reason is that our OT implementation memoizes intermediate transformed operations to improve performance.
 This memory use could be reduced at the cost of increased merge times.
+The computer we used for benchmarking had enough RAM to prevent swapping in all cases.
 
 \begin{figure}
   \includegraphics[width=\linewidth]{diagrams/memusage.pdf}
@@ -913,10 +925,10 @@ Automerge stores the full editing history of a document, and \autoref{chart-dt-v
 % Note that storing the raw editing trace in this compact form removes one of the principle benefits of \algname, as the event graph must be replayed in order to determine the current document text. To improve load time, the current text content can be cached and stored alongside the event graph on disk. Alternately, the transformed operation positions can also be stored in the file. In our testing, this resulted in a tiny increase in file size while improving load performance by an order of magnitude.
 
 In contrast, Yjs only stores the resulting document text, and any data needed to merge changes.
-Yjs does not store deleted characters or the \emph{happened before} relationship between events.
+Yjs does not store deleted characters or the happened-before relationship between events.
 % (Ie, Yjs does not store the edges in the event graph.)
 \autoref{chart-dt-vs-yjs} compares Yjs to the equivalent event graph encoding in which we only store the final document text and operation metadata.
-Our encoding is smaller than Yjs on the sequential and async traces, but larger for the concurrent traces, where the edges in the event graph take a nontrivial amount of space.
+Our encoding is smaller than Yjs on the sequential and async traces, but larger for the concurrent traces, where the edges in the event graph take more space.
 The overhead of storing the event graph is between 20\% and 3$\times$ the final plain text file size.
 % Using this scheme, \algname can still merge editing events and load the document text directly from disk.
 
@@ -958,11 +970,11 @@ A problem with this architecture is that when two replicas have diverged and eac
 Other collaborative text editing algorithms \cite{Preguica2009,Roh2011RGA,fugue,Weiss2010} belong to the family of \emph{conflict-free replicated data types} (CRDTs) \cite{Shapiro2011}.
 To our knowledge, all existing CRDTs for text work by assigning each character a unique ID, and translating index-based insertions and deletions into ID-based ones.
 These unique IDs need to be held in memory when a document is being edited, persisted for the lifetime of the document, and sent to all replicas.
-In contrast, \algname uses unique IDs only transiently during replay but does not persist or replicate them, and it can free all of its internal state whenever a critical version is reached.
+In contrast, \algname uses unique IDs only transiently during replay but does not persist or replicate them, and it can free its internal state whenever a critical version is reached.
 \algname needs to store the event graph as long as concurrent operations may arrive, but this takes less space than CRDT state, and it only needs to be in-memory while merging concurrent operations.
 Most of the time the event graph can remain on disk.
 
-Gu et al.'s \emph{mark \& retrace} method \cite{Gu2005} builds a CRDT-like structure containing the entire editing history, not only the parts being merged.
+Gu et al.'s mark \& retrace method \cite{Gu2005} builds a CRDT-like structure containing the entire editing history, not only the parts being merged.
 Differential synchronization \cite{Fraser2009} relies on heuristics such as similarity-matching of text to perform merges, which is not guaranteed to converge.
 
 Version control systems such as Git \cite{Coglan2019}, Pijul \cite{pijul}, and Darcs \cite{darcs} also track the editing history of text files.
@@ -991,6 +1003,7 @@ By requiring no server, \algname makes it possible for decentralised, local-firs
   Thank you to Matthew Weidner and Joe Hellerstein for feedback on a draft of this paper.
 \end{acks}
 
+\clearpage
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{works}
 
