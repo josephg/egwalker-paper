@@ -1315,7 +1315,7 @@ fn generateDocument(events) {
 \clearpage
 \section{Proof of Correctness}\label{proofs}
 
-We now demonstrate that \algname is a correct collaborative text algorithm by showing that it satisfies the \emph{strong list specification} proposed by Attiya et al. \cite{Attiya2016}, a formal specification of collaborative text editing.
+We now demonstrate that \algname is correct by showing that it satisfies the \emph{strong list specification} proposed by Attiya et al. \cite{Attiya2016}, a formal specification of collaborative text editing.
 Informally speaking, this specification requires that replicas converge to the same document state, that this state contains exactly those characters that were inserted but not deleted, and that inserted characters appear in the correct place relative to the characters that surrounded it at the time it was inserted.
 Assuming network partitions are eventually repaired, this is a stronger specification than \emph{strong eventual consistency} \cite{Shapiro2011}, which is a standard correctness criterion for CRDTs \cite{Gomes2017verifying}.
 
@@ -1346,7 +1346,7 @@ We use a slightly stronger version of the specification that avoids this assumpt
 We also simplify the specification by using our event graph definition instead of the original abstract execution definition (containing message broadcast/receive events and a visibility relation).
 These changes do not affect the substance of the proof: each node of our event graph corresponds to a \emph{do} event in the original strong list specification, and the transitive closure of our event graph is equivalent to the visibility relation.
 
-Given an event graph $G$ we define a replay function $\mathsf{replay}(G)$ as introduced in \autoref{replay}, based on the \algname algorithm.
+For a given event graph $G$ we define a replay function $\mathsf{replay}(G)$ as introduced in \autoref{replay}, based on the \algname algorithm.
 It iterates over the events in $G$ in some topologically sorted order, transforming the operation in each event as described in \autoref{algorithm}, and then applying the transformed operation to the document state resulting from the operations applied so far (starting with the empty document).
 In a real implementation, $\mathsf{replay}$ returns the final document state as a concatenated sequence of characters.
 For the sake of this proof, we define $\mathsf{replay}$ to instead return a sequence of $(\mathit{id}, c)$ pairs, where $\mathit{id}$ is the unique ID of the event that inserted the character $c$.
@@ -1358,7 +1358,7 @@ We can now state our modified definition of the strong list specification:
 \begin{definition}\label{strong-list-spec}
   A collaborative text editing algorithm with a replay function $\mathsf{replay}(G)$ satisfies the \emph{strong list specification} if for every valid event graph $G \subset \mathsf{Evt}$ there exists a relation $\mathit{lo} \subset \mathsf{ID} \times \mathsf{ID}$ called the \emph{list order}, such that:
   \begin{enumerate}
-    \item For event $e \in G$, let $G_e = \{e\} \cup \mathsf{Events}(e.\mathit{parents})$ be the subset of $G$ consisting of $e$ and all events that happened before $e$.
+    \item For event $e \in G$, let $G_e = \{e\} \cup \mathsf{Events}(e.\mathit{parents})$ be the set of all events that happened before $e$ and $e$ itself.
     Let $\mathit{doc}_e = \mathsf{replay}(G_e) = \langle (\mathit{id}_0, c_0), \dots, (\mathit{id}_{n-1}, c_{n-1}) \rangle$ be the document state immediately after locally generating $e$, where $c_i \in \mathsf{Char}$ and $\mathit{id}_i \in \mathsf{ID}$. Then:
       \begin{enumerate}
         \item $\mathit{doc}_e$ contains exactly the elements that have been inserted but not deleted in $G_e$:
@@ -1389,7 +1389,7 @@ We can now state our modified definition of the strong list specification:
 \end{lemma}
 \begin{proof}
   If we had $s_p = \texttt{NotInsertedYet}$, that would imply that we retreated the insertion of the character deleted by $e$, which contradicts the fact that the insertion of a character must happen before any deletion of the same character.
-  Furthermore, if we had $s_p = \texttt{Del} k$ for some $k$, that would imply that an event that happened before $e$ already deleted the same character, in which case it would not be possible to generate $e$.
+  Furthermore, if we had $s_p = \texttt{Del}\; k$ for some $k$, that would imply that an event that happened before $e$ already deleted the same character, in which case it would not be possible to generate $e$.
   This leaves $s_p = \texttt{Ins}$ or placeholder as the only options that do not result in a contradiction.
 \end{proof}
 
@@ -1404,7 +1404,7 @@ We can now state our modified definition of the strong list specification:
   By the definition of critical version, any event $e$ that is concurrent with $a$ or $b$ must be after the critical version, and therefore the record that is updated by $e$ must exist in $S_0$.
 
   $S_1$ has the same record sequence and the same $s_e$ in each record as $S_0$, since retreating and advancing do not change those things.
-  The $s_p$ values in $S_1$ are set so that every record inserted by an event concurrently with $b$ has $s_p = \texttt{NotInsertedYet}$, every record whose insertion happened before $b$ but which was not deleted before $b$ has $s_p = \texttt{Ins}$, and every record that was deleted by $k>0$ separate events before $b$ has $s_p = \texttt{Del} k$.
+  The $s_p$ values in $S_1$ are set so that every record inserted by an event that is concurrent with $b$ has $s_p = \texttt{NotInsertedYet}$, every record whose insertion happened before $b$ but which was not deleted before $b$ has $s_p = \texttt{Ins}$, and every record that was deleted by $k>0$ separate events before $b$ has $s_p = \texttt{Del}\; k$.
   To achieve this it is sufficient to consider events that happened after the last critical version.
   Thus, the $s_p$ values in $S_1$ do not depend on the $s_p$ values in $S_0$, and they do not depend on any events that are concurrent with $b$.
 
@@ -1557,12 +1557,12 @@ We can now state our modified definition of the strong list specification:
 
   Case (1): The set of elements that have been inserted but not deleted grows by $(e_{k+1}.\mathit{id}, c)$ and otherwise stays unchanged.
   The transformation of an insertion operation is always another insertion operation.
-  The document state is therefore updated by inserting the same element $(e_{k+1}.\mathit{id}, c)$, and otherwise remains unchanged.
+  The document state is thus updated by inserting the same element $(e_{k+1}.\mathit{id}, c)$, and otherwise remains unchanged.
   Moreover, the transformed index of that insertion is computed by counting the number of internal state records with $s_e = \texttt{Ins}$ that appear before the new record in the internal state, and the new record also has $s_e = \texttt{Ins}$, and the $s_e$ property of no other record is updated, so the correspondence between internal state records and document state is preserved.
 
-  Case (2): The element being deleted is at index $j$ in the document at the time $e_{k+1}$ was generated, which is $\mathsf{replay}(\mathsf{Events}(e_{k+1}.\mathit{parents}))$.
-  We compute this element by retreating and advancing events until the prepare version equals $e_{k+1}.\mathit{parents}$, and then finding the $j$th (zero-indexed) record in the internal state that has $s_p = \texttt{Ins}$.
-  The records with $s_p = \texttt{Ins}$ are those that have been inserted but not deleted in events that happened before $e_{k+1}$, and therefore the $j$th such record is the record corresponding to $\mathsf{replay}(\mathsf{Events}(e_{k+1}.\mathit{parents}))[j]$.
+  Case (2): The element being deleted is located at index $j$ in the document at the time $e_{k+1}$ was generated, which is $\mathsf{replay}(\mathsf{Events}(e_{k+1}.\mathit{parents}))$.
+  We compute this element by retreating and advancing events until the prepare version equals $e_{k+1}.\mathit{parents}$, and then finding the $j$th (zero-indexed) record that has $s_p = \texttt{Ins}$ in the internal state.
+  The records with $s_p = \texttt{Ins}$ are those that have been inserted but not deleted in events that happened before $e_{k+1}$, and thus the $j$th such record corresponds to $\mathsf{replay}(\mathsf{Events}(e_{k+1}.\mathit{parents}))[j]$.
   Before applying $e_{k+1}$, this record may have either $s_e = \texttt{Ins}$ or $s_e = \texttt{Del}$.
   If $s_e = \texttt{Ins}$, we update it to $s_e = \texttt{Del}$, and transform $e_{k+1}$ into a deletion whose index is the number of $s_e = \texttt{Ins}$ to the left of the target record in the internal state; by the inductive hypothesis, this is the correct document element to be deleted.
   If $s_e = \texttt{Del}$ before applying $e_{k+1}$, that event is transformed into a no-op, since another operation in $E_k$ has already deleted the element in question from the document state.
@@ -1570,7 +1570,7 @@ We can now state our modified definition of the strong list specification:
 
   If $e_{k+1}$ is a critical version, we clear the internal state and replace it with a placeholder.
   By the definition of critical version, every event in $E_k$ and $e_{k+1}$ happened before every event in the rest of $E$.
-  Therefore, after retreating and advancing any event after $e_{k+1}$, any internal state record with $s_e = \texttt{Del}$ will also have $s_p = \texttt{Del} k$ for some $k>0$, and any internal state record with $s_e = \texttt{Ins}$ will also have $s_p = \texttt{Ins}$ unless it is deleted by an event after $e_{k+1}$.
+  Therefore, after retreating and advancing any event after $e_{k+1}$, any internal state record with $s_e = \texttt{Del}$ will also have $s_p = \texttt{Del}\; k$ for some $k>0$, and any internal state record with $s_e = \texttt{Ins}$ will also have $s_p = \texttt{Ins}$ unless it is deleted by an event after $e_{k+1}$.
   Since an internal state with $s_e = \texttt{Del}$ can never move to state $s_e = \texttt{Ins}$, this means that any records with $s_e = \texttt{Del}$ as of the critical version can be discarded, since they will never again be needed for transforming the index of an operation after $e_{k+1}$.
   Moreover, since all of the remaining records have $s_e = s_p = \texttt{Ins}$ as of the critical version, and since the replay of the remaining events in $E$ will never need to advance or retreat an event prior to the critical version, all of the records in the internal state can all be replaced by a single placeholder while still preserving the invariants of the induction.
 \end{proof}
