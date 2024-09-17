@@ -1055,7 +1055,7 @@ To run our experiments, you need the following:
 
 You need a recent compiler and runtime for the Rust programming language. We have tested with Rust 1.78; newer versions should also work.
 
-You also need NodeJS installed in order to generate the charts showing our results. We used version 21.
+You also need NodeJS installed in order to run the Yjs benchmark and to generate the charts showing our results. We used version 21.
 
 Other software dependencies are managed through Cargo and npm respectively, and they are automatically installed as part of the build process.
 
@@ -1147,7 +1147,7 @@ Note: Our OT implementation takes 1 hour to replay the A2 editing trace.
 
 \subsubsection{Experiment E3: Merge time (12 compute-hours)}
 
-This experiment measures the CPU time taken to merge in the entire editing trace, as if it had been received from a remote peer.
+This experiment measures the CPU time taken to merge the entire editing trace into an empty document, as if it had been received from a remote peer.
 The benchmarks cover the same algorithms as Experiment E2.
 To run this experiment:
 \begin{verbatim}
