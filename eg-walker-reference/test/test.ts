@@ -79,7 +79,7 @@ function importDTOpLog(data: DTExport): ListOpLog {
 
 // This is the data format from the `dt export-trace` command.
 // This lets us run any editing trace in the concurrent editing traces repository:
-// [link elided for anonymous review]
+// https://github.com/josephg/editing-traces
 interface ConcurrentTrace {
   kind: 'concurrent',
   endContent: string,
