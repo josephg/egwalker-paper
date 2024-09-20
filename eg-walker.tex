@@ -100,7 +100,7 @@ Different users may therefore make edits concurrently; the software must merge s
 
 For example, in \autoref{two-inserts}, two users initially have the same document ``Helo''.
 User 1 inserts a second letter ``l'' at index 3, while concurrently user 2 inserts an exclamation mark at index 4.
-When user 2 receives the operation $\mathit{Insert}(3, \text{``l''})$ it can apply it to obtain ``Hello!'', but when user 1 receives $\mathit{Insert}(4, \text{``!''})$ it cannot apply that operation as-is, since that would result in the state ``Hell!o'', which would be inconsistent with the other user's state and the intended insertion position.
+When user 2 receives the operation $\mathit{Insert}(3, \text{``l''})$ they can apply it to obtain ``Hello!'', but when user 1 receives $\mathit{Insert}(4, \text{``!''})$ they cannot apply that operation as-is, since that would result in the state ``Hell!o'', which would be inconsistent with the other user's state and the intended insertion position.
 Due to the concurrent insertion at an earlier index, user 1 must insert the exclamation mark at index 5.
 
 \begin{figure}
@@ -136,7 +136,7 @@ In \autoref{benchmarking} we show a real-life example document that takes one ho
 
 Larger divergence occurs if users may edit a document offline, or if the software supports explicit branching and merging workflows.
 In version control systems like Git, used mostly for software development, offline working and explicit branching are already the norm.
-Recent HCI research indicates that such workflows would also be valuable for writing prose \cite{Upwelling,Patchwork}, but OT-based collaborative editors struggle to offer such features because of the cost of merging substantially diverged branches.
+Recent research indicates that such workflows would also be valuable for writing prose \cite{Upwelling,Patchwork}, but OT-based collaborative editors struggle to offer such features because of the cost of merging substantially diverged branches.
 
 \emph{Conflict-free Replicated Data Types} (CRDTs) have been proposed as an alternative to OT.
 The first CRDT for collaborative text editing appeared in 2006 \cite{Oster2006WOOT}, and over a dozen text CRDTs have been published since \cite{crdt-papers}.
@@ -163,13 +163,13 @@ Most of the time, \algname therefore uses 1–2 orders of magnitude less memory 
 During merging, when \algname temporarily uses more memory, its peak memory use is comparable to the best known CRDT implementations.
 
 \algname assumes no central server, so it can be used over a peer-to-peer network.
-Although all existing CRDTs and a few OT algorithms can be used peer-to-peer, most of them have poor performance compared to the centralised OT used in production software such as Google Docs.
+Although all existing CRDTs and a few OT algorithms can be used peer-to-peer, most of them have poor performance compared to the centralised OT commonly used in production software.
 In contrast, \algname's performance matches or surpasses that of centralised algorithms.
 It therefore paves the way towards more collaboration software working peer-to-peer, for example in environments where co-located devices can communicate via local radio links, but not reach the Internet or any cloud services.
 This setting is important e.g. for devices onboard the same aircraft~\cite{ditto-aircraft}, in a military context~\cite{ditto-military}, or for scientists conducting fieldwork in remote locations~\cite{antarctica}.
 
-Collaboration on plain text files is the first application for \algname.
-We believe that our approach can be generalised to other file types such as rich text, spreadsheets, graphics, presentations, CAD drawings, and more.
+This paper focusses on collaborative editing of plain text files.
+We believe that our approach can be generalised to other file types such as rich text, spreadsheets, graphics, presentations, CAD drawings, and more in the future.
 More generally, \algname provides a framework for efficient coordination-free distributed systems, in which nodes can always make progress independently, but converge eventually \cite{Hellerstein2010}.
 
 This paper makes the following contributions:
@@ -184,12 +184,12 @@ This paper makes the following contributions:
 \section{Background}
 
 We consider a collaborative plain text editor whose state is a linear sequence of characters, which may be edited by inserting or deleting characters at any position.
-Such an edit is captured as an \emph{operation}; we use the notation $\mathit{Insert}(i, c)$ to denote an operation that inserts character $c$ at index $i$, and $\mathit{Delete}(i)$ deletes the character at index $i$ (indexes are zero-based).
+Such an edit is captured as an \emph{operation}; the operation $\mathit{Insert}(i, c)$ inserts character $c$ at index $i$, and $\mathit{Delete}(i)$ deletes the character at index $i$ (indexes are zero-based).
 Our implementation compresses runs of consecutive insertions or deletions, but for simplicity we describe the algorithm in terms of single-character operations.
 
 \subsection{System model}
 
-Each device on which a user edits a document is a \emph{replica}, and each replica stores its full editing history.
+Each device on which a user edits a document is a \emph{replica}, and each replica stores the full editing history of the document.
 When a user makes an insertion or deletion, that operation is immediately applied to the user's local replica, and then asynchronously sent over the network to any other replicas that have a copy of the same document.
 Users can also edit their local copy while offline; the corresponding operations are then enqueued and sent when the device is next online.
 
@@ -365,18 +365,21 @@ Regardless of whether the OT or the CRDT approach is used, a collaborative editi
   \label{topological-sort}
 \end{figure}
 
-\subsection{Replaying history with CRDTs}\label{crdt-replay}
+\subsection{Implementing OT using a CRDT}\label{crdt-replay}
 
-Using such an incremental update function we can replay any event graph by starting with an empty document and applying the events one by one in topologically sorted order, as illustrated in \autoref{topological-sort}.
-For each event we need to evaluate the insertion/deletion index in the context of the document state in which the event was generated, and transform it into the corresponding update in the state that reflects all operations processed so far.
+One way of implementing such a replay algorithm would be to simulate a network of CRDT replicas in a single process.
+For each branch in the event graph there is a separate simulated replica, which takes operations in their original index-based form and generates a corresponding ID-based CRDT operation.
+Another simulated replica receives every operation generated by the other replicas and applies them in some topologically sorted order, as illustrated in \autoref{topological-sort}.
 
-One way of implementing such an algorithm would be to simulate a network of communicating replicas on a single machine, maintaining a separate simulated replica for each branch in the event graph, and an additional simulated replica that receives every operation generated by the other replicas.
 For example, the history in \autoref{topological-sort} could be replayed using one simulated replica for $e_\mathrm{A1\dots A6}$, a second for $e_\mathrm{B1\dots B4}$, and a third for $e_\mathrm{C1\dots C3}$.
-Every time an event's parent is from another simulated replica, the corresponding network communication is simulated, and the remote operations are merged using a CRDT algorithm.
-Every operation is thus generated in the context of the appropriate replica state, and sent to the simulated replica that applies all events using the same CRDT.
-The process of generating the operation on one simulated replica and applying it on another thus provides us with the required incremental update, without performing any actual network communication.
+Every time an event's parent is an event generated on another simulated replica, the corresponding network communication is simulated, and the remote operations are merged using a CRDT algorithm.
+For example, before the replica for $e_\mathrm{B1\dots B4}$ can generate $e_\mathrm{B3}$ it must first merge $e_\mathrm{A2}$ and $e_\mathrm{A3}$.
+Each simulated replica thus tracks the document version in which the indexes of insertions and deletions should be interpreted.
+The simulated replica that applies all operations then converts the ID-based operation back into an index based on its document version.
+This index-based operation then allows an incremental update of the document state.
 
-This approach works, but it is fairly slow because it incurs the overhead of updating multiple simulated replicas and running the CRDT algorithm even at times when there is no concurrency in the event graph.
+The process of translating an index-based operation into an ID-based one on one simulated replica, and translating it back into an index-based operation on another, is effectively an operational transformation algorithm: it updates the index to reflect the effects of concurrent operations (which have been applied to the second simulated replica but not the first).
+However, the algorithm is fairly slow because it incurs the overhead of updating multiple simulated replicas and running the CRDT algorithm even at times when there is no concurrency in the event graph.
 It also uses a lot of memory because it needs a separate copy of the CRDT state for every concurrent branch in the event graph.
 % (Seph): We have benchmark data for this approach btw.
 
@@ -802,7 +805,7 @@ The statistics given in \autoref{traces-table} are after repetition.
 
 \subsection{Experimental approach}
 
-To evaluate the performance of \algname, we compare our Rust implementation with two popular CRDT libraries: Automerge v0.5.9 \cite{automerge} (Rust) and Yjs v13.6.10 \cite{yjs} (JavaScript).\footnote{We also tested Yrs \cite{yrs}, the Rust rewrite of Yjs by the original authors. It performed worse than Yjs, so we omitted it from our results.}
+To evaluate the performance of \algname, we compare our Rust implementation with two popular CRDT libraries: Automerge v0.5.9 \cite{automerge} (Rust) and Yjs v13.6.10 \cite{yjs} (JavaScript).\footnote{We also tested Yrs \cite{yrs}, the Rust rewrite of Yjs by the original authors. At the time of our experiments it performed worse than Yjs, so we omitted it from our results.}
 We only test their collaborative text datatypes, and not the other features they support.
 However, the performance of these libraries varies widely.
 In an effort to distinguish between implementation differences and algorithmic differences, we have also implemented our own performance-optimised reference CRDT library.
