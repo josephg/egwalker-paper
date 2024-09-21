@@ -169,7 +169,7 @@ In contrast, \algname's performance matches or surpasses that of centralised alg
 It therefore paves the way towards more collaboration software working peer-to-peer, for example in environments where co-located devices can communicate via local radio links, but not reach the Internet or any cloud services.
 This setting is important e.g. for devices onboard the same aircraft~\cite{ditto-aircraft}, in a military context~\cite{ditto-military}, or for scientists conducting fieldwork in remote locations~\cite{antarctica}.
 
-This paper focusses on collaborative editing of plain text files.
+This paper focuses on collaborative editing of plain text files.
 We believe that our approach can be generalised to other file types such as rich text, spreadsheets, graphics, presentations, CAD drawings, and more in the future.
 More generally, \algname provides a framework for efficient coordination-free distributed systems, in which nodes can always make progress independently, but converge eventually \cite{Hellerstein2010}.
 
@@ -790,8 +790,8 @@ The traces represent the editing history of the following documents:
     \item[Asynchronous Traces:] We reconstructed the editing trace of some files in Git repositories. The event graph mirrors the branching/merging of Git commits. Since Git does not record individual keystrokes, we generated the minimal edit operations necessary to perform each commit's diff. Trace A1 is \texttt{src/node.cc} from the Git repository for Node.js \cite{node-src-nodecc}, and A2 is \texttt{Makefile} from the Git repository for Git itself \cite{git-makefile}.
 \end{description}
 
-Even though the sequential traces do not excercise the merging algorithm, they are important to include in the benchmark.
-Anecodotal evidence suggests that the majority of documents in practice are sequentially edited~-- that is, they either have a single author, or multiple authors who take turns to write.
+Even though the sequential traces do not exercise the merging algorithm, they are important to include in the benchmark.
+Anecdotal evidence suggests that the majority of documents in practice are sequentially edited~-- that is, they either have a single author, or multiple authors who take turns to write.
 The concurrent traces have many short-lived branches (see the \emph{graph runs} column in \autoref{traces-table}).
 The asynchronous traces have a small number of long-running branches, which occur in the context of offline working or editors that support explicit branching and merging~\cite{Upwelling,Patchwork}.
 
