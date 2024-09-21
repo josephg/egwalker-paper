@@ -1428,7 +1428,7 @@ We can now state our modified definition of the strong list specification:
   To replay $a$ followed by $b$, we first retreat/advance so that the prepare state corresponds to $a.\mathit{parents}$, then apply $a$, then retreat $a$, then retreat/advance so that the prepare state corresponds to $b.\mathit{parents}$, then apply $b$.
   Applying $a$ inserts a record into the internal state, and after retreating $a$ this record has $s_p = \texttt{NotInsertedYet}$ and $s_e = \texttt{Ins}$.
   Since $b$ is concurrent to $a$, $a$ cannot be a critical version, and therefore the internal state is not cleared after applying $a$.
-  When $b$ is applied, the presence of the record inserted by $a$ is the only difference between the internal state when applying $b$ after $a$ compared to applying $b$ without applying $a$ first (by \autoref{lemma-prepare-state}).
+  When $b$ is applied, the presence of the record inserted by $a$ is the only difference between the internal state when applying $b$ after $a$ compared to applying $b$ without applying $a$ first (by Lemma \ref{lemma-prepare-state}).
   When determining the insertion position in the internal state for $b$'s record based on $b$'s index $j$, the record inserted by $a$ does not count since it has $s_p = \texttt{NotInsertedYet}$.
   Therefore, $b$'s record is inserted into the internal state at the same position relative to its neighbours, regardless of whether $a$ has been applied previously.
   By similar argument the same holds for $a$'s record.
@@ -1460,20 +1460,20 @@ We can now state our modified definition of the strong list specification:
   Since $a$ and $b$ are concurrent, the character being deleted by $b$ cannot be the character inserted by $a$.
   We therefore only need to consider two cases: (1)~the record inserted by $a$ has an earlier position in the internal state than the record updated by $b$; or (2) vice versa.
 
-  Case (1): If we replay $a$ before $b$, we first apply $a$, then retreat $a$, then apply $b$ (and also retreat/advance other events before applying, like in \autoref{lemma-ins-ins}).
+  Case (1): If we replay $a$ before $b$, we first apply $a$, then retreat $a$, then apply $b$ (and also retreat/advance other events before applying, like in Lemma \ref{lemma-ins-ins}).
   Applying $a$ inserts a record into the internal state, and after retreating $a$ this record has $s_p = \texttt{NotInsertedYet}$ and $s_e = \texttt{Ins}$.
   When subsequently applying $b$ we update an internal state record at a later position.
-  The record inserted by $a$ is not counted when mapping $b$'s index to an internal record, but it is counted when mapping the internal record back to a transformed index, resulting in $b$'s transformed index being one greater than it would have been without earlier applying $a$ (by \autoref{lemma-prepare-state}).
+  The record inserted by $a$ is not counted when mapping $b$'s index to an internal record, but it is counted when mapping the internal record back to a transformed index, resulting in $b$'s transformed index being one greater than it would have been without earlier applying $a$ (by Lemma \ref{lemma-prepare-state}).
   On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears after $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
   The transformed operations therefore converge.
 
   Case (2): If we replay $b$ before $a$, we first apply $b$, then retreat $b$, then apply $a$ (plus other retreats/advances).
   Applying $b$ updates an existing record in the internal state (possibly splitting a placeholder in the process).
-  Before applying $b$ this record must have $s_p = \texttt{Ins}$ (by \autoref{lemma-prepare-delete}), and it can have either $s_e = \texttt{Ins}$ (in which case, the transformed operation for $b$ is $\mathit{Delete}(j')$ for some transformed index $j'$) or $s_e = \texttt{Del}$ (in which case, $b$ is transformed into a no-op).
+  Before applying $b$ this record must have $s_p = \texttt{Ins}$ (by Lemma \ref{lemma-prepare-delete}), and it can have either $s_e = \texttt{Ins}$ (in which case, the transformed operation for $b$ is $\mathit{Delete}(j')$ for some transformed index $j'$) or $s_e = \texttt{Del}$ (in which case, $b$ is transformed into a no-op).
   After applying and retreating $b$ this record has $s_p = \texttt{Ins}$ and $s_e = \texttt{Del}$ in any case.
   We next apply $a$, which by assumption inserts a record into the internal state at a later position than $b$'s record.
   If we had $s_e = \texttt{Del}$ before applying $b$, the process of applying and retreating $b$ did not change the internal state, so the transformed operation for $a$ is the same as if $b$ had not been applied, which is consistent with the fact that $b$ was transformed into a no-op.
-  If we had $s_e = \texttt{Ins}$ before applying $b$, $b$'s record is counted when mapping $a$'s index to an internal record position, but not counted when mapping the internal record back to a transformed index, resulting in $a$'s transformed index being one less than it would have been without earlier applying $b$ (by \autoref{lemma-prepare-state}), as required given that $b$ has deleted an earlier character.
+  If we had $s_e = \texttt{Ins}$ before applying $b$, $b$'s record is counted when mapping $a$'s index to an internal record position, but not counted when mapping the internal record back to a transformed index, resulting in $a$'s transformed index being one less than it would have been without earlier applying $b$ (by Lemma \ref{lemma-prepare-state}), as required given that $b$ has deleted an earlier character.
   On the other hand, if we replay $a$ before $b$, the record inserted by $a$ appears after $b$'s record in the internal state, so the transformation of $b$ is not affected by $a$, and the transformed operations converge.
 \end{proof}
 
@@ -1487,17 +1487,17 @@ We can now state our modified definition of the strong list specification:
   Case (1): We further consider two sub-cases: (1a)~the record that $a$ will update has $s_e = \texttt{Ins}$ prior to applying $a$; or (1b)~the record has $s_e = \texttt{Del}$.
 
   Case (1a): Say we replay $a$ before $b$.
-  Before applying $a$, the record that $a$ will update must have $s_p = \texttt{Ins}$ (by \autoref{lemma-prepare-delete}).
+  Before applying $a$, the record that $a$ will update must have $s_p = \texttt{Ins}$ (by Lemma \ref{lemma-prepare-delete}).
   After applying and retreating $a$, the record updated by $a$ has $s_p = \texttt{Ins}$ and $s_e = \texttt{Del}$, and the transformed operation for $a$ is $\mathit{Delete}(i')$ for some transformed index $i'$.
   We subsequently apply $b$, which by assumption updates an internal state record that is later than $a$'s.
   $a$'s record is therefore counted when mapping the index of $b.\mathit{op}$ to an internal record position, but not counted when mapping the internal record back to a transformed index.
-  If $a$ had not been replayed previously, it would have been counted during both mappings (by \autoref{lemma-prepare-state}).
+  If $a$ had not been replayed previously, it would have been counted during both mappings (by Lemma \ref{lemma-prepare-state}).
   Thus, if the record updated by $b$ has $s_e = \texttt{Ins}$, the transformed operation for $b$ is $\mathit{Delete}(j'-1)$, where $j'$ is the transformed index of $b$'s operation if $a$ had not been replayed previously, and $j'-1 \geq i'$, as required.
   If $b$'s record previously has $s_e = \texttt{Del}$, it is transformed into a no-op.
   On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears later than $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
 
   Case (1b): Say we replay $a$ before $b$.
-  Before applying $a$, the record that $a$ will update must have $s_p = \texttt{Ins}$ (by \autoref{lemma-prepare-delete}), and $s_e = \texttt{Del}$ by assumption.
+  Before applying $a$, the record that $a$ will update must have $s_p = \texttt{Ins}$ (by Lemma \ref{lemma-prepare-delete}), and $s_e = \texttt{Del}$ by assumption.
   After applying and retreating $a$, the record updated by $a$ remains in the same state ($s_p = \texttt{Ins}$, $s_e = \texttt{Del}$), and the transformed operation for $a$ is a no-op.
   When we subsequently apply $b$, the transformed operation is therefore the same as if $a$ had not been applied, as required.
   On the other hand, if we replay $b$ before $a$, the record updated by $b$ appears later than $a$'s record in the internal state, so the transformation of $a$ is not affected by $b$.
@@ -1528,9 +1528,9 @@ We can now state our modified definition of the strong list specification:
   Replaying the events in the prefix $\langle e_1, e_2, \dots, e_{i-1} \rangle$ is a deterministic algorithm resulting in some document state and some internal state.
   Next, we replay either $e_i$ followed by $e_{i+1}$, or $e_{i+1}$ followed by $e_i$.
   Since $e_i$ and $e_{i+1}$ are concurrent, it is not possible for only one of the two to be contained in a critical version, and therefore no state clearing will take place between applying these two events.
-  If $e_i$ and $e_{i+1}$ are both insertions, the resulting states in either order are the same by \autoref{lemma-ins-ins}.
-  If one of $e_i$ and $e_{i+1}$ is an insertion and the other is a deletion, we use \autoref{lemma-ins-del}.
-  If both $e_i$ and $e_{i+1}$ are deletions, we use \autoref{lemma-del-del}.
+  If $e_i$ and $e_{i+1}$ are both insertions, the resulting states in either order are the same by Lemma \ref{lemma-ins-ins}.
+  If one of $e_i$ and $e_{i+1}$ is an insertion and the other is a deletion, we use Lemma \ref{lemma-ins-del}.
+  If both $e_i$ and $e_{i+1}$ are deletions, we use Lemma \ref{lemma-del-del}.
   Finally, replaying the suffix $\langle e_{i+2}, \dots, e_n \rangle$ is a deterministic algorithm.
   This shows that concurrent operations commute.
 \end{proof}
@@ -1550,7 +1550,7 @@ We can now state our modified definition of the strong list specification:
 \end{lemma}
 \begin{proof}
   Let $E = \langle e_1, e_2, \dots, e_n \rangle$ be some topological sort of $G$, and assume that we replay $G$ in this order.
-  By \autoref{lemma-deterministic} it does not matter which of the possible orders we choose.
+  By Lemma \ref{lemma-deterministic} it does not matter which of the possible orders we choose.
   We then prove the thesis by induction over $n$, the number of events in $G$.
   The base case is trivial: $G=\{\}$, $\mathit{doc}=\langle \rangle$, so there are no events, no records in the internal state, and no elements in the document state.
 
@@ -1582,30 +1582,30 @@ We can now state our modified definition of the strong list specification:
 \end{proof}
 
 \begin{theorem}\label{main-theorem}
-  The \algname algorithm satisfies the strong list specification (\autoref{strong-list-spec}).
+  The \algname algorithm satisfies the strong list specification (Definition \ref{strong-list-spec}).
 \end{theorem}
 \begin{proof}
   Given a valid event graph $G$, let $\mathsf{replay}(G)$ be the replay function based on \algname, as introduced earlier.
-  We must show that there exists a list order $\mathit{lo} \subset \mathsf{ID} \times \mathsf{ID}$ that satisfies the conditions given in \autoref{strong-list-spec}.
+  We must show that there exists a list order $\mathit{lo} \subset \mathsf{ID} \times \mathsf{ID}$ that satisfies the conditions given in Definition \ref{strong-list-spec}.
   We claim that this list order corresponds exactly to the sequence of records and placeholders in the internal state after replaying the entire event graph $G$.
-  By \autoref{lemma-deterministic}, this internal state exists and is unique.
+  By Lemma \ref{lemma-deterministic}, this internal state exists and is unique.
   This correspondence is more apparent if we assume a variant of \algname that does not clear the internal state on critical versions, but we also claim that performing the optimisations in \autoref{clearing} preserves this property.
 
   To begin, note that the internal state is a totally ordered sequence of records, and that (aside from clearing the internal state) we only ever modify this sequence by inserting records or by updating the $s_p$ and $s_e$ properties of existing records.
   Thus, if a record with ID $\mathit{id}_i$ appears before a record with ID $\mathit{id}_j$ at some point in the replay, the order of those IDs remains unchanged for the rest of the replay.
   We define the list order $\mathit{lo}$ to be the ordering relation among IDs in the internal state after replaying $G$ using a \algname variant that does not clear the internal state.
-  This order exists, is unique (\autoref{lemma-deterministic}), and is by definition transitive, irreflexive, and total, so it meets requirement (2) of \autoref{strong-list-spec}.
+  This order exists, is unique (Lemma \ref{lemma-deterministic}), and is by definition transitive, irreflexive, and total, so it meets requirement (2) of Definition \ref{strong-list-spec}.
 
   Let $e \in G$ be any event in the graph, and let $G_e = \{e\} \cup \mathsf{Events}(e.\mathit{parents})$ be the subset of $G$ consisting of $e$ and all events that happened before $e$.
-  Note that $G_e$ satisfies the conditions in \autoref{valid-graph}, so it is also valid.
+  Note that $G_e$ satisfies the conditions in Definition \ref{valid-graph}, so it is also valid.
   Let $\mathit{doc}_e = \mathsf{replay}(G_e) = \langle (\mathit{id}_0, c_0), \dots, (\mathit{id}_{n-1}, c_{n-1}) \rangle$ be the document state immediately after locally generating $e$.
-  Since $\mathsf{replay}$ is deterministic (\autoref{lemma-deterministic}), $\mathit{doc}_e$ exists and is unique.
+  Since $\mathsf{replay}$ is deterministic (Lemma \ref{lemma-deterministic}), $\mathit{doc}_e$ exists and is unique.
 
-  By \autoref{state-correspondence}, $\mathit{doc}_e$ contains exactly the elements that have been inserted but not deleted in $G_e$, which is requirement (1a) of \autoref{strong-list-spec}.
-  Also by \autoref{state-correspondence}, the $i$th element in $\mathit{doc}_e$ corresponds to the $i$th record with $s_e = \texttt{Ins}$ in the internal state obtained by replaying $G_e$.
-  Since any pair of IDs that are ordered by the internal state derived from $G_e$ retain the same ordering in the internal state derived from $G$, we know that the ordering of elements in $\mathit{doc}_e$ is consistent with the list order $\mathit{lo}$, satisfying requirement (1b) of \autoref{strong-list-spec}.
+  By Lemma \ref{state-correspondence}, $\mathit{doc}_e$ contains exactly the elements that have been inserted but not deleted in $G_e$, which is requirement (1a) of Definition \ref{strong-list-spec}.
+  Also by Lemma \ref{state-correspondence}, the $i$th element in $\mathit{doc}_e$ corresponds to the $i$th record with $s_e = \texttt{Ins}$ in the internal state obtained by replaying $G_e$.
+  Since any pair of IDs that are ordered by the internal state derived from $G_e$ retain the same ordering in the internal state derived from $G$, we know that the ordering of elements in $\mathit{doc}_e$ is consistent with the list order $\mathit{lo}$, satisfying requirement (1b) of Definition \ref{strong-list-spec}.
 
-  Finally, to demonstrate requirement (1c) of \autoref{strong-list-spec} we assume that $e.\mathit{op} = \mathit{Insert}(i,c)$, and we need to show that $\mathit{doc}_e [i] = (e.\mathit{id}, c)$.
+  Finally, to demonstrate requirement (1c) of Definition \ref{strong-list-spec} we assume that $e.\mathit{op} = \mathit{Insert}(i,c)$, and we need to show that $\mathit{doc}_e [i] = (e.\mathit{id}, c)$.
   Since $G_e$ contains only $e$ and events that happened before $e$, but no events concurrent with $e$, we know that immediately before applying $e$, every record in the internal state will have $s_p = \texttt{Ins}$ if and only if it has $s_e = \texttt{Ins}$ (because there are no events that are reflected in the effect version but not in the prepare version $e.\mathit{parents}$).
   Therefore, the set of records that are counted while mapping the original insertion index $i$ to an internal state record equals the set of records that are counted while mapping the internal record back to a transformed index.
   Thus, the transformed index of the insertion is also $i$, and therefore the new element is inserted at index $i$ of the document as required.
