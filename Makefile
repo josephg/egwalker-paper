@@ -240,6 +240,3 @@ $(DIAGRAMS) &: svg-plot/node_modules $(ALL_RESULTS)
 # This is the master target.
 reg-text.pdf: reg-text.typ $(DIAGRAMS) $(ALL_RESULTS)
 	typst compile reg-text.typ
-
-paper_data_anon.zip: #| $(ALL_RESULTS)
-	zip -vr $@ README_anon.md Makefile_anon results tools feathertail-reference datasets -x '*node_modules/*' -x '*target/*' -x '*.idea/*'
