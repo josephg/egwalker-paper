@@ -231,7 +231,7 @@ This simulation process is usually very slow, but that doesn't really matter. Ou
 
 ---
 
-The paper text is copyright of the authors. All rights reserved unless otherwise indicated.
+The paper text is copyright Joseph Gentle and Martin Kleppmann. It is made available under a [Creative Commons CC-BY 4.0 license](https://creativecommons.org/licenses/by/4.0/).
 
 Most of the raw editing traces are also available at [josephg/editing-traces](https://github.com/josephg/editing-traces). See that repository for details & licensing information.
 
