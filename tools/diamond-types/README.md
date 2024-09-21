@@ -20,6 +20,13 @@ For detail about how to *use* diamond types, see the [package level documentatio
 
 Note the package published to cargo is quite out of date, both in terms of API and performance.
 
+For much more detail about how this library *works*, see:
+
+- The talk I gave on this library at a recent [braid user meetings](https://braid.org/meeting-14) or
+- [INTERNALS.md](INTERNALS.md) in this repository.
+- [This blog post on making diamond types 5000x faster than competing CRDT implementations](https://josephg.com/blog/crdts-go-brrr/)
+  - And since that blog post came out, performance has increased another 10-80x (!).
+
 As well as being lightning fast, this library is also designed to be interoperable with positional updates. This allows simple peers to interact with the data structure via operational transform.
 
 
@@ -44,3 +51,8 @@ Much more detail on the internal data structures used is in [INTERNALS.md](INTER
 # LICENSE
 
 This code is published under the ISC license.
+
+
+# Acknowledgements
+
+This work has been made possible by funding from the [Invisible College](https://invisible.college/).

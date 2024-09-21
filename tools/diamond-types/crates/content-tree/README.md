@@ -103,3 +103,7 @@ See [examples/custom_entry.rs](examples/custom_entry.rs) for a fully worked exam
 - Move to using a trait for list configuration
 - Handle notify functions in a cleaner way - preferably passed in via a generic parameter on the type
 - Consider removing internal list sizes
+
+---
+
+This code was implemented as part of [diamond types](https://github.com/josephg/diamond-types).
