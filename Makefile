@@ -1,5 +1,5 @@
 .phony: all cargo_magic clean all_datasets am_datasets yjs_datasets yrs_benches
-all: reg-text.pdf
+all: eg-walker.pdf
 # all: $(ALL_JSON) $(DIAGRAMS)
 
 clean:
@@ -238,5 +238,14 @@ $(DIAGRAMS) &: svg-plot/node_modules $(ALL_RESULTS)
 	cd svg-plot && node render.js
 
 # This is the master target.
-reg-text.pdf: reg-text.typ $(DIAGRAMS) $(ALL_RESULTS)
-	typst compile reg-text.typ
+eg-walker.pdf: eg-walker.tex $(DIAGRAMS) $(ALL_RESULTS)
+	node datasets-table.js
+	rsvg-convert -f pdf -o diagrams/ff.pdf diagrams/ff.svg
+	rsvg-convert -f pdf -o diagrams/filesize_full.pdf diagrams/filesize_full.svg
+	rsvg-convert -f pdf -o diagrams/filesize_smol.pdf diagrams/filesize_smol.svg
+	rsvg-convert -f pdf -o diagrams/memusage.pdf diagrams/memusage.svg
+	rsvg-convert -f pdf -o diagrams/timings.pdf diagrams/timings.svg
+	pdflatex eg-walker
+	bibtex eg-walker
+	pdflatex eg-walker
+	pdflatex eg-walker

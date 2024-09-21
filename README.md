@@ -9,7 +9,7 @@ A rough breakdown of the files and folders:
 - `datasets/`: The editing traces (datasets) used in this paper. The raw datasets are contained in `datasets/raw` and all other files are generated from the raw datasets.
 - `egwalker-reference`: This is a reference implementation of the egwalker algorithm described in this paper, written in typescript.
 - `svg-plot`: This tool generates charts in SVG format in the `diagrams/` folder from JSON data in `results/`.
-- `reg-text.typ`: [Typst](https://typst.app/) source for the paper itself. The paper embeds SVGs from `diagrams/` and uses some stats from the `results/` directory for tables.
+- `eg-walker.tex`: LaTeX source for the paper itself. The paper embeds SVGs from `diagrams/` and uses some stats from the `results/` directory for tables.
 
 
 ## Reproducing our results
@@ -94,7 +94,7 @@ Output: `datasets/*.am, *.yjs, *.json`
 
 These files *should* be byte-for-byte identical with the files distributed via this git repository. Ie, after regenerated these files, `git status` should report no changes.
 
-The size of the files produced during this step are measured to produce *Figure 11* and *Figure 12* on page 12 in the paper.
+The size of the files produced during this step are measured to produce *Figure 11* and *Figure 12* in the paper.
 
 This process takes an unreasonably long time to run! Sorry! We just didn't optimize this process much, since you only need to do this once. You can also run these scripts in parallel using make. For example:
 
@@ -172,15 +172,24 @@ npm i # only needed once to install dependencies
 node render.js
 ```
 
-This tool outputs a set of SVGs in `diagrams/*.svg`
+This tool outputs a set of SVGs in `diagrams/*.svg`. To convert them to PDF (required for embedding into LaTeX), we use `rsvg-convert` command line tool:
+
+```
+for file in diagrams/*.svg; do rsvg-convert -f pdf -o "${file/.svg/.pdf}" "$file"; done
+```
 
 ### Step 5: Generate the paper (OPTIONAL)
 
-Our paper is written using [typst](https://typst.app) (a modern replacement for LaTeX). You can install typst using `cargo install typst-cli` then generate the paper with this command
+Our paper is written using LaTeX, and you can build it in the usual way:
 
 ```
-typst compile reg-text.typ
+pdflatex eg-walker
+bibtex eg-walker
+pdflatex eg-walker
+pdflatex eg-walker
 ```
+
+An earlier version of the paper, which was written using [Typst](https://typst.app), can be found in `reg-text.typ`. The LaTeX version is the more up-to-date.
 
 ### Step 6: Validate our claims (30 human minutes)
 
@@ -192,15 +201,15 @@ This falls out of the algorithm (since there's no equivalent to a CRDT prepare f
 
 However, you should still be able to validate all our performance claims!
 
-`diagrams/timings.svg` should match *Figure 8* on page 10. Obviously, your computer may be faster or slower than ours. But the relative speed of the various algorithms should remain intact. This diagram is generated from `results/timings.json`. You can compare the raw benchmarking results with ours using `git diff results/timings.json`.
+`diagrams/timings.svg` should match *Figure 8*. Obviously, your computer may be faster or slower than ours. But the relative speed of the various algorithms should remain intact. This diagram is generated from `results/timings.json`. You can compare the raw benchmarking results with ours using `git diff results/timings.json`.
 
-`diagrams/memusage.svg` should match *Figure 10* on page 11. Run-to-run variance in this test should be very small. This diagram is generated from files with the pattern of `results/(alg)_memusage.json`.
+`diagrams/memusage.svg` should match *Figure 10*. Run-to-run variance in this test should be very small. This diagram is generated from files with the pattern of `results/(alg)_memusage.json`.
 
-`diagrams/filesize_full.svg` and `diagrams/filesize_smol.svg` should match *Figure 11* and *Figure 12* on page 12. These diagrams are generated from the size of the files in the `datasets/` directory. The "base sizes" (the size of all raw text) is shown in `results/dataset_stats.json`, along with various other stats. (This file is generated during step 2a from running `tools/diamond-types/target/release/paper-stats`).
+`diagrams/filesize_full.svg` and `diagrams/filesize_smol.svg` should match *Figure 11* and *Figure 12*. These diagrams are generated from the size of the files in the `datasets/` directory. The "base sizes" (the size of all raw text) is shown in `results/dataset_stats.json`, along with various other stats. (This file is generated during step 2a from running `tools/diamond-types/target/release/paper-stats`).
 
 `diagrams/plot_ff.svg` was ultimately cut from the paper to keep the size down. You can ignore this one!
 
-*Table 1* on page 15 in the paper is generated directly from `results/dataset_stats.json`. This file is generated from the source code in [`tools/diamond-types/crates/paper-stats/src/main.rs`](tools/diamond-types/crates/paper-stats/src/main.rs). The columns are populated as follows:
+*Table 1* in the paper is generated from `results/dataset_stats.json`. This file is generated from the source code in [`tools/diamond-types/crates/paper-stats/src/main.rs`](tools/diamond-types/crates/paper-stats/src/main.rs), and converted into a LaTeX table by running `node datasets-table.js`. The columns are populated as follows:
 
 - *repeats*: Hardcoded in the table. But these numbers should match the equivalent `-n3` / `-n25` / etc numbers in the calls to `bench-duplicate` from `step1-prepare.sh` and `Makefile`.
 - *Events (k)*: `total_keystrokes` field from dataset_stats. Our egwalker implementation treats every single-character insert or delete as a distinct event. (Events are eagerly run-length encoded throughout the code for performance, but semantically, each insert or delete of a single character is distinct.)
