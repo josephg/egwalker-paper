@@ -240,11 +240,6 @@ $(DIAGRAMS) &: svg-plot/node_modules $(ALL_RESULTS)
 # This is the master target.
 eg-walker.pdf: eg-walker.tex $(DIAGRAMS) $(ALL_RESULTS)
 	node datasets-table.js
-	rsvg-convert -f pdf -o diagrams/ff.pdf diagrams/ff.svg
-	rsvg-convert -f pdf -o diagrams/filesize_full.pdf diagrams/filesize_full.svg
-	rsvg-convert -f pdf -o diagrams/filesize_smol.pdf diagrams/filesize_smol.svg
-	rsvg-convert -f pdf -o diagrams/memusage.pdf diagrams/memusage.svg
-	rsvg-convert -f pdf -o diagrams/timings.pdf diagrams/timings.svg
 	pdflatex eg-walker
 	bibtex eg-walker
 	pdflatex eg-walker

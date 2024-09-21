@@ -172,11 +172,7 @@ npm i # only needed once to install dependencies
 node render.js
 ```
 
-This tool outputs a set of SVGs in `diagrams/*.svg`. To convert them to PDF (required for embedding into LaTeX), we use `rsvg-convert` command line tool:
-
-```
-for file in diagrams/*.svg; do rsvg-convert -f pdf -o "${file/.svg/.pdf}" "$file"; done
-```
+This tool outputs a set of SVGs in `diagrams/*.svg`. To convert them to PDF (required for embedding into LaTeX), we manually open them in [Inkscape](https://inkscape.org/) and export to PDF. (We previously used `rsvg-convert`, but it embeds Type 3 fonts, which are not allowed in the final paper.)
 
 ### Step 5: Generate the paper (OPTIONAL)
 
