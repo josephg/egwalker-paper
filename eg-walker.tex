@@ -4,6 +4,7 @@
 \includeappendixtrue % \includeappendixtrue or \includeappendixfalse to enable/disable appendix
 \ifincludeappendix\settopmatter{printfolios=true}\fi % conference version has no page numbers, extended version does
 
+\usepackage{doi}
 \usepackage{tikz}
 \usetikzlibrary {arrows.meta}
 
@@ -1032,17 +1033,19 @@ Specifically, it contains the following items:
 
 \subsection{Description \& Requirements}
 
-%\textit{[Mandatory] This section should list all the information necessary to recreate the same experimental setup you have used to run your artifact. This includes at least a persistent link to a publicly accessible archival repository where all the artifact's main components (software, data-sets, documentation, etc.) can be accessed and, where this apply, the minimal hardware and software requirements to run your artifact. It is also very good practice to list and describe in this section benchmarks where those are part of, or simply have been used to produce results with, your artifact.}
-
 \subsubsection{How to access}
 
 All code and data of the artifact is publicly available in the following GitHub repository:
 
 \url{https://github.com/josephg/egwalker-paper}
 
-\textit{Note for artifact evaluation:} please use the head of the master branch, \texttt{df91322b} at the time of writing. Once artifact evaluation is complete we will upload a snapshot to Zenodo and include the final commit hash in the artifact appendix. % TODO: update this for camera-ready
+A snapshot of this repository is archived at:
 
-% The README file in this repository contains detailed instructions to configure \& run our code locally.
+\url{https://zenodo.org/records/13823409}
+
+\doi{10.5281/zenodo.13823409}
+
+The README file in this repository contains detailed instructions to configure \& run our code locally.
 
 \subsubsection{Hardware dependencies}
 
