@@ -540,16 +540,16 @@ The rules for updating $s_p$ and $s_e$ are:
 \begin{figure}
   \begin{tikzpicture}
     \tikzstyle{state} = [draw,align=center,text width=0.9cm,text height=8pt,text depth=1pt]
-    \node [state] (nyi) at (0, 0) {\texttt{NIY}};
+    \node [state] (niy) at (0, 0) {\texttt{NIY}};
     \node [state] (ins) at (1.5, 0) {\texttt{Ins}};
     \node [state] (del1) at (3, 0) {\texttt{Del 1}};
     \node [state] (del2) at (4.5, 0) {\texttt{Del 2}};
     \node [state] (deln) at (6, 0) {$\cdots$};
-    \draw [->] (nyi) to [out=45,in=135] node [above,label={left:$\mathsf{advance}$:}] {$\mathit{Insert}$} (ins);
+    \draw [->] (niy) to [out=45,in=135] node [above,label={left:$\mathsf{advance}$:}] {$\mathit{Insert}$} (ins);
     \draw [->] (ins) to [out=45,in=135] node [above] {$\mathit{Delete}$} (del1);
     \draw [->] (del1) to [out=45,in=135] node [above] {$\mathit{Delete}$} (del2);
     \draw [->,dashed] (del2) to [out=45,in=135] node [above] {$\mathit{Delete}$} (deln);
-    \draw [->] (ins) to [out=225,in=315] node [below,label={left:$\mathsf{retreat}$:}] {$\mathit{Insert}$} (nyi);
+    \draw [->] (ins) to [out=225,in=315] node [below,label={left:$\mathsf{retreat}$:}] {$\mathit{Insert}$} (niy);
     \draw [->] (del1) to [out=225,in=315] node [below] {$\mathit{Delete}$} (ins);
     \draw [->] (del2) to [out=225,in=315] node [below] {$\mathit{Delete}$} (del1);
     \draw [->,dashed] (deln) to [out=225,in=315] node [below] {$\mathit{Delete}$} (del2);
@@ -573,7 +573,7 @@ $s_e$ does not count the number of deletions and does not have a $\texttt{NotIns
     \matrix [box] (right) at (5,0) {
       \node {``H''}; & \node (top3) {``h''}; & \node (top4) {``i''}; \\
       \node {$\mathit{id}: 3$}; & \node {$\mathit{id}: 1$}; & \node {$\mathit{id}: 2$}; \\
-      \node {$s_p: \texttt{NYI}$}; & \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Ins}$}; \\
+      \node {$s_p: \texttt{NIY}$}; & \node {$s_p: \texttt{Ins}$}; & \node {$s_p: \texttt{Ins}$}; \\
       \node {$s_e: \texttt{Ins}$}; & \node (bot3) {$s_e: \texttt{Del}$}; & \node (bot4) {$s_e: \texttt{Ins}$}; \\
     };
     \draw (top1.north west) -- (bot1.south west);
