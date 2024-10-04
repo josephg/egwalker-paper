@@ -1,6 +1,10 @@
 # Collaborative Text Editing with Eg-walker: Better, Faster, Smaller
 
-This folder / repository contains everything needed to produce the Egwalker paper, including reproducing all contained results.
+This repository accompanies the following research paper:
+
+Joseph Gentle and Martin Kleppmann. Collaborative Text Editing with Eg-walker: Better, Faster, Smaller. *20th European Conference on Computer Systems* (EuroSys), March 2025. [doi:10.1145/3689031.3696076](https://doi.org/10.1145/3689031.3696076), [arXiv:2409.14252](https://arxiv.org/abs/2409.14252)
+
+It contains everything needed to produce the Eg-walker paper, including reproducing all contained results.
 
 A rough breakdown of the files and folders:
 
