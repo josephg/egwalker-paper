@@ -215,7 +215,7 @@ Whenever a user performs an operation, a new event containing that operation is 
 The new event is then broadcast over the network, and each replica adds it to its copy of the graph.
 If any parents are missing (i.e., a parent ID in the event does not resolve to a known event), the replica waits for them to arrive before adding them to the graph; the result is a simple causal broadcast protocol \cite{Birman1991,Cachin2011}.
 Two replicas can merge their event graphs by taking the union of their sets of events.
-Events in the graph are immutable; they always represents the operation as originally generated, and not as a result of any transformation.
+Events in the graph are immutable; they always represent the operation as originally generated, and not as a result of any transformation.
 The graph grows monotonically (we never remove events), and a new event is always a child of existing events (we never add a parent to an existing event).
 
 \begin{figure}
